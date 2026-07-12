@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String    @id @default(cuid()) @db.VarChar(30)
+  email        String    @unique
+  hashPassword String
+  projects     Project[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+}
+
+model Project {
+  id                  String                @id @default(cuid()) @db.VarChar(30)
+  title               String
+  initialPrompt       String
+  userId              String
+  user                User                  @relation(fields: [userId], references: [id])
+  conversationHistory ConversationHistory[]
+  secret              Secret[]
+  status              ProjectStatus         @default(PROVISIONING)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @default(now()) @updatedAt
+}
+
+model ConversationHistory {
+  id        String           @id @default(cuid()) @db.VarChar(30)
+  projectId String
+  project   Project          @relation(fields: [projectId], references: [id])
+  type      ConversationType
+  from      MessageFrom
+  contents  String
+  hidden    Boolean          @default(false)
+  toolCall  ToolCall?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @default(now()) @updatedAt
+}
+
+model Secret {
+  id             Int      @id @default(autoincrement())
+  key            String
+  encryptedValue String
+  projectId      String
+  project        Project  @relation(fields: [projectId], references: [id])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([projectId, key])
+}
+
+enum ProjectStatus {
+  PROVISIONING
+  BUILDING
+  READY
+  ERROR
+}
+
+enum ConversationType {
+  TOOL_CALL
+  TEXT_MESSAGE
+}
+
+enum MessageFrom {
+  USER
+  ASSISTANT
+}
+
+enum ToolCall {
+  READ_FILE
+  WRITE_FILE
+  DELETE_FILE
+  UPDATE_FILE
+}
