@@ -27,7 +27,7 @@ Next number in sequence. Match the format of the existing session notes:
 **"What I Implemented Myself" is the honest one.** If I wrote the code, say so. If you wrote it
 because I said "just give it", say that too. That distinction is the whole point of the log.
 
-## 2. Update `docs/PROJECT_ROADMAP.md`
+## 2. Update `docs/README.md`
 
 - Move finished items into **Completed ✅**
 - Set the new **Current task 🚧**
@@ -44,7 +44,7 @@ number. If a decision was superseded, mark the old one and leave it — the hist
 minds is worth more than a tidy list. If something moved from open to decided, remove it from the
 **Open** table.
 
-## 4. Update `docs/LEARNING_LOG.md`
+## 4. Update `docs/LEARNING.md`
 
 - Move a concept to **Mastered** only if I can explain it *and* shipped code using it. Date it.
 - Add anything new to **Currently Learning**
@@ -77,7 +77,7 @@ tell me which of those answers I could actually defend in an interview and which
 ## Finally
 
 Verify the docs still match the disk — paths, file names, anything you referenced. This repo has
-drifted into describing deleted code before; the audit in `PROJECT_ROADMAP.md` is the scar.
+drifted into describing deleted code before; the audit in `README.md` is the scar.
 
 Then tell me which files changed. Don't commit unless I ask.
 

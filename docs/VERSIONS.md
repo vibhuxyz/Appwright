@@ -117,7 +117,7 @@ specifically: **all session state stays in the DB, and every event carries a seq
 
 ## How this relates to the existing `ROADMAP.md`
 
-The root [`ROADMAP.md`](../ROADMAP.md) holds the older M1–M5 / P2–P11 board plus a detailed
+The root `docs/versions/V4_APP_BUILDER.md` holds the older M1–M5 / P2–P11 board plus a detailed
 frontend-registry design. Mapping:
 
 | Old | New |

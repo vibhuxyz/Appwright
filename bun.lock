@@ -10,6 +10,23 @@
         "typescript": "5.9.2",
       },
     },
+    "libs/ts/agent-core": {
+      "name": "@repo/agent-core",
+      "version": "0.0.0",
+      "bin": {
+        "devian": "./src/cli.ts",
+      },
+      "dependencies": {
+        "@repo/contracts": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
     "libs/ts/config": {
       "name": "@repo/config",
       "devDependencies": {
@@ -67,6 +84,21 @@
         "typescript-eslint": "^8.50.0",
       },
     },
+    "libs/ts/tools": {
+      "name": "@repo/tools",
+      "version": "0.0.0",
+      "dependencies": {
+        "@repo/agent-core": "workspace:*",
+        "@repo/contracts": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
     "libs/ts/typescript-config": {
       "name": "@repo/typescript-config",
       "version": "0.0.0",
@@ -91,8 +123,10 @@
     "services/api": {
       "name": "api",
       "dependencies": {
+        "@repo/agent-core": "workspace:*",
         "@repo/contracts": "workspace:*",
         "@repo/db": "workspace:*",
+        "@repo/tools": "workspace:*",
         "argon2": "^0.44.0",
         "cors": "^2.8.6",
         "express": "^5.2.1",
@@ -330,6 +364,8 @@
 
     "@radix-ui/react-use-layout-effect": ["@radix-ui/react-use-layout-effect@1.1.1", "", { "peerDependencies": { "@types/react": "*", "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc" }, "optionalPeers": ["@types/react"] }, "sha512-RbJRS4UWQFkzHTTwVymMTUv8EqYhOp8dOOviLj2ugtTiXRaRQS7GLGxZTLL1jWhMeoSCf5zmcZkqTl9IiYfXcQ=="],
 
+    "@repo/agent-core": ["@repo/agent-core@workspace:libs/ts/agent-core"],
+
     "@repo/config": ["@repo/config@workspace:libs/ts/config"],
 
     "@repo/contracts": ["@repo/contracts@workspace:libs/ts/contracts"],
@@ -337,6 +373,8 @@
     "@repo/db": ["@repo/db@workspace:libs/ts/db"],
 
     "@repo/eslint-config": ["@repo/eslint-config@workspace:libs/ts/eslint-config"],
+
+    "@repo/tools": ["@repo/tools@workspace:libs/ts/tools"],
 
     "@repo/typescript-config": ["@repo/typescript-config@workspace:libs/ts/typescript-config"],
 

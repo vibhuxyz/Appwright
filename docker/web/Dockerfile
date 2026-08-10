@@ -12,6 +12,8 @@ COPY package.json bun.lock* ./
 COPY services/api/package.json                 services/api/
 COPY services/web/package.json                 services/web/
 COPY services/orchestrator/package.json        services/orchestrator/
+COPY libs/ts/agent-core/package.json           libs/ts/agent-core/
+COPY libs/ts/tools/package.json                libs/ts/tools/
 COPY libs/ts/config/package.json               libs/ts/config/
 COPY libs/ts/contracts/package.json            libs/ts/contracts/
 COPY libs/ts/db/package.json                   libs/ts/db/

@@ -1,96 +1,80 @@
-# Devian — Documentation
+# Devian — docs
 
-**What we're building:** an AI app builder in the shape of **Emergent / Lovable**. A user types
-*"build me a food delivery app"*; a planner turns that into requirements, a frozen architecture,
-and an ordered task list; a coding agent executes those tasks inside an isolated cloud sandbox;
-the user watches a live preview, reviews, iterates, and deploys.
+An AI app builder in the shape of Emergent/Lovable. One sentence in → a planner produces a frozen
+architecture and a task list → a coding agent executes the tasks in an isolated sandbox → live
+preview, review, iterate, deploy.
 
----
-
-## Working with Claude on this
-
-Type **`/start`** at the beginning of a session. It makes Claude read the docs below, show the
-current task tracker, check the docs against the actual code, and pick up where you left off.
-Type **`/wrap`** at the end — it writes the session note and updates the roadmap, decisions, and
-learning log, so the next session has memory.
-
-[`../CLAUDE.md`](../CLAUDE.md) loads automatically and holds the teaching contract (guided
-learning, simple English, analogy first, don't write the code for me).
+**Type `/start` to begin a session. Type `/wrap` to end one.** The docs are the memory.
 
 ---
 
-## Start here
+## Status
 
-| If you want to… | Read |
-|---|---|
-| Understand the whole system | [ARCHITECTURE.md](./ARCHITECTURE.md) |
-| Know what to build next | [PROJECT_ROADMAP.md](./PROJECT_ROADMAP.md) → [VERSIONS.md](./VERSIONS.md) |
-| Start coding right now | [versions/V0_AGENT_LOOP.md](./versions/V0_AGENT_LOOP.md) |
-| **Write good code while coding** | **[CODE_QUALITY.md](./CODE_QUALITY.md)** — keep it open |
-| Know why something is the way it is | [DECISIONS.md](./DECISIONS.md) |
-| Know what to learn next | [LEARNING_PATH.md](./LEARNING_PATH.md) |
-| Prepare to be interviewed on this | [INTERVIEW_PREP.md](./INTERVIEW_PREP.md) |
+**Now:** V0 — Slice 1. The agent loop.
+**Next:** V1 — web app + persistence.
+
+- [x] Architecture extracted from the *Coding Agents + Cloud* deck
+- [x] V0–V5 ladder defined, each with one acceptance test
+- [x] **TypeScript end to end** ([D4](./DECISIONS.md)) — the agent is a library, not a service
+- [x] Repo restructured: `services/` + `libs/` + `docker/`, no task runner
+- [x] Slice 0 — workspace scaffolded, `bun install` clean, API imports `@repo/agent-core`
+- [ ] **Slice 1 — `Message`, `AgentEvent` (with `seq`), `AgentEventSink` in `libs/ts/agent-core/src/types.ts`**
+- [ ] Slice 2–7 — provider, tools, loop, prompt, CLI, proof
+
+**Exit criterion for V0:** `bun run agent "read package.json, then add a clean script to it"`
+produces **two chained tool calls in one turn, with no human input between them.**
+
+Detail: [versions/V0_AGENT_LOOP.md](./versions/V0_AGENT_LOOP.md)
 
 ---
 
-## The plan in ten lines
+## The plan
 
 ```
- V0  AGENT LOOP            while-not-if · tools · streaming · providers
- V1  WEB APP + MEMORY      Projects/Sessions/Messages · SSE · 3-pane UI · preview
- V2  ISOLATION & CONTROL   git worktrees · approvals · diffs · verification
- V3  CLOUD SANDBOX         queue · orchestrator · sandbox mgr · auth · multi-tenant   ◄ the wall
- V4  APP BUILDER           planner · blueprint · task DAG · generation               ◄ Emergent parity
- V5  AUTONOMY & DEPLOY     self-heal · memory · observability · one-click deploy
+V0  AGENT LOOP           while-not-if · tools · streaming · providers
+V1  WEB APP + MEMORY     Projects/Sessions/Messages · SSE · 3-pane UI · preview
+V2  ISOLATION & CONTROL  git worktrees · approvals · diffs · verification
+V3  CLOUD SANDBOX        queue · orchestrator · sandbox · auth · multi-tenant   ◄ the wall
+V4  APP BUILDER          planner · blueprint · task DAG · generation            ◄ Emergent parity
+V5  AUTONOMY & DEPLOY    self-heal · memory · observability · one-click deploy
 
- Track B (parked)          bridge · device auth · handoff — "run it on my own machine"
+Track B (parked)         bridge · device auth · handoff — "run it on my own machine"
 ```
 
-Every version has **one acceptance test**. No partial credit.
+Every version has **one** acceptance test. No partial credit. Never skip a rung.
 
 ---
 
-## Every file
+## The files
 
-| File | What it holds |
+| | |
 |---|---|
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | The full system. Diagrams for every layer, the data model, the end-to-end sequence, and where we deliberately deviate from the source deck |
-| [VERSIONS.md](./VERSIONS.md) | The V0–V5 ladder: ship criteria, estimates, sequencing rules, and how this maps onto the older `ROADMAP.md` |
-| [versions/V0_AGENT_LOOP.md](./versions/V0_AGENT_LOOP.md) | Rebuild the loop. Tools, providers, streaming, the CLI harness |
-| [versions/V1_WEB_APP.md](./versions/V1_WEB_APP.md) | Postgres schema, REST + SSE, the 3-pane UI, live preview |
-| [versions/V2_ISOLATION_AND_CONTROL.md](./versions/V2_ISOLATION_AND_CONTROL.md) | Worktrees, approvals, diff/merge, verification |
-| [versions/V3_CLOUD_SANDBOX.md](./versions/V3_CLOUD_SANDBOX.md) | Sandbox port, queue, orchestrator, worker, auth, multi-tenancy |
-| [versions/V4_APP_BUILDER.md](./versions/V4_APP_BUILDER.md) | Intent → blueprint → task DAG → generation → verification |
-| [versions/V5_AUTONOMY_AND_DEPLOY.md](./versions/V5_AUTONOMY_AND_DEPLOY.md) | Observability, error classification, self-healing, deployment, memory |
-| [CODE_QUALITY.md](./CODE_QUALITY.md) | 14 patterns pulled out of `ref-ai/packages`, each with its Python form — plus which ref-ai package to read at which version, and a pre-commit checklist |
-| [DECISIONS.md](./DECISIONS.md) | Twelve decisions with trade-offs, plus seven still open |
-| [LEARNING_PATH.md](./LEARNING_PATH.md) | Per-version concepts, "you know it when…" tests, and the traps at each level |
-| [LEARNING_LOG.md](./LEARNING_LOG.md) | What has actually been mastered, and habits being built |
-| [INTERVIEW_PREP.md](./INTERVIEW_PREP.md) | Per-version interview questions from this architecture, with what a strong answer sounds like |
-| [PROJECT_ROADMAP.md](./PROJECT_ROADMAP.md) | Status board: current phase, current task, next up |
-| [SESSION_01](./SESSION_01.md) · [02](./SESSION_02.md) · [03](./SESSION_03.md) | Session notes |
+| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | The system. Diagrams, data model, every layer, where we deviate from the deck |
+| **[VERSIONS.md](./VERSIONS.md)** | The ladder: ship criteria, estimates, sequencing rules |
+| **[versions/](./versions/)** | The actual TODO list per version, with traps and definition of done |
+| **[DECISIONS.md](./DECISIONS.md)** | 13 decisions with trade-offs, plus what's still open |
+| **[CODE_QUALITY.md](./CODE_QUALITY.md)** | How we write code here — patterns from `ref-ai/packages`. Keep it open while coding |
+| **[LEARNING.md](./LEARNING.md)** | What to learn at each version, and what's actually been mastered |
+| **[INTERVIEW_PREP.md](./INTERVIEW_PREP.md)** | Questions built from this architecture |
+| **[sessions/](./sessions/)** | Session notes |
 
 ---
 
-## Conventions
+## Rules
 
-- **Every version ends in a demo, not a refactor.** If work doesn't change what you can show
-  someone, it belongs inside another version.
-- **Write the acceptance test first.** It is the definition of done.
+- **Write the acceptance test first.** It's the definition of done.
+- **Every version ends in a demo, not a refactor.**
 - **Never optimise before feeling the limitation.** No queue until one process is visibly the
-  bottleneck. No warm pool until cold starts visibly hurt.
+  bottleneck. No multi-stage Docker build until push times annoy you.
 - **Record trade-offs, not just choices.** A decision without a recorded cost is a preference.
-  New decisions go in [DECISIONS.md](./DECISIONS.md); superseded ones stay, marked.
-- **Keep docs matching the disk.** Re-audit at the end of every version — the previous roadmap
-  drifted into describing code that had been deleted.
+- **If a doc disagrees with the code, the code wins** — then fix the doc that session. This repo has
+  drifted twice.
 
 ---
 
 ## Source material
 
-- **`Coding agents + cloud`** (100xdevs) — the deck this architecture is extracted from: the tool
-  loop, the schema, the routes, worktrees, approvals, the bridge, handoff.
-- **`ref-ai/packages/`** — a complete TypeScript agent loop in this repo. The V0 reference. Port it,
-  don't reinvent it.
-- **[`../ROADMAP.md`](../ROADMAP.md)** — deep design reference for the frontend-builder / registry
-  thinking. **Not** the schedule of record; [VERSIONS.md](./VERSIONS.md) is.
+- **`Coding agents + cloud`** (100xdevs) — the deck: the tool loop, the schema, the routes,
+  worktrees, approvals, the bridge, handoff.
+- **`ref-ai/packages/`** — 10 MIT-licensed TypeScript packages, 142k lines, 438 test files. Read
+  it; some of it you can install. Map in [CODE_QUALITY.md](./CODE_QUALITY.md). **Never delete it.**

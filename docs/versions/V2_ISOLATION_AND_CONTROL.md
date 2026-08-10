@@ -140,7 +140,7 @@ different device than the one that asked. An in-memory promise breaks both.
       show it in the project list. *(Decide: does a 24h-old approval expire? — open question.)*
 
 ### Slice 4 — Verification
-- [ ] `libs/py/verify`: run a command in the workspace, capture structured output.
+- [ ] `libs/ts/verify`: run a command in the workspace, capture structured output.
 - [ ] Checks: `tsc --noEmit` → `bun run build` → `lint`. Each returns `{ ok, errors[] }` with
       file/line/message parsed out — not a raw log dump.
 - [ ] Run after each agent turn; emit `verification_start` / `verification_result` events.
@@ -167,10 +167,10 @@ different device than the one that asked. An in-memory promise breaks both.
 ## Files this version touches
 
 ```
-NEW  libs/py/tools/src/*                  worktree add/remove/diff/merge wrappers
-NEW  libs/py/verify/src/*               tsc · build · lint runners + output parsers
+NEW  libs/ts/tools/src/*                  worktree add/remove/diff/merge wrappers
+NEW  libs/ts/verify/src/*               tsc · build · lint runners + output parsers
 EDIT libs/ts/db/prisma/schema.prisma    Approval; Session.branch, worktreePath, mode, devPort
-EDIT libs/py/agent_core/src/loop.ts          approval suspension hook (the ONLY loop change in V2)
+EDIT libs/ts/agent-core/src/loop.ts          approval suspension hook (the ONLY loop change in V2)
 NEW  services/api/src/routes/approval.ts
 NEW  services/api/src/routes/git.ts       diff · merge · revert
 EDIT services/web/src/*                      diff pane · approval cards · verification bar · session switcher
@@ -197,7 +197,7 @@ EDIT libs/ts/contracts/src/*            Approval + verification schemas
 
 Git internals (worktrees, refs, the object store, three-way merge) · suspendable/resumable
 workflows · capability-based permission models · structured compiler output parsing.
-See [LEARNING_PATH.md → V2](../LEARNING_PATH.md#v2--isolation-trust-and-git).
+See [LEARNING.md → V2](../LEARNING.md#v2--isolation-trust-and-git).
 
 ---
 

@@ -44,7 +44,7 @@ conversation history per project.*
           │  runAgentLoop({ emit: sseEmit })
           ▼
 ┌────────────────────┐
-│  libs/py/agent_core    │───────► LLM
+│  libs/ts/agent-core    │───────► LLM
 └─────────┬──────────┘
           ▼
    working copy on disk   ──► Vite dev server :5173+  ──► preview iframe
@@ -186,7 +186,7 @@ EDIT libs/ts/contracts/src/*               request/response schemas shared with 
 ## Concepts to learn here
 
 SSE vs WebSockets · event-sourced history · optimistic UI · Prisma migrations · long-lived HTTP
-connections · backpressure. See [LEARNING_PATH.md → V1](../LEARNING_PATH.md#v1--persistence--streaming).
+connections · backpressure. See [LEARNING.md → V1](../LEARNING.md#v1--persistence--streaming).
 
 ---
 
@@ -195,5 +195,5 @@ connections · backpressure. See [LEARNING_PATH.md → V1](../LEARNING_PATH.md#v
 - [ ] Acceptance test passes including the mid-run hard refresh.
 - [ ] Every message type is persisted and replayable.
 - [ ] The agent loop from V0 is **unchanged** — only its `emit` callback differs. If you had to
-      modify `libs/py/agent_core` to make V1 work, the V0 boundary was drawn wrong; fix it now.
+      modify `libs/ts/agent-core` to make V1 work, the V0 boundary was drawn wrong; fix it now.
 - [ ] Cost and token counts visible in the UI.

@@ -137,10 +137,10 @@ Self-healing on top of an unreliable planner just automates the wrong thing fast
 ## Files this version touches
 
 ```
-NEW  libs/py/observability/src/*     log capture, runtime error bridge, timeline
-NEW  libs/py/healer/src/*            classifier + fix strategies + budget/loop detection
-NEW  libs/py/deploy/src/*            provider adapters, migrations, env injection, smoke tests
-NEW  libs/py/memory/src/*            store + hybrid retrieval
+NEW  libs/ts/observability/src/*     log capture, runtime error bridge, timeline
+NEW  libs/ts/healer/src/*            classifier + fix strategies + budget/loop detection
+NEW  libs/ts/deploy/src/*            provider adapters, migrations, env injection, smoke tests
+NEW  libs/ts/memory/src/*            store + hybrid retrieval
 EDIT services/orchestrator/src/*          heal loop wired into the DAG executor
 EDIT services/web/src/*                   log panel, timeline, deploy button, findings report
 EDIT libs/ts/db/prisma/schema.prisma HealAttempt, Deployment, Memory
@@ -165,7 +165,7 @@ EDIT libs/ts/db/prisma/schema.prisma HealAttempt, Deployment, Memory
 
 Error taxonomy & structured diagnostics · bounded retry / circuit breakers · deployment pipelines
 & migrations · secret management · retrieval-augmented generation · evaluation (how do you *know*
-the healer works?). See [LEARNING_PATH.md → V5](../LEARNING_PATH.md#v5--autonomy-and-operations).
+the healer works?). See [LEARNING.md → V5](../LEARNING.md#v5--autonomy-and-operations).
 
 ---
 

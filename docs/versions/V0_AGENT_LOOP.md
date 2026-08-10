@@ -38,7 +38,7 @@ The patterns in them — and their Python translations — are written up in
 ## Acceptance test
 
 ```
-$ make agent ARGS="read package.json, then add a `clean` script to it"
+$ bun run agent "read package.json, then add a `clean` script to it"
 
   ● read_file(package.json)          ✓ 412 bytes
   ● edit_file(package.json)          ✓ +1 −0
@@ -50,7 +50,7 @@ re-prompt after the first tool call, the loop is an `if`, not a `while`, and V0 
 
 Second test — the loop must terminate:
 ```
-$ make agent ARGS="what files are in src/?"
+$ bun run agent "what files are in src/?"
   ● list_files(src)                  ✓ 7 entries
   ✓ src/ contains: index.ts, ...
 ```
@@ -61,12 +61,12 @@ One tool call, then a plain answer, then **exit**. No extra LLM round-trip.
 ## Architecture
 
 ```
-   CLI (make agent ARGS='"..."')          ← V0
+   CLI (bun run agent "..."')          ← V0
    FastAPI POST /run                      ← V1, same loop, different sink
         │
         ▼
    ┌───────────────────────────────────────────────┐
-   │  agent_core.run_agent_loop()      libs/py     │
+   │  agent_core.run_agent_loop()      libs/ts     │
    │                                               │
    │   messages[] ──► provider.stream() ──► LLM    │
    │       ▲                  │                    │
@@ -102,86 +102,90 @@ changes. This single decision is what makes V1 cheap.
 ## TODO
 
 ### Slice 0 — Housekeeping ✅ done 2026-08-10
-- [x] Language: **Python** ([D4](../DECISIONS.md#decision-4-python-for-the-agent-engine--active-confirms-d1)).
-- [x] Repo restructured to `services/` + `libs/` ([D12](../DECISIONS.md#decision-12-repo-layout--services--libs--active)).
-- [x] `libs/py/agent_core`, `libs/py/tools`, `services/agent` scaffolded with `pyproject.toml`.
-- [x] `uv` workspace at the root; Makefile + Docker Compose replace Turborepo ([D11](../DECISIONS.md#decision-11-docker-compose--makefile-instead-of-turborepo--active-supersedes-d3)).
-- [ ] `make install` runs clean, `make types` (mypy + tsc) passes on the empty scaffold.
+- [x] Language: **TypeScript** ([D4](../DECISIONS.md#decision-4-typescript-end-to-end--active-supersedes-d1)).
+- [x] Repo restructured to `services/` + `libs/` + `docker/` ([D12](../DECISIONS.md#decision-12-repo-layout--services--libs--active)).
+- [x] `libs/ts/agent-core` + `libs/ts/tools` scaffolded; `services/api` imports both directly.
+- [x] No task runner — `package.json` scripts + Docker Compose ([D11](../DECISIONS.md#decision-11-no-task-runner--active-supersedes-d3)).
+- [x] `bun install` clean; `bun run agent "…"` and `GET /hello` both work.
 
 ### Slice 1 — Message + event types
-File: `libs/py/agent_core/src/agent_core/types.py`
+File: `libs/ts/agent-core/src/types.ts`
 
-- [ ] `Message` — provider-agnostic, one shape for user/assistant/tool. Pydantic model.
-      Fields: `role`, `type` (`text` | `tool_call` | `tool_response`), `content`, `tool_call_id`, `data`.
-- [ ] `AgentEvent` — a discriminated union on `type`: `agent_start`, `text_delta`,
+- [ ] `Message` — provider-agnostic, one shape for user/assistant/tool.
+      Fields: `role`, `type` (`text` | `toolCall` | `toolResponse`), `content`, `toolCallId`, `data`.
+- [ ] `AgentEvent` — a **`z.discriminatedUnion("type", […])`**: `agent_start`, `text_delta`,
       `tool_call_start`, `tool_call_end`, `tool_error`, `agent_end`, `error`.
-      Every event carries `seq` (monotonic) and `session_id`.
-- [ ] `AgentEventSink` — a `Protocol` (or `Callable[[AgentEvent], Awaitable[None]]`), not a class.
-- [ ] **These Pydantic models are the source of truth for both languages**
-      ([D10](../DECISIONS.md#decision-10-pydantic-is-the-source-of-truth-for-cross-language-types--active)).
-      Wire up `make contracts` and check that the generated
-      `libs/ts/contracts/src/generated/agent-events.ts` looks sane. Do this in Slice 1, not later —
-      it is much harder to retrofit once the API is consuming hand-written types.
+      Every event carries `seq` (monotonic) and `sessionId`.
+- [ ] `AgentEventSink = (e: AgentEvent) => void | Promise<void>` — a type alias, not a class.
+- [ ] **Define these once, in Zod, and let everyone import them**
+      ([D10](../DECISIONS.md#decision-10-one-type-definition-shared-by-import--active-replaces-the-codegen-plan)).
+      One definition validates at runtime, infers the static type, and — via `z.toJSONSchema()` —
+      produces the schema the model is given.
 
 **Why `seq` now:** stream resume in V1 and handoff in Track B both need "give me everything after
 event N". Adding it later means migrating persisted history.
 
-**Python note:** use `Literal` discriminators + `Field(discriminator="type")` so Pydantic parses
-the union correctly and the exported JSON Schema is a clean `oneOf`. A loose `dict` here produces
-useless TypeScript on the other side.
+**Why Zod and not a plain `type`:** the agent's inputs come from an LLM and cannot be trusted. A
+bare TypeScript type is erased at runtime and validates nothing.
 
 ### Slice 2 — Provider abstraction
-Directory: `libs/py/agent_core/src/agent_core/providers/`
+Directory: `libs/ts/agent-core/src/providers/`
 
-- [ ] `class Provider(Protocol)` with
-      `def stream(messages, tools, **opts) -> AsyncIterator[ProviderChunk]`.
-      Use `Protocol`, not `ABC` — structural typing means an adapter needs no import of the base.
+- [ ] `interface Provider { stream(messages, tools, opts): AsyncIterable<ProviderChunk> }`.
 - [ ] Implement **one** provider properly first (Anthropic or OpenAI — pick one, ship it).
-- [ ] Normalise its tool-call format into the internal `Message` type. This adapter is the whole
+- [ ] Normalise its tool-call format into the internal `Message` type. That adapter is the entire
       point of the interface.
-- [ ] Second provider only *after* the loop works end to end with the first.
-- [ ] API keys via `pydantic-settings` in `services/agent/devian_agent/config.py`; never hardcode.
-      `.env` is already gitignored.
+- [ ] **`FakeProvider` first, before the real one.** Scripted responses, so you can test truncation,
+      tool errors, and the exit condition — none of which you can trigger reliably against a real
+      model. See [CODE_QUALITY.md §13](../CODE_QUALITY.md).
+- [ ] Second real provider only *after* the loop works end to end with the first.
+- [ ] API keys from `process.env` via a typed config module; never hardcoded. `.env` is gitignored.
+
+> **Consider installing instead of writing.** `@earendil-works/pi-ai` (`ref-ai/packages/ai`, MIT)
+> has 31 provider adapters, auth resolution, and token + cost tracking. Porting the *loop* teaches
+> you something; writing your third provider adapter does not.
 
 ### Slice 3 — Tools
-Directory: `libs/py/tools/src/devian_tools/`
+Directory: `libs/ts/tools/src/`
 
-- [ ] `Tool` = name + description + a **Pydantic args model** + an `execute(args, ctx)` coroutine.
-- [ ] Generate the LLM-facing JSON schema with `Model.model_json_schema()` — one source of truth,
+- [ ] `Tool` = `{ name, description, args: ZodSchema, executionMode, execute(args, ctx) }`.
+- [ ] Generate the LLM-facing JSON schema with `z.toJSONSchema(tool.args)` — one source of truth,
       and it validates the model's arguments on the way back in for free.
 - [ ] Implement the core set:
   - [ ] `list_files(path)`
   - [ ] `read_file(path)` — with line numbers; truncate huge files
   - [ ] `write_file(path, content)`
-  - [ ] `edit_file(path, old_string, new_string)` — exact-match replace, error if not unique
+  - [ ] `edit_file(path, oldString, newString)` — exact-match replace, error if not unique
   - [ ] `grep(pattern, path)`
-  - [ ] `bash(command)` — timeout, captured stdout/stderr, exit code. Use
-        `asyncio.create_subprocess_exec`, never `shell=True` with model-supplied input.
-- [ ] **Path fence** (`fence.py`): every filesystem tool resolves through `safe_resolve()` and
-      rejects anything outside its workspace. The TypeScript side already implements this correctly
-      — `libs/ts/contracts/src/utils/projectFiles.ts` (`workspaceRoot(projectId)` +
-      `safeResolve(projectId, relPath)`). **Port its logic; keep identical semantics.** The API
-      reads the tree through the TS one, the agent writes through the Python one — if they disagree
-      about what a workspace is, files land where the UI can't see them.
-- [ ] Write the fence test **first**: `read_file("../../.env")` must raise, not return your keys.
+  - [ ] `bash(command)` — timeout, captured stdout/stderr, exit code. Pass an **argv array**,
+        never `shell: true` with model-supplied input.
+- [ ] **Path fence** (`fence.ts`): every filesystem tool resolves through `safeResolve()` and
+      rejects anything outside its workspace. **`@repo/contracts/src/utils/projectFiles.ts` already
+      implements this correctly** — `workspaceRoot(projectId)` + `safeResolve(projectId, relPath)`.
+      **Import it. Do not write a second one.** The API reads the file tree through it; if two
+      implementations disagree about what a workspace is, files land where the UI can't see them.
+- [ ] Write the fence test **first**: `read_file("../../.env")` must throw, not return your keys.
+- [ ] `executionMode: "sequential"` on `write_file`, `edit_file`, and `bash`. Reads stay parallel.
 - [ ] Truncate every tool result before it enters message history (a 4 MB file blows the context
       window and your budget).
 
 ### Slice 4 — The loop
-File: `libs/py/agent_core/src/agent_core/loop.py`
+File: `libs/ts/agent-core/src/loop.ts`
 
-- [ ] `async def run_agent_loop(messages, tools, provider, emit, max_iterations=25) -> list[Message]`.
-- [ ] `while True:` call provider → append assistant message → if no tool calls, **break**.
-- [ ] Execute tool calls; append a `tool_response` for **every** call (a missing response corrupts
-      the next request — most providers hard-error on it).
-- [ ] Tool errors are **not** exceptions: catch, and feed the error text back as the tool result so
-      the model can recover.
+- [ ] `runAgentLoop({ messages, tools, provider, emit, maxIterations = 25, signal })`.
+- [ ] `while (true)`: call provider → push assistant message → if no tool calls, **break**.
+- [ ] Execute tool calls; push a `toolResponse` for **every** call (a missing one corrupts the next
+      request — most providers hard-error).
+- [ ] Tool errors are **not** exceptions: catch them and feed the error text back as the tool result
+      so the model can recover.
 - [ ] Iteration budget → stop with a clear "budget exhausted" event.
-- [ ] Handle truncation: if the provider reports a length stop, do not try to parse partial tool JSON.
-- [ ] Parallel execution **only** for read-only tools (`asyncio.gather`); writes stay strictly
-      sequential.
-- [ ] The loop is `async` all the way down and does no I/O of its own beyond `emit` and
-      `tool.execute`. No `print`, no HTTP, no file writes.
+- [ ] Truncation: if the provider reports a length stop, **fail every tool call in that message** —
+      the arguments may be silently incomplete even when the JSON parses.
+- [ ] Parallel only when every tool in the batch allows it (`Promise.all`, order-preserving);
+      otherwise sequential.
+- [ ] Thread `AbortSignal` through and check it between tool calls.
+- [ ] The loop does no I/O of its own beyond `emit` and `tool.execute`. No `console.log`, no `fetch`,
+      no `node:fs`.
 
 ### Slice 5 — System prompt
 - [ ] Write the system prompt in a `.md` file, not a string literal, and load it.
@@ -190,13 +194,13 @@ File: `libs/py/agent_core/src/agent_core/loop.py`
 - [ ] Keep it short. Long system prompts cost tokens on every single iteration of the loop.
 
 ### Slice 6 — CLI harness
-File: `services/agent/devian_agent/cli.py`
+File: `libs/ts/agent-core/src/cli.ts`
 
-- [ ] `make agent ARGS='"<prompt>"'` — the thinnest possible driver, wiring `emit` to stdout.
+- [ ] `bun run agent "<prompt>"` — the thinnest possible driver, wiring `emit` to stdout.
 - [ ] Render events: tool calls as `● name(args)`, results as `✓/✗`, text deltas streamed inline.
 - [ ] `--project <path>` flag so it can run against `templates/vite-react`.
-- [ ] **No FastAPI in this slice.** The CLI proves the loop works before any HTTP exists. If the
-      loop only runs behind a web server, you cannot tell which layer is broken.
+- [ ] **No HTTP in this slice.** The CLI proves the loop works before any server exists. If the loop
+      only runs behind a web server, you cannot tell which layer is broken.
 
 ### Slice 7 — Prove it
 - [ ] Run the acceptance test above against the project template.
@@ -204,27 +208,27 @@ File: `services/agent/devian_agent/cli.py`
 - [ ] Adversarial run: ask for something requiring 5+ tool calls (*"find every component that
       imports React and list them"*). Confirm it completes, and check the iteration count.
 - [ ] Deliberately break a tool (bad path) and confirm the agent recovers instead of crashing.
-- [ ] `pytest` covers: the fence (escape raises), the loop's exit condition, and truncation.
+- [ ] `bun test` covers: the fence (escape throws), the loop's exit condition, truncation, and a
+      length-stop producing failed tool calls.
 
 ---
 
 ## Files this version touches
 
 ```
-NEW  libs/py/agent_core/src/agent_core/types.py         Message · AgentEvent · Tool  (source of truth)
-NEW  libs/py/agent_core/src/agent_core/loop.py          run_agent_loop
-NEW  libs/py/agent_core/src/agent_core/engine/sink.py   AgentEventSink protocol
-NEW  libs/py/agent_core/src/agent_core/providers/*.py   Anthropic / OpenAI adapters
-NEW  libs/py/tools/src/devian_tools/fs.py               read · write · edit · list
-NEW  libs/py/tools/src/devian_tools/shell.py            bash
-NEW  libs/py/tools/src/devian_tools/fence.py            safe_resolve  ← port from the TS version
-NEW  libs/py/tools/src/devian_tools/export_schema.py    feeds `make contracts`
-NEW  services/agent/devian_agent/cli.py                 V0 driver
-NEW  services/agent/devian_agent/config.py              pydantic-settings
-NEW  services/agent/prompts/system.md                   system prompt
-GEN  libs/ts/contracts/src/generated/agent-events.ts    from `make contracts` — never hand-edit
-READ ref-ai/packages/agent/src/agent-loop.ts                 the reference (TypeScript — port the
-                                                        structure, not the syntax)
+NEW  libs/ts/agent-core/src/types.ts        Message · AgentEvent · Tool   (Zod — the definition)
+NEW  libs/ts/agent-core/src/loop.ts         runAgentLoop
+NEW  libs/ts/agent-core/src/engine/sink.ts  AgentEventSink
+NEW  libs/ts/agent-core/src/engine/truncate.ts
+NEW  libs/ts/agent-core/src/providers/*.ts  fake · anthropic | openai
+EDIT libs/ts/agent-core/src/cli.ts          replace the placeholder with the real driver
+NEW  libs/ts/agent-core/prompts/system.md   system prompt
+NEW  libs/ts/tools/src/fs.ts                read · write · edit · list
+NEW  libs/ts/tools/src/shell.ts             bash
+NEW  libs/ts/tools/src/search.ts            grep
+NEW  libs/ts/tools/src/fence.ts             re-export safeResolve from @repo/contracts
+NEW  libs/ts/agent-core/test/*.test.ts      loop · fence · truncation
+READ ref-ai/packages/agent/src/agent-loop.ts    the reference — same language, so port directly
 ```
 
 ---
@@ -234,33 +238,33 @@ READ ref-ai/packages/agent/src/agent-loop.ts                 the reference (Type
 | Trap | Symptom | Fix |
 |---|---|---|
 | `if` instead of `while` | Agent does one tool call then stops mid-task | The loop is the whole point |
-| Missing `tool_response` | Provider 400s on the next request | Always append one response per call |
-| No iteration cap | Agent reads the same file 40× and burns $12 | `max_iterations` + repeated-call detection |
+| Missing `toolResponse` | Provider 400s on the next request | Always push one response per call |
+| No iteration cap | Agent reads the same file 40× and burns $12 | `maxIterations` + repeated-call detection |
 | No-op `emit` | "Real-time streaming" becomes a rewrite later | Wire the sink from day one |
 | Untruncated tool results | Context overflow on the 3rd iteration | Truncate everything entering history |
-| Tool errors thrown | Whole run dies on a typo'd path | Errors are data, feed them back |
-| Path escape | `read_file("../../.env")` leaks your keys | `safe_resolve` on every fs tool |
-| **Sync code in the async loop** | One blocking `subprocess.run` freezes every concurrent session | `asyncio` subprocess + `httpx.AsyncClient` |
-| **`shell=True` on model input** | The fence is irrelevant; the model just runs anything | `create_subprocess_exec` with an arg list |
-| **Hand-writing the TS types** | Silent drift between agent and browser | `make contracts` (D10) |
+| Tool errors thrown | Whole run dies on a typo'd path | Errors are data — feed them back |
+| Path escape | `read_file("../../.env")` leaks your keys | `safeResolve` on every fs tool |
+| **`shell: true` on model input** | The fence is irrelevant; the model runs anything | Pass an argv array |
+| **Executing a truncated tool call** | Silent corruption — the args parsed but were incomplete | On a length stop, fail every call in the message |
+| **Parallel writes** | "The agent randomly corrupts files" | `executionMode: "sequential"` on writes and bash |
+| **A plain `type` for tool args** | Erased at runtime; validates nothing | Zod schema, validated at the boundary |
 
 ---
 
 ## Concepts to learn here
 
-Function calling · agentic loops · `asyncio` and async iterators · provider abstraction ·
-Pydantic → JSON Schema · context-window management. Details in
-[LEARNING_PATH.md → V0](../LEARNING_PATH.md#v0--the-loop).
+Function calling · agentic loops · async iterators and streaming · provider abstraction ·
+Zod → JSON Schema · context-window management. Details in
+[LEARNING.md → V0](../LEARNING.md#v0--the-loop).
 
 ---
 
 ## Definition of done
 
 - [ ] Both acceptance tests pass, repeatedly.
-- [ ] `run_agent_loop` is a pure function of `(messages, tools, provider, emit)` — no printing, no
-      HTTP, no file writes inside it.
+- [ ] `runAgentLoop` is a pure function of `(messages, tools, provider, emit)` — no printing, no
+      HTTP, no `node:fs` inside it.
 - [ ] Every event carries a `seq`.
 - [ ] Path fence verified by a test: the agent cannot read or write outside its workspace.
-- [ ] `make contracts` produces TypeScript that matches the Pydantic models, and it's committed.
-- [ ] `make types` (mypy + tsc) and `make test` are green.
-- [ ] A `SESSION_0N.md` note written up: what was built, what was learned.
+- [ ] `bun run check-types` and `bun test` are green.
+- [ ] A `docs/sessions/SESSION_0N.md` note written up: what was built, what was learned.

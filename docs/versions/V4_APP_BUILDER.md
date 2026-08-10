@@ -211,7 +211,7 @@ Persisted → a crash resumes at the first non-green node instead of restarting 
       obliterates.
 
 ### Slice 7 — Verification per task
-- [ ] Reuse `libs/py/verify` from V2, now run **after every task**.
+- [ ] Reuse `libs/ts/verify` from V2, now run **after every task**.
 - [ ] Add a runtime smoke check: boot the dev server, hit the routes the task created, assert 200.
 - [ ] A task is not green until it verifies green. A red task never unblocks its dependents.
 
@@ -238,12 +238,12 @@ Persisted → a crash resumes at the first non-green node instead of restarting 
 ## Files this version touches
 
 ```
-NEW  libs/py/planner/src/intent.ts        LLM classification
-NEW  libs/py/planner/src/requirements.ts  DET
-NEW  libs/py/planner/src/architecture.ts  DET, frozen decisions
-NEW  libs/py/planner/src/blueprint.ts     schema + builder
-NEW  libs/py/planner/src/taskGraph.ts     DAG build + topo sort
-NEW  libs/py/composer/src/*               deterministic workspace assembly
+NEW  libs/ts/planner/src/intent.ts        LLM classification
+NEW  libs/ts/planner/src/requirements.ts  DET
+NEW  libs/ts/planner/src/architecture.ts  DET, frozen decisions
+NEW  libs/ts/planner/src/blueprint.ts     schema + builder
+NEW  libs/ts/planner/src/taskGraph.ts     DAG build + topo sort
+NEW  libs/ts/composer/src/*               deterministic workspace assembly
 NEW  templates/registry/                    (optional) component blocks
 EDIT libs/ts/db/prisma/schema.prisma      Blueprint, Task
 EDIT services/orchestrator/src/*               DAG executor
@@ -271,7 +271,7 @@ EDIT services/web/src/*                        plan panel, blueprint panel, ques
 
 Planner/executor separation · IR design · DAG scheduling · structured LLM output · prompt
 scoping & context budgets · determinism boundaries · progressive disclosure in UX.
-See [LEARNING_PATH.md → V4](../LEARNING_PATH.md#v4--planning-systems).
+See [LEARNING.md → V4](../LEARNING.md#v4--planning-systems).
 
 ---
 
@@ -279,7 +279,7 @@ See [LEARNING_PATH.md → V4](../LEARNING_PATH.md#v4--planning-systems).
 
 **Full-stack or frontend-only?**
 
-The root [`ROADMAP.md`](../../ROADMAP.md) locks *"frontend-only, mock data layer in `src/data/`,
+The root this file locks *"frontend-only, mock data layer in `src/data/`,
 no Postgres/Prisma"* for its MVP. **Emergent is full-stack.** These are different products and the
 choice determines how many generation agents exist, what the templates contain, and what
 "verified" means.

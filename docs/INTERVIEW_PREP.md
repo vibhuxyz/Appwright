@@ -264,4 +264,4 @@ better answer than bluffing — and interviewers test for bluffing.
 ---
 
 *See also:* [ARCHITECTURE.md](./ARCHITECTURE.md) · [DECISIONS.md](./DECISIONS.md) ·
-[LEARNING_PATH.md](./LEARNING_PATH.md) · [CODE_QUALITY.md](./CODE_QUALITY.md)
+[LEARNING.md](./LEARNING.md) · [CODE_QUALITY.md](./CODE_QUALITY.md)

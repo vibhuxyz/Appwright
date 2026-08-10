@@ -14,17 +14,17 @@ per-version TODOs, and a learning curve.
   longer on disk: `apps/opencode/` (the working TS agent loop) is deleted, `services/orchestrator`
   and `services/agent` are empty files, `services/api` is a 5-line stub, `services/web` is the Vite
   starter. The effective position is near-greenfield.
-- Wrote the documentation set: [ARCHITECTURE.md](./ARCHITECTURE.md), [VERSIONS.md](./VERSIONS.md),
-  [versions/V0–V5](./versions/), [LEARNING_PATH.md](./LEARNING_PATH.md); rewrote
-  [DECISIONS.md](./DECISIONS.md), [PROJECT_ROADMAP.md](./PROJECT_ROADMAP.md), and
-  [LEARNING_LOG.md](./LEARNING_LOG.md).
+- Wrote the documentation set: [ARCHITECTURE.md](../ARCHITECTURE.md), [VERSIONS.md](../VERSIONS.md),
+  [versions/V0–V5](../versions/), [LEARNING_PATH.md](../LEARNING.md); rewrote
+  [DECISIONS.md](../DECISIONS.md), [PROJECT_ROADMAP.md](../README.md), and
+  [LEARNING.md](../LEARNING.md).
 
 ## What I Implemented Myself
 - Supplied the deck and the cloud/planner extension, and set the product direction:
   **build something like Emergent.**
 
 ## New Concepts Learned
-Full list in [LEARNING_LOG.md](./LEARNING_LOG.md#concepts-added-from-the-coding-agents--cloud-deck).
+Full list in [LEARNING.md](../LEARNING.md).
 The five that changed how the system is designed:
 
 1. **`if` vs `while`** — the naive agent handles one tool call and stops. The loop only ends when
@@ -40,7 +40,7 @@ The five that changed how the system is designed:
    artifact; a plan produces one you can inspect, cache, diff, and resume.
 
 ## Engineering Decisions Made
-All recorded with trade-offs in [DECISIONS.md](./DECISIONS.md).
+All recorded with trade-offs in [DECISIONS.md](../DECISIONS.md).
 
 - **D4 — TypeScript for the agent engine** *(closes Session 02's open question)*. The stack is
   already TS end to end, types are shared through `libs/ts/contracts`, and the reference impl is
@@ -63,7 +63,7 @@ V0 agent loop → V1 web app + memory → V2 isolation & control
    → V3 cloud sandbox → V4 app builder (Emergent parity) → V5 autonomy & deploy
 ```
 Each version has one acceptance test; V3 is the hard one (distributed systems).
-See [VERSIONS.md](./VERSIONS.md).
+See [VERSIONS.md](../VERSIONS.md).
 
 ## Homework Before Next Session
 - Read `ref-ai/packages/agent/src/agent-loop.ts` end to end and answer, in your own words:
@@ -71,10 +71,10 @@ See [VERSIONS.md](./VERSIONS.md).
   parallel and others sequentially? *(You are about to reimplement this — if you can't answer all
   three, read it again.)*
 - Confirm D4 and D5, then delete `apps/agent-engine/` in its own commit.
-- Settle **O1** in [DECISIONS.md](./DECISIONS.md#open--not-yet-decided): full-stack or
+- Settle **O1** in [DECISIONS.md](../DECISIONS.md): full-stack or
   frontend-only for the V4 app builder? It silently shapes every V4 slice.
 
 ## Next Session Plan
-Start [V0](./versions/V0_AGENT_LOOP.md): scaffold `libs/py/agent_core`, define `Message` / `AgentEvent`
+Start [V0](../versions/V0_AGENT_LOOP.md): scaffold `libs/ts/agent-core`, define `Message` / `AgentEvent`
 (with `seq`) / `Tool` in `libs/ts/contracts`, then build the loop — `while`, not `if`, with a real
 `emit` sink from the first line.

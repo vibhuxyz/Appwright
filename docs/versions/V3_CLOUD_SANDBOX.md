@@ -115,7 +115,7 @@ that is what makes acceptance step 5 pass.
 ## TODO
 
 ### Slice 1 — Sandbox abstraction
-- [ ] `libs/py/sandbox`: define the port before picking a provider.
+- [ ] `libs/ts/sandbox`: define the port before picking a provider.
 ```ts
 interface SandboxProvider {
   create(opts: { projectId: string; snapshot?: string }): Promise<Sandbox>;
@@ -134,7 +134,7 @@ interface Sandbox {
       your machine. Lets you port every caller to the interface *before* introducing cloud
       latency, cost, and network failure into your debugging loop.
 - [ ] **`E2BSandboxProvider`** second — the real one.
-- [ ] Swap by config. If swapping requires touching `libs/py/agent_core`, the port is wrong.
+- [ ] Swap by config. If swapping requires touching `libs/ts/agent-core`, the port is wrong.
 
 ### Slice 2 — Move the agent into the sandbox
 - [ ] Decide the split (**recommended:** worker outside, tools execute inside):
@@ -212,11 +212,11 @@ sandbox ─events─► worker ─┬─pub/sub──► API ──SSE──► 
 ## Files this version touches
 
 ```
-NEW  libs/py/sandbox/src/*             SandboxProvider port + local & E2B adapters
+NEW  libs/ts/sandbox/src/*             SandboxProvider port + local & E2B adapters
 EDIT services/orchestrator/src/index.ts     EMPTY → job state machine
 EDIT services/agent/src/index.ts           EMPTY → job consumer + agent driver
 EDIT services/api/src/*                  auth middleware, ownership checks, enqueue instead of execute
-EDIT libs/py/agent_core/src/tools/*         tools execute via Sandbox, not node:fs
+EDIT libs/ts/agent-core/src/tools/*         tools execute via Sandbox, not node:fs
 EDIT libs/ts/db/prisma/schema.prisma   Sandbox, Job; Project.userId non-null
 NEW  infra/                             Dockerfiles, compose, deploy config
 ```
@@ -242,7 +242,7 @@ NEW  infra/                             Dockerfiles, compose, deploy config
 
 Container/microVM isolation · job queues & at-least-once delivery · idempotency · distributed
 state machines · multi-tenancy & row-level isolation · pub/sub fan-out · lease/heartbeat
-patterns · cost modelling. See [LEARNING_PATH.md → V3](../LEARNING_PATH.md#v3--distributed-systems--isolation---the-wall).
+patterns · cost modelling. See [LEARNING.md → V3](../LEARNING.md#v3--distributed-systems--isolation---the-wall).
 
 ---
 

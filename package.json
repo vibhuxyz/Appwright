@@ -12,12 +12,19 @@
     "libs/ts/*"
   ],
   "scripts": {
-    "dev:web": "bun --filter web dev",
+    "agent": "bun libs/ts/agent-core/src/cli.ts",
+    "dev": "docker compose up -d --build",
     "dev:api": "bun --filter api dev",
+    "dev:web": "bun --filter web dev",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f",
     "build": "bun --filter '*' build",
+    "test": "bun test",
     "lint": "bun --filter '*' lint",
     "check-types": "bun --filter '*' check-types",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "db:migrate": "cd libs/ts/db && bunx prisma migrate dev",
+    "db:studio": "cd libs/ts/db && bunx prisma studio"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",

@@ -6,11 +6,11 @@ Start a working session on **Devian**.
 
 ## Step 1 — Read these, in this order. Actually read them, don't skim.
 
-1. `docs/PROJECT_ROADMAP.md` — **which version and slice we are on**
+1. `docs/README.md` — **which version and slice we are on**
 2. `docs/versions/V*.md` — **only the current version's file.** Not all of them.
    ⭐ **Its checkboxes are the progress record.** `[x]` = done and verified. `[ ]` = not started.
    That list, not my memory and not yours, is where we pick up.
-3. `docs/LEARNING_LOG.md` — **what I already know vs. what is new to me.** This decides how much
+3. `docs/LEARNING.md` — **what I already know vs. what is new to me.** This decides how much
    you explain. Don't teach me something listed under "Mastered". Do say *"this is new for you"*
    for anything on the gap list.
 4. `docs/VERSIONS.md` — the acceptance test for this version. It is the definition of done.
@@ -31,7 +31,7 @@ Read the most recent `docs/SESSION_0N.md` if you need context on what happened l
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ COMPLETED
-  - [from PROJECT_ROADMAP.md]
+  - [from README.md]
 
 🚧 IN PROGRESS
   - [the current task]
@@ -72,7 +72,7 @@ Three files answer three different questions. Use all three:
 | Question | File |
 |---|---|
 | **What has been built?** | the current `docs/versions/V*.md` checkboxes |
-| **What do I already understand?** | `docs/LEARNING_LOG.md` — Mastered vs Currently Learning |
+| **What do I already understand?** | `docs/LEARNING.md` — Mastered vs Currently Learning |
 | **What happened last session?** | the newest `docs/SESSION_0N.md` |
 
 **Then teach the first unchecked box, at the depth the learning log implies.**

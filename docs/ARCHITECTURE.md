@@ -8,7 +8,7 @@
 > Source material: the `Coding agents + cloud` deck (100xdevs) + the cloud/planner extension.
 > This document is the single architectural reference. Version plan lives in
 > [VERSIONS.md](./VERSIONS.md), per-version TODOs in [versions/](./versions/),
-> the learning curve in [LEARNING_PATH.md](./LEARNING_PATH.md).
+> the learning curve in [LEARNING.md](./LEARNING.md).
 
 ---
 
@@ -112,9 +112,7 @@ devian/
 ├── ref-ai/packages/           TypeScript reference agent (agentLoop.ts) — READ-ONLY reference
 ├── docs/                 ← you are here
 ├── docker-compose.yml    runs the stack (D11)
-├── Makefile              the command surface (D11)
-├── pyproject.toml        uv workspace root
-└── package.json          bun workspaces (TS only)
+└── package.json          bun workspaces + the script surface (D11)
 
   DELETED 2026-08-10:  apps/opencode/ · apps/agent-engine/ · apps/worker/
                        script/reset-project.mjs · turbo.json
@@ -184,7 +182,7 @@ message with **no** tool calls.
 
 > **A: tool handling is a `while` loop, not an `if`.**
 
-Our engine is Python ([D4](./DECISIONS.md#decision-4-python-for-the-agent-engine--active-confirms-d1)),
+Our engine is Python ([D4](./DECISIONS.md#decision-4-typescript-end-to-end--active-supersedes-d1)),
 so the shape we actually build is:
 
 ```python
@@ -879,40 +877,36 @@ product.
 
 Mapping the architecture onto real directories in this repo.
 
-| Component | Directory | Lang | Status | Responsibility |
-|---|---|---|---|---|
-| Web app | `services/web` | TS | 🟡 starter | Project list, session view, chat, diff pane, preview iframe |
-| API / Gateway | `services/api` | TS | 🟡 stub | REST + SSE, auth, validation, persistence. **Never executes agent code** |
-| Agent service | `services/agent` | **PY** | 🟡 scaffold | HTTP/SSE wrapper around the loop. Plays the worker role from V3 |
-| Agent engine | `libs/py/agent_core` | **PY** | ❌ | The loop, `Message`/`AgentEvent` types, providers. V0 |
-| Tools | `libs/py/tools` | **PY** | ❌ | fs · bash · grep · git · the path fence. V0 |
-| Orchestrator | `services/orchestrator` | TS | ❌ empty | Job state machine, queue producer, sandbox lifecycle. V3 |
-| Planner | *(to create)* `libs/py/planner` | **PY** | ❌ | Intent → blueprint → task DAG. V4 |
-| Sandbox provider | *(to create)* `libs/py/sandbox` | **PY** | ❌ | `SandboxProvider` port + E2B/local adapters. V3 |
-| DB | `libs/ts/db` | TS | 🟡 wrong shape | Prisma + Postgres; needs Session/Task/Approval models |
-| Contracts | `libs/ts/contracts` | TS | 🟡 partial | Zod for HTTP; **generated** agent-event types (D10). `projectFiles.ts` is ✅ — reuse it |
-| Template | `templates/vite-react` | — | ✅ | Pristine starter copied into each new project |
+| Component | Directory | Status | Responsibility |
+|---|---|---|---|
+| Web app | `services/web` | 🟡 starter | Project list, session view, chat, diff pane, preview iframe |
+| API | `services/api` | 🟡 stub | REST + SSE, auth, validation, persistence. **Imports the agent directly** |
+| Agent engine | `libs/ts/agent-core` | ❌ | The loop, `Message`/`AgentEvent` types, providers. V0 |
+| Tools | `libs/ts/tools` | ❌ | fs · bash · grep · git · the path fence. V0 |
+| Orchestrator | `services/orchestrator` | ❌ empty | Job state machine, queue producer, sandbox lifecycle. V3 |
+| Worker | *(to create)* `services/worker` | ❌ | Consumes jobs, imports `agent-core`, runs beside a sandbox. V3 |
+| Planner | *(to create)* `libs/ts/planner` | ❌ | Intent → blueprint → task DAG. V4 |
+| Sandbox provider | *(to create)* `libs/ts/sandbox` | ❌ | `SandboxProvider` port + E2B/local adapters. V3 |
+| DB | `libs/ts/db` | 🟡 wrong shape | Prisma + Postgres; needs Session/Task/Approval models |
+| Contracts | `libs/ts/contracts` | 🟡 partial | Zod schemas. `projectFiles.ts` is ✅ — import it, don't rewrite it |
+| Template | `templates/vite-react` | ✅ | Pristine starter copied into each new project |
 
-### The language boundary
+### No language boundary
 
 ```
-   Browser ──SSE──► services/api  (TS)  ──HTTP/SSE──►  services/agent  (PY)
-                          │                                   │
-                          ▼                                   ▼
-                     Postgres                            agent_core.run_agent_loop
-                     (persistence)                            │
-                                                              ▼
-                                                        devian_tools → workspace files
+   Browser ──SSE──► services/api ──import──► @repo/agent-core ──► @repo/tools ──► files
+                          │                        │
+                          ▼                        └──► LLM providers
+                     Postgres
 ```
 
-**The API owns state; the agent owns execution.** The API never runs a loop; the agent never
-touches Postgres. Events cross as JSON, typed by the Pydantic models the agent already uses
-([D10](./DECISIONS.md#decision-10-pydantic-is-the-source-of-truth-for-cross-language-types--active)).
+The agent is a **library**, not a service ([D4](./DECISIONS.md#decision-4-typescript-end-to-end--active-supersedes-d1)).
+No serialisation, no second process, no codegen — `Message` and `AgentEvent` are Zod schemas the
+API and the browser both `import`.
 
-Both sides need the same idea of "a workspace". `libs/ts/contracts/src/utils/projectFiles.ts`
-(reads the file tree for the UI) and `libs/py/tools/fence.py` (writes files for the agent) must
-agree on `workspaceRoot(id)` and the path-escape rule. That shared definition is the one place
-this split can silently break.
+At **V3** a `services/worker` appears and imports the same package, running beside a sandbox. That
+separation exists for **isolation**, which is a real reason — not as a side effect of a language
+choice.
 
 ---
 
@@ -1052,4 +1046,4 @@ Not yet decided — each one changes what gets built.
 
 *Next:* [VERSIONS.md](./VERSIONS.md) — the version ladder ·
 [versions/](./versions/) — per-version TODOs ·
-[LEARNING_PATH.md](./LEARNING_PATH.md) — what to learn, in order
+[LEARNING.md](./LEARNING.md) — what to learn, in order
