@@ -1,0 +1,97 @@
+# Devian — local stack.
+# This replaces Turborepo's job: it is what actually runs the services.
+# Same shape we need in V3, so local dev and cloud deployment stay close.
+#
+#   make up      start
+#   make logs    tail
+#   make down    stop
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: devian
+      POSTGRES_PASSWORD: devian
+      POSTGRES_DB: devian
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devian"]
+      interval: 5s
+      retries: 10
+
+  # Not needed until V3 (queue + pub/sub). Started early so the wiring is familiar.
+  redis:
+    image: redis:8-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  # Python. The agent loop, its tools, and the provider adapters.
+  agent:
+    build:
+      context: .
+      dockerfile: docker/agent/Dockerfile
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      WORKSPACES_DIR: /workspaces
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/agent:/app/services/agent
+      - ./libs/py:/app/libs/py
+      - workspaces:/workspaces
+    develop:
+      watch:
+        - action: sync
+          path: ./services/agent
+          target: /app/services/agent
+
+  # TypeScript. Owns HTTP, auth, persistence, and streaming to the browser.
+  # Calls the agent service over HTTP/SSE — it never runs the loop itself.
+  api:
+    build:
+      context: .
+      dockerfile: docker/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://devian:devian@postgres:5432/devian
+      REDIS_URL: redis://redis:6379
+      AGENT_URL: http://agent:8000
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      agent:
+        condition: service_started
+    volumes:
+      - ./services/api:/app/services/api
+      - ./libs/ts:/app/libs/ts
+      - workspaces:/workspaces
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web/Dockerfile
+    environment:
+      VITE_API_URL: http://localhost:3001
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    volumes:
+      - ./services/web:/app/services/web
+      - ./libs/ts:/app/libs/ts
+
+volumes:
+  pgdata:
+  # Generated projects live here. Shared between api (reads the file tree)
+  # and agent (writes files). In V3 this is replaced by a real sandbox.
+  workspaces:

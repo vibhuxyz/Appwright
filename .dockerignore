@@ -1,0 +1,64 @@
+# Everything here is excluded from the Docker build context.
+# Without this the context is ~580MB of node_modules and Docker uploads it on
+# every single build. With it, ~10MB.
+#
+# Dependencies are installed INSIDE the image from the lockfiles, never copied
+# from the host — host node_modules contain platform-specific binaries that
+# break in a Linux container.
+
+# ─── dependencies (installed in-image from lockfiles) ───
+node_modules
+**/node_modules
+.venv
+**/.venv
+
+# ─── the reference implementation — 142k lines we never ship ───
+ref-ai
+
+# ─── docs and planning ───
+docs
+*.md
+!services/*/README.md
+
+# ─── vcs & tooling ───
+.git
+.gitignore
+.github
+.claude
+.turbo
+.vscode
+.idea
+
+# ─── local env & secrets ───
+.env
+.env.*
+!.env.example
+
+# ─── build output ───
+dist
+**/dist
+build
+**/build
+.next
+**/.next
+.vite
+**/.vite
+
+# ─── python caches ───
+__pycache__
+**/__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+
+# ─── generated project workspaces ───
+workspaces
+
+# ─── misc ───
+.DS_Store
+*.pem
+coverage
+Dockerfile*
+docker-compose*.yml

@@ -1,0 +1,52 @@
+[project]
+name = "devian"
+version = "0.0.0"
+description = "Devian — AI app builder. Python workspace root."
+requires-python = ">=3.12"
+
+# Declaring the members as dependencies is what makes plain `uv sync` install
+# them — and with them, the `devian-serve` / `devian-agent` entry points.
+# Listing them under [tool.uv.workspace] alone only tells uv they EXIST.
+dependencies = [
+    "devian-agent",
+    "agent-core",
+    "devian-tools",
+]
+
+# The root is a workspace container, not an installable package itself.
+[tool.uv]
+package = false
+
+# uv workspace: every Python package in the monorepo is a member.
+# `uv sync` at the root resolves them all into one lockfile + one .venv.
+[tool.uv.workspace]
+members = ["services/agent", "libs/py/*"]
+
+[tool.uv.sources]
+devian-agent = { workspace = true }
+agent-core = { workspace = true }
+devian-tools = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.8",
+    "mypy>=1.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_return_any = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["services/agent/tests", "libs/py"]

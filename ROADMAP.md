@@ -279,22 +279,29 @@ on top of the already-running A+B loop. Generalize to many domains / full-stack 
 
 ---
 
-## M1 — LIVE DESIGN STATE (where we are right now)
+## M1 — LIVE DESIGN STATE
 
-**Corrected by running it (the earlier "corrupted Frankenstein" note was STALE):**
-- The `fronted` template `src/` is **clean and minimal** (`App.tsx` = plain "Project ready!" starter) —
-  exactly the minimal-starter content the registry future wants.
-- It **compiles**: `tsc --noEmit` exits 0.
-- The "untracked `src/`" was NOT corruption or `.gitignore` — there is a **nested `.git` repo inside
-  `apps/project-template/fronted/`**. The template is version-controlled by its own embedded git,
-  invisible to the monorepo (same pattern in `apps/opencode/.git`).
-- `projectFiles.ts:8` points at `apps/project-template/`**`frontend`** but the folder is **`fronted`**
-  (typo) → `listProjectFiles()` 500s before the agent even runs.
+> ⚠️ **STALE as of 2026-08-10.** This section described a code state that no longer exists.
+> Re-audited against disk — see the corrections below. Current status of record:
+> [`docs/PROJECT_ROADMAP.md`](./docs/PROJECT_ROADMAP.md).
 
-**So A1 collapsed** from "rebuild the baseline" to "**de-embed the nested git, commit the baseline into
-the monorepo, fix its address.**"
+**Corrections from the 2026-08-10 audit — every claim below was checked against disk:**
 
-**Decisions reached (by the user, via design questioning):**
+| Old claim | Reality on disk |
+|---|---|
+| "nested `.git` inside `apps/project-template/fronted/`" | ❌ **No nested `.git` exists** anywhere in the repo. Already resolved. |
+| "`projectFiles.ts:8` points at `frontend` but the folder is `fronted` (typo) → 500s" | ❌ **No typo, and no such line.** `projectFiles.ts` never referenced the template — it resolves a per-project workspace directory. |
+| "`projectRoot` is still a module-level constant" | ❌ **No `projectRoot` exists.** It is already `workspaceRoot(projectId)` — per-project, with `safeResolve(projectId, relPath)`. The multi-project problem this flagged is **already fixed**. |
+| "template is CORRUPTED" | ❌ Already corrected in this file; the template `src/` is clean and compiles. |
+| `apps/opencode/*` (all references) | ❌ **Directory deleted.** The only agent-loop reference now is `ref-ai/packages/`. |
+| "`script/reset-project.mjs` — dead reset script" | ✅ Was true. **Deleted** 2026-08-10; workspace creation is rebuilt properly in V1 Slice 6. |
+| `apps/agent-engine/` (Python scaffold) | ✅ Superseded by [D4](./docs/DECISIONS.md). **Deleted** 2026-08-10. |
+
+**Net effect:** phase A1's blocking questions (nested `.git`, the path typo, the global `projectRoot`)
+are **all moot**. `libs/ts/contracts/src/utils/projectFiles.ts` already implements the per-project
+workspace model that A2 was reaching for — V1 builds on it rather than replacing it.
+
+**Decisions reached (by the user, via design questioning) — still valid:**
 - **Two-directory model:** `project-template/` = pristine, read-only, agent never touches it (source of
   truth). A separate **working copy** = what the agent edits, Vite serves, and the snapshot reads.
 - **Reset = `rm working/ ; cp project-template/ → working/`** (what the dead `reset-project.mjs` was
@@ -303,29 +310,35 @@ the monorepo, fix its address.**"
 - **Baseline content = minimal blank starter** (already true) — makes block-injection clean and the
   missing `delete_file` tool largely irrelevant.
 
-**Open questions still on the table (A1 → A2):**
-1. **Nested `.git` reconciliation** — remove (de-embed, recommended) vs submodule vs gitlink. What gets
-   copied if left in place?
-2. **The `cp` exclude contract** — `node_modules`, nested `.git`, `bun.lock`: which poison the working
-   copy, at copy/edit/serve time? (Docker `.dockerignore` ↔ `rsync --exclude` shape.)
-3. `projectRoot` is still a module-level constant → must repoint to the working copy in A2. Smell: a
-   single global can't survive multi-project — note now, don't necessarily fix for MVP.
-4. How does the system decide **new project vs iterate** in the no-auth in-memory MVP? (button? empty
-   history? explicit signal?) — A3.
-
-**Next step:** user answers Q1 + Q2 (A1 `.git` + `cp` contract) → de-embed → commit baseline → confirm
-`tsc` green → A1 done → A2 unblocks.
+**Open questions — only one survives the audit:**
+1. ~~Nested `.git` reconciliation~~ — moot, no nested `.git` exists.
+2. **The `cp` exclude contract** — `node_modules`, `bun.lock`, `.git`: which poison the working copy,
+   at copy/edit/serve time? (Docker `.dockerignore` ↔ `rsync --exclude` shape.) → **still open**,
+   answered in V1 Slice 6.
+3. ~~`projectRoot` is a module-level constant~~ — moot, already per-project (`workspaceRoot(projectId)`).
+4. How does the system decide **new project vs iterate**? → resolved by design: reset happens on
+   `POST /project` only, never on a follow-up message. See V1 Slice 1.
 
 ---
 
-## Key file map (for fast re-orientation)
-- `apps/opencode/src/devianAgent.ts` — `runAgent` (FENCE system prompt + tool wiring); `:263` no-op emit.
-- `apps/opencode/src/engine/agentLoop.ts` — `runAgentLoop`, the tool-calling loop + event emitter.
-- `apps/opencode/src/tools/agentTools.ts` — list/read/write/edit file tools (no delete).
-- `packages/contracts/src/utils/projectFiles.ts` — `projectRoot` (hard-coded to template) + `safeResolve` guard.
-- `apps/backed/src/index.ts` — Express; `POST /api/messages` → `await runAgent` → returns full snapshot (synchronous, no streaming).
-- `apps/web/src/App.tsx` — 3-pane UI (chat / file tree+code / preview iframe), plain fetch.
-- `apps/project-template/frontend/` — the template the agent edits (currently CORRUPTED).
-- `script/reset-project.mjs` — dead reset script (wrong paths).
+## Key file map (re-audited 2026-08-10)
+
+**Live:**
+- `libs/ts/contracts/src/utils/projectFiles.ts` — `workspaceRoot(projectId)`, `safeResolve(projectId, relPath)`,
+  `listProjectFiles` / `readProjectFile` / `writeProjectFile`. Per-project, path-escape guarded. **Reuse this.**
+- `libs/ts/db/prisma/schema.prisma` — Prisma + Postgres. Old shape (`ConversationHistory`); V1 Slice 1 rewrites it.
+- `templates/vite-react/` — the pristine template. Clean, compiles, correctly spelled.
+- `ref-ai/packages/agent/src/agent-loop.ts` — **the agent-loop reference to port from.** The only one left.
+
+**Empty or stubs (V0/V1 fill these in):**
+- `services/api/src/index.ts` — 5-line stub.
+- `services/orchestrator/src/index.ts` — empty (0 lines).
+- `services/agent/src/index.ts` — empty (0 lines).
+- `services/web/src/App.tsx` — Vite starter, not the 3-pane UI.
+
+**Deleted (do not look for these):**
+- `apps/opencode/` — held `devianAgent.ts`, `agentLoop.ts`, `agentTools.ts`. Gone.
+- `apps/agent-engine/` — Python scaffold, superseded by [D4](./docs/DECISIONS.md). Deleted 2026-08-10.
+- `script/reset-project.mjs` — dead paths. Deleted 2026-08-10.
 
 </content>
