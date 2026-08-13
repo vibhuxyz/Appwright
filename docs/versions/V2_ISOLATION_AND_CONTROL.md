@@ -106,9 +106,10 @@ different device than the one that asked. An in-memory promise breaks both.
 - [ ] On project create: `git init` the workspace, commit the template as the initial commit on `main`.
 - [ ] On session create: `git worktree add <path> -b agent/<sessionId> main`.
 - [ ] Point the agent's workspace root at the **session's worktree**, not the project root.
-      *(`projectFiles.ts` is already per-**project** — `workspaceRoot(projectId)`. V2 widens that key
-      from `projectId` to `sessionId`, since a session is now its own directory. Small change,
-      because the global-constant problem was already solved.)*
+      *(`projectFiles.ts` is already keyed per-**project** — `workspaceRoot(projectId)`. V2 widens
+      that key from `projectId` to `sessionId`, since a session is now its own directory. Small
+      change — **assuming V0 Slice 3 has already exported the function and repointed `PROJECTS_DIR`
+      off the deleted `apps/` path.** If that is still outstanding, do it there, not here.)*
 - [ ] Auto-commit after each agent turn (`agent: <first line of prompt>`) so every turn is a
       revertable checkpoint.
 - [ ] `DELETE /session/:id` → `git worktree remove` + branch cleanup.

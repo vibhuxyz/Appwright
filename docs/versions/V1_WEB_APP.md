@@ -20,7 +20,8 @@ conversation history per project.*
 
 ## Acceptance test
 
-1. Open `localhost:5173`. See a list of projects. Create one.
+1. Open `localhost:3000` (Appwright's own UI — `services/web/vite.config.ts` pins it, `strictPort`).
+   See a list of projects. Create one.
 2. Type *"add a dark mode toggle to the header"*.
 3. Watch tool calls appear **as they execute** — not a spinner, then a dump.
 4. **Hard-refresh the page mid-run.** The transcript is still there and the run is still going.

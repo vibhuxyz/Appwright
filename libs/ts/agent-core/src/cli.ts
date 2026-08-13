@@ -2,7 +2,7 @@
 const prompt = process.argv.slice(2).join(" ").trim();
 
 if (!prompt) {
-	console.error('usage: bun devian "your prompt here"');
+	console.error('usage: bun appwright "your prompt here"');
 	process.exit(1);
 }
 

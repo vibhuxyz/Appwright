@@ -1,6 +1,6 @@
-# Devian — Version Ladder
+# Appwright — Version Ladder
 
-> Target: an **Emergent/Lovable-style AI app builder**. Six versions, each one shippable and
+> Target: an **Emergent/Lovable-style AI app builder**. Seven versions, each one shippable and
 > demoable on its own. Full architecture in [ARCHITECTURE.md](./ARCHITECTURE.md).
 > Detailed TODOs per version live in [versions/](./versions/).
 
@@ -16,15 +16,18 @@
   │                        Projects/Sessions/Messages · REST · SSE · 3-pane UI · preview
   ▼
  V2  ISOLATION & CONTROL   "the agent can't wreck anything and I approve what it does"
-  │                        git worktrees · approvals · diffs · verification (tsc/build/lint)
+  │                        git worktrees · approvals · diffs · verification
   ▼
  V3  CLOUD SANDBOX         "it runs in our cloud, for many users, in parallel"
   │                        queue · orchestrator · sandbox mgr · auth · preview URLs
   ▼
- V4  APP BUILDER           "one prompt → a whole working app"     ◄── EMERGENT PARITY
-  │                        planner · blueprint · task DAG · multi-agent generation
+ V4  APP BUILDER           "one prompt → a whole working full-stack app"   ◄ EMERGENT PARITY
+  │                        planner · blueprint · task DAG · Next+Prisma+auth generation
   ▼
- V5  AUTONOMY & DEPLOY     "it fixes itself and ships to a real URL"
+ V5  BROWSER AGENT         "it USES the app it built, and finds real bugs"
+  │                        semantic clicks · E2E tests · visual checks
+  ▼
+ V6  AUTONOMY & DEPLOY     "it fixes itself and ships to a real URL"
                            self-heal · memory · observability · one-click deploy
 ```
 
@@ -38,8 +41,9 @@
 | **V1** | Web App + Memory | Browser: open a project → chat → watch tool calls stream live → refresh the page → history is intact → preview pane shows the running app | 2–3 wks | V0 |
 | **V2** | Isolation & Control | Two agent sessions run in parallel on the same repo without collision; a `bash` call pauses for approval; a diff view shows exactly what changed; bad code is caught by `tsc` before it reaches the user | 2 wks | V1 |
 | **V3** | Cloud Sandbox | Sign up on a deployed URL from a machine that has never seen the repo → build an app → it runs in **our** sandbox → preview loads from a public URL | 3–4 wks | V2 |
-| **V4** | App Builder | *"Build me a food delivery app"* → clarifying questions → visible task list → tasks tick off → working full app in the preview → *"make the cart sticky"* → it updates | 4–6 wks | V3 |
-| **V5** | Autonomy & Deploy | Plant a bug → the agent detects it from logs and self-heals → click Deploy → app is live on a real domain | 4+ wks | V4 |
+| **V4** | App Builder | *"Build me a food delivery app"* → clarifying questions → visible task list → tasks tick off → a **full-stack** app in the preview (Next.js + Prisma + Postgres + auth, with seeded data) → *"make the cart sticky"* → it updates | 5–7 wks | V3 |
+| **V5** | Browser Agent | *"Build a signup page"* → it builds it, then **uses** it: valid email, invalid email, duplicate email, empty password — and finds a 500 the compiler could never catch, plus a layout break at 375px | 3–4 wks | V4 |
+| **V6** | Autonomy & Deploy | Plant a bug → the agent detects it from browser + logs and self-heals → click Deploy → app is live on a real domain | 4+ wks | V5 |
 
 *Estimates assume solo, part-time, learning as you go. They are ranges, not promises.*
 
@@ -52,7 +56,7 @@ partial credit, no "mostly working".
 
 ### V0 — [details →](./versions/V0_AGENT_LOOP.md)
 ```
-$ devian "read package.json, then add a `clean` script to it"
+$ appwright "read package.json, then add a `clean` script to it"
   ● read_file(package.json)
   ● edit_file(package.json)
   ✓ Added a `clean` script.
@@ -61,7 +65,7 @@ Two chained tool calls in one turn, no human intervention between them. **That s
 the loop continues on its own — is what V0 exists to prove.**
 
 ### V1 — [details →](./versions/V1_WEB_APP.md)
-Browser at `localhost:5173`: project list → session → chat. Tool calls appear as they execute.
+Browser at `localhost:3000`: project list → session → chat. Tool calls appear as they execute.
 Hard-refresh mid-run and the transcript is still there. Preview iframe shows the edited app.
 
 ### V2 — [details →](./versions/V2_ISOLATION_AND_CONTROL.md)
@@ -78,8 +82,12 @@ requeues and the user sees a reconnect, not a crash.
 One sentence in → a working multi-page app out, with a visible plan that ticked off task by task,
 and every task verified green before the next started.
 
-### V5 — [details →](./versions/V5_AUTONOMY_AND_DEPLOY.md)
-The app fixes its own build errors within a retry budget, and deploys to a public URL.
+### V5 — [details →](./versions/V5_BROWSER_AGENT.md)
+The agent opens the app it just built, fills the signup form five different ways, and reports two
+real defects — one runtime, one visual. Every action targets a role and name, never a coordinate.
+
+### V6 — [details →](./versions/V6_AUTONOMY_AND_DEPLOY.md)
+The app fixes its own errors within a retry budget, and deploys to a public URL.
 
 ---
 
@@ -95,7 +103,7 @@ learning and a real feature later for users whose code cannot leave their machin
  B3  Handoff                  attach to a live session from any surface, replay by seq
 ```
 
-Schedule after V4. Nothing in V0–V5 should be designed in a way that makes Track B impossible —
+Schedule after V5. Nothing in V0–V6 should be designed in a way that makes Track B impossible —
 specifically: **all session state stays in the DB, and every event carries a sequence number.**
 
 ---
@@ -115,20 +123,21 @@ specifically: **all session state stays in the DB, and every event carries a seq
 
 ---
 
-## How this relates to the existing `ROADMAP.md`
+## Where the old M1–M5 / P2–P11 board went
 
-The root `docs/versions/V4_APP_BUILDER.md` holds the older M1–M5 / P2–P11 board plus a detailed
-frontend-registry design. Mapping:
+There is no `ROADMAP.md` in this repo — it was folded into
+[versions/V4_APP_BUILDER.md](./versions/V4_APP_BUILDER.md), which now holds the older
+M1–M5 / P2–P11 board plus the detailed frontend-registry design. Mapping:
 
 | Old | New |
 |---|---|
 | M1 create from scratch, M3 realtime, M4 preview, M5 end-to-end | **V1** |
 | Phase A (two-directory model), Phase B (event stream → WS) | **V1** |
-| P4 Verification Engine | **V2** (basic) → **V5** (full) |
+| P4 Verification Engine | **V2** (compile) → **V5** (interact + look) |
 | P2 E2B sandbox, P10 fleet/scale-out | **V3** |
 | Phase C (blueprint, registry, selector), P8 thinking front-end | **V4** |
-| P5 self-healing, P6 observability, P7 memory, P11 deploy | **V5** |
-| P3 repo intelligence, P9 quality agents | **V5+** |
+| P5 self-healing, P6 observability, P7 memory, P11 deploy | **V6** |
+| P3 repo intelligence, P9 quality agents | **V6+** |
 
-`ROADMAP.md` stays as the deep design reference for the frontend-builder/registry thinking.
+`V4_APP_BUILDER.md` stays as the deep design reference for the frontend-builder/registry thinking.
 **`docs/VERSIONS.md` (this file) is the schedule of record.**

@@ -10,7 +10,7 @@
 
 ## What I Implemented Myself
 - Guided the architectural design process.
-- Requested the mentor to map out the Devian graph architecture and scaffold the files.
+- Requested the mentor to map out the Appwright graph architecture and scaffold the files.
 
 ## New Concepts Learned
 - **Event-Driven LLM Loops (Pi-style):** Structuring agent execution as a state machine that yields events continuously, rather than waiting for a single block of generated text.

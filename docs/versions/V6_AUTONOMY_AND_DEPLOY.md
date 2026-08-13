@@ -1,14 +1,14 @@
-# V5 — Autonomy & Deploy
+# V6 — Autonomy & Deploy
 
 > **Goal:** the system fixes its own mistakes and ships the result to a real URL.
 >
-> **Status:** 🔴 not started · **Est.** 4+ weeks · **Depends on:** [V4](./V4_APP_BUILDER.md)
+> **Status:** 🔴 not started · **Est.** 4+ weeks · **Depends on:** [V6](./V5_BROWSER_AGENT.md)
 
 ---
 
 ## Why this version exists
 
-After V4 you can generate an app. V5 is about the two things that decide whether people *keep*
+After V6 the agent can generate an app **and prove it works in a browser**. V6 is about the two things that decide whether people *keep*
 using it:
 
 1. **It doesn't hand you broken code.** When something is red, the system diagnoses and fixes it
@@ -100,7 +100,10 @@ Self-healing on top of an unreliable planner just automates the wrong thing fast
       honestly. *"7 of 8 tasks completed; task 5 blocked on X"* is a good outcome. A silent green
       is not.
 - [ ] Every heal attempt is persisted — it is training data for Slice 6 and the only way to tune
-      the budget.
+      the budget. **It is a `TaskAttempt` with `trigger = heal`, not a separate table**
+      ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)).
+      The attempt row already carries model, cost, error, and verification result — which is exactly
+      what a heal needs recorded, and what makes the heal rate computable.
 
 ### Slice 4 — Deployment
 - [ ] Targets: Vercel/Netlify (frontend), Railway/Fly (backend), Neon/Supabase (Postgres),
@@ -143,7 +146,7 @@ NEW  libs/ts/deploy/src/*            provider adapters, migrations, env injectio
 NEW  libs/ts/memory/src/*            store + hybrid retrieval
 EDIT services/orchestrator/src/*          heal loop wired into the DAG executor
 EDIT services/web/src/*                   log panel, timeline, deploy button, findings report
-EDIT libs/ts/db/prisma/schema.prisma HealAttempt, Deployment, Memory
+EDIT libs/ts/db/prisma/schema.prisma Deployment, Memory   (HealAttempt = TaskAttempt, D35)
 ```
 
 ---
@@ -165,13 +168,14 @@ EDIT libs/ts/db/prisma/schema.prisma HealAttempt, Deployment, Memory
 
 Error taxonomy & structured diagnostics · bounded retry / circuit breakers · deployment pipelines
 & migrations · secret management · retrieval-augmented generation · evaluation (how do you *know*
-the healer works?). See [LEARNING.md → V5](../LEARNING.md#v5--autonomy-and-operations).
+the healer works?). See [LEARNING.md → V6](../LEARNING.md#v6--autonomy-and-operations).
 
 ---
 
-## Beyond V5
+## Beyond V6
 
-From the root `ROADMAP.md`, still parked:
+From the old M1–M5 / P2–P11 board (now folded into
+[V4_APP_BUILDER.md](./V4_APP_BUILDER.md)), still parked:
 
 - **Repo intelligence (P3)** — symbol index, import graph, repo map so the agent reuses existing
   code instead of redefining it.

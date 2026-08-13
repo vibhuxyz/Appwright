@@ -8,7 +8,7 @@
     "./types": "./src/types.ts"
   },
   "bin": {
-    "devian": "./src/cli.ts"
+    "appwright": "./src/cli.ts"
   },
   "scripts": {
     "check-types": "tsc --noEmit"

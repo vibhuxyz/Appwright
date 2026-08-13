@@ -1,10 +1,10 @@
 ---
-description: End a Devian session — write the session note and update the docs so the next session has memory
+description: End a Appwright session — write the session note and update the docs so the next session has memory
 ---
 
 End the session. **The docs are the memory — if you skip this, the next session starts blind.**
 
-Do all four. Don't ask permission for each one; just do them and show me the diff summary at the end.
+Do all seven. Don't ask permission for each one; just do them and show me the diff summary at the end.
 
 ## 1. Write `docs/SESSION_0N.md`
 
@@ -44,13 +44,35 @@ number. If a decision was superseded, mark the old one and leave it — the hist
 minds is worth more than a tidy list. If something moved from open to decided, remove it from the
 **Open** table.
 
-## 4. Update `docs/LEARNING.md`
+## 4. Update `~/.ai/SKILLS.md` — the global profile
+
+This one travels between projects, so keep its ✅ column trustworthy.
+
+- Move a topic to **✅ Solid** only if **both** are true: I can explain it, **and** I shipped code
+  using it this session. Date it, name the project, and write one line of evidence.
+- Move to **🟡 Learning** when it was taught but not yet shipped.
+- Add a row to the Log table.
+
+**Never promote something because we discussed it.** An inflated ✅ column makes the file useless
+for its only job — deciding how much to explain next time.
+
+## 5. Update `docs/LEARNING.md`
 
 - Move a concept to **Mastered** only if I can explain it *and* shipped code using it. Date it.
 - Add anything new to **Currently Learning**
 - If I repeated a mistake, write it down — repeated mistakes are the signal worth tracking
 
-## 5. Tick the version doc
+## 6. Update `docs/CRASH_COURSE.md`
+
+The six-line cards should already be in there — they get written the moment a concept is explained,
+not at wrap. So here, just three things:
+
+- Update the **State** column. `🟡 taught` → `✅ shipped` only when I have code using it that runs.
+- Promote anything from *"mentioned but not yet taught"* that got a real explanation today.
+- If you had to re-explain a concept, date it. **A concept taught twice means the first analogy
+  failed** — replace it, don't add a second card.
+
+## 7. Tick the version doc
 
 Check off completed items in `docs/versions/V*.md` for the current version.
 

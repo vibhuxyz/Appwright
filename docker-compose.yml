@@ -1,4 +1,4 @@
-# Devian — local stack.
+# Appwright — local stack.
 # This replaces Turborepo's job: it is what actually runs the services.
 # Same shape we need in V3, so local dev and cloud deployment stay close.
 #
@@ -10,15 +10,15 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: devian
-      POSTGRES_PASSWORD: devian
-      POSTGRES_DB: devian
+      POSTGRES_USER: appwright
+      POSTGRES_PASSWORD: appwright
+      POSTGRES_DB: appwright
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U devian"]
+      test: ["CMD-SHELL", "pg_isready -U appwright"]
       interval: 5s
       retries: 10
 
@@ -39,7 +39,7 @@ services:
       context: .
       dockerfile: docker/api/Dockerfile
     environment:
-      DATABASE_URL: postgresql://devian:devian@postgres:5432/devian
+      DATABASE_URL: postgresql://appwright:appwright@postgres:5432/appwright
       REDIS_URL: redis://redis:6379
       PORT: 3001
     ports:

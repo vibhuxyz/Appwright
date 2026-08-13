@@ -1,4 +1,4 @@
-# Devian — Architecture
+# Appwright — Architecture
 
 > **What we are building:** an AI app builder in the shape of **Emergent / Lovable** —
 > a user types *"build me a food delivery app"*, a planner turns that into requirements +
@@ -27,7 +27,8 @@
 11. [Data model](#11-data-model)
 12. [End-to-end sequence](#12-end-to-end-sequence)
 13. [Deviations from the deck (and why)](#13-deviations-from-the-deck-and-why)
-14. [Open questions](#14-open-questions)
+14. [The generated application](#14-the-generated-application--what-it-is-and-what-it-owns)
+15. [Open questions](#15-open-questions)
 
 ---
 
@@ -92,24 +93,25 @@
 An honest audit — the docs were describing a system that is no longer on disk.
 
 ```
-devian/
+appwright/
 ├── services/                     ← deployable units
-│   ├── web/          TS   React + Vite   ── still the Vite starter (App.tsx untouched)
-│   ├── api/          TS   Express        ── src/index.ts is 5 lines (stub)
-│   ├── agent/        PY   FastAPI        ── scaffolded 2026-08-10, no loop yet  ◄ V0
-│   └── orchestrator/ TS   —              ── empty. V3 fills it in
-├── libs/                         ← importable code
-│   ├── py/
-│   │   ├── agent_core/    the loop, Message/AgentEvent types, providers   ◄ V0
-│   │   └── tools/         fs, bash, grep, git + the path fence            ◄ V0
-│   └── ts/
-│       ├── contracts/     Zod schemas + projectFiles.ts ── workspaceRoot(projectId)
-│       │                  + safeResolve(projectId, path) — already correct, reuse it
-│       ├── db/            Prisma + POSTGRES ── User, Project, ConversationHistory, Secret
-│       └── ui/ config/ eslint-config/ typescript-config/
+│   ├── web/          TS   React + Vite   ── 255-line chat UI from the DELETED architecture.
+│   │                                        Hardcodes http://localhost:4000; the API is on 3001.
+│   │                                        Dead code, not a starter. V1 replaces it.
+│   ├── api/          TS   Express        ── src/index.ts is 30 lines: /health + /hello (stub)
+│   └── orchestrator/ TS   —              ── src/index.ts is 0 bytes. V3 fills it in
+├── libs/ts/                      ← importable code. TypeScript only (D4)
+│   ├── agent-core/        the loop, Message/AgentEvent types, providers   ◄ V0
+│   │                      index.ts 8 lines · cli.ts 11 lines · types.ts 0 BYTES
+│   ├── tools/             fs, bash, grep, git + the path fence            ◄ V0
+│   │                      index.ts 18 lines — a hello() stub, nothing else
+│   ├── contracts/         Zod schemas + projectFiles.ts ── ⚠️ BROKEN, see below
+│   ├── db/                Prisma + POSTGRES ── User, Project, ConversationHistory, Secret
+│   └── ui/ config/ eslint-config/ typescript-config/
 ├── templates/
-│   └── vite-react/       the pristine starter the agent copies per project
-├── ref-ai/packages/           TypeScript reference agent (agentLoop.ts) — READ-ONLY reference
+│   └── vite-react/       the pristine starter the agent copies per project (16-line App.tsx)
+├── ref-ai/packages/           10 MIT TS packages, 252k lines, 438 tests — READ-ONLY reference
+│                              the loop is at packages/agent/src/agent-loop.ts
 ├── docs/                 ← you are here
 ├── docker-compose.yml    runs the stack (D11)
 └── package.json          bun workspaces + the script surface (D11)
@@ -120,18 +122,36 @@ devian/
 
 **Critical fact:** `apps/opencode/` — which contained the *working* TypeScript agent loop
 (`agentLoop.ts`, tools, subagents) — has been **deleted** from the working tree. The only
-surviving agent-loop reference is `ref-ai/packages/`, and it is TypeScript while the engine is now
-Python ([D4](./DECISIONS.md)) — so V0 ports its **structure**, not its code.
+surviving agent-loop reference is `ref-ai/packages/`. It is TypeScript and so is our engine
+([D4](./DECISIONS.md#decision-4-typescript-end-to-end--active-supersedes-d1)) — so V0 can port its
+**structure** directly, and may simply *install* the provider layer rather than rewrite it.
+
+### ⚠️ `projectFiles.ts` is not the fence these docs promised
+
+Three documents used to say *"`workspaceRoot` + `safeResolve` are already correct — import them,
+do not write a second one."* Verified 2026-08-11 against the file. **Both claims are false:**
+
+| Claim | Reality |
+|---|---|
+| `workspaceRoot` / `safeResolve` are importable | **Neither is exported.** Both are module-private. `index.ts` re-exports the file, but only `listProjectFiles`, `listProjectPaths`, `readProjectFile`, `writeProjectFile` are public |
+| the fence root is correct | `PROJECTS_DIR = ../../../../apps/projects` resolves to **`libs/apps/projects`** — and `apps/` was deleted on 2026-08-10. It fences a directory that does not exist |
+
+The *escape logic* inside `safeResolve` is sound and worth keeping. Everything around it is stale.
+**V0 Slice 3 must export the two functions and repoint `PROJECTS_DIR` before importing anything.**
+That is a code change in `libs/ts/contracts`, not a copy-paste.
 
 **So the true starting position is:**
 
 | Thing | Status |
 |---|---|
-| Agent loop | ❌ gone. Python package scaffolded, empty. Reference in `ref-ai/packages` |
-| API | 🟡 stub |
-| Orchestrator | ❌ empty (V3) |
+| Agent loop | ❌ gone. `libs/ts/agent-core` scaffolded, `types.ts` **0 bytes**. Reference in `ref-ai/packages` |
+| Tools | ❌ `libs/ts/tools` exports a `hello()` stub. No fs, no bash, no fence |
+| API | 🟡 stub — `/health` + `/hello` prove the workspace resolves. Nothing else |
+| Orchestrator | ❌ empty file (V3) |
 | DB schema | 🟡 exists, but modelled for the *old* shape (no Session, no worktree, no sandbox) |
-| Web UI | ❌ Vite starter |
+| Contracts | 🔴 **worse than empty** — the fence is unexported and points at a deleted directory |
+| Web UI | 🔴 dead 255-line UI from the deleted architecture, wired to a port nothing listens on |
+| Tests | ❌ **zero test files in the whole project** |
 | Sandboxing | ❌ nothing |
 | Planner | ❌ nothing |
 
@@ -182,28 +202,29 @@ message with **no** tool calls.
 
 > **A: tool handling is a `while` loop, not an `if`.**
 
-Our engine is Python ([D4](./DECISIONS.md#decision-4-typescript-end-to-end--active-supersedes-d1)),
+Our engine is TypeScript ([D4](./DECISIONS.md#decision-4-typescript-end-to-end--active-supersedes-d1)),
 so the shape we actually build is:
 
-```python
-messages: list[Message] = [Message(role="user", content=prompt)]
+```ts
+const messages: Message[] = [{ role: "user", type: "text", content: prompt }];
 
-while True:
-    res = await provider.stream(messages, tools)   # tokens stream out as they arrive
-    messages.append(res)
-    await emit(assistant_event(res))               # → SSE → the TS API → browser
+while (true) {
+  const res = await provider.stream(messages, tools);  // tokens stream as they arrive
+  messages.push(res);
+  await emit(assistantEvent(res));                     // → SSE → browser
 
-    if not res.tool_calls:                         # final answer → done
-        break
+  if (!res.toolCalls?.length) break;                   // final answer → done
 
-    # independent calls can run in parallel; dependent ones must be sequential
-    for call in res.tool_calls:
-        result = await tools[call.name].execute(call.args)
-        messages.append(Message(
-            role="tool", type="tool_response",
-            tool_call_id=call.id, content=result,
-        ))
-        await emit(tool_result_event(call, result))
+  // independent calls can run in parallel; dependent ones must be sequential
+  for (const call of res.toolCalls) {
+    const result = await tools[call.name].execute(call.args, ctx);
+    messages.push({
+      role: "tool", type: "toolResponse",
+      toolCallId: call.id, content: result,
+    });
+    await emit(toolResultEvent(call, result));
+  }
+}
 ```
 
 Note what the loop does **not** do: it never writes to the database. Persistence is the API's job
@@ -227,7 +248,18 @@ stateDiagram-v2
     Executing --> Error: tool threw
     Error --> CallingLLM: feed error back to LLM
     Done --> [*]
+
+    CallingLLM --> Stopped: cancelled · timeout · budget
+    Executing --> Stopped: cancelled · timeout · budget
+    Stopped --> [*]
 ```
+
+**`Done` is one of six exits, not the exit**
+([D26](./DECISIONS.md#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0)).
+`completed` · `cancelled` · `timeout` · `maxIterations` · `budgetExceeded` · `fatalError`. The loop
+returns which one; every other exit is the one that happens when something has gone wrong or a
+human is waiting. Note that `Error` above is a **tool** error — it feeds back to the model and the
+loop continues. Only the loop breaking is `fatalError`.
 
 ### 3.5 Loop concerns that bite in production
 
@@ -238,6 +270,9 @@ stateDiagram-v2
 | **Parallel tools** | `Promise.all` on tool calls that depend on each other → race | Only parallelise read-only tools; writes stay sequential |
 | **Context overflow** | History outgrows the window | Summarise/compact old turns; keep tool results truncated |
 | **Provider drift** | OpenAI vs Anthropic vs Gemini tool-call shapes differ | Provider abstraction layer — normalise to one internal `Message` type |
+| **No cancellation** | The user presses Stop; the run keeps spending | `AbortSignal` checked between **every tool call**, not every iteration ([D26](./DECISIONS.md#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0)) |
+| **Unbounded cost** | A loop stays inside every sandbox limit and still burns $40 on one file | Budget on the loop context — `maxTokens`, `maxCostUsd`, `deadline`. Sandbox caps bound the *box*, not the *loop* |
+| **Agent touching the disk directly** | Moving into a sandbox at V3 means rewriting every tool | Tools go through a `Runtime` from V0 ([D27](./DECISIONS.md#decision-27-the-agent-is-a-client-of-the-runtime-not-a-resident--active-target-v0-shapes-v3)) |
 
 `ref-ai/packages/agent/src/agent-loop.ts` already solves streaming (`AgentEventSink`), multi-provider,
 truncation, and parallel-vs-sequential tool execution. **Port it, don't reinvent it.**
@@ -641,14 +676,45 @@ This is the difference between "a coding agent" and "a product".
 - **Network egress policy** — the agent needs npm/pip; it does not need your internal network.
 - **No production credentials inside.** Ever. The sandbox proxies through a service that holds
   the secrets; the sandbox holds a scoped, short-lived token at most.
-- **CPU / memory / disk / wall-clock caps** with hard kill.
+- **CPU / memory / disk / wall-clock caps** with hard kill. These bound the **box**. They do not
+  bound the **loop** — that needs its own token and cost budget
+  ([D26](./DECISIONS.md#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0)).
+  An agent can sit inside every limit here and still spend $40 re-reading one file.
+- **The project is always at `/workspace`** — every backend, no exceptions
+  ([D28](./DECISIONS.md#decision-28-workspace-is-the-only-root--active-target-v0-slice-3)). The
+  fence root is that constant, so it cannot differ between the backend you test on and the one
+  you ship on.
+- **The environment is prepared before the agent starts**
+  ([D29](./DECISIONS.md#decision-29-the-environment-is-prepared-before-the-agent-starts--active-target-v3)) —
+  runtime, package manager, deps, DB, migrations. The agent spends its tokens on the user's
+  problem, not on `nvm`.
 - **Ephemeral by default** — the durable artifacts are the git repo and object storage, not
   the container's disk.
 - **Preview served from the sandbox** (`https://preview-<id>.ourdomain`), never `localhost`.
+- **Everything the agent reads is untrusted** — files, compiler output, npm READMEs, and the pages
+  of the app it just built ([D23](./DECISIONS.md#decision-23-everything-the-agent-reads-is-untrusted-input--active-target-v0-slice-3)).
+- **Dependencies come from a list, not from the model**
+  ([D24](./DECISIONS.md#decision-24-the-agent-may-not-install-packages-it-invented--active-target-v4-enforced-in-v0s-bash-tool)).
+  Egress policy allows npm, which makes `npm install` the one hole every other control leaves open.
 
-Candidate providers: **E2B** (built for exactly this), Firecracker microVMs, Fly Machines,
-gVisor-hardened containers, Modal. E2B is the fastest path; the interface should be behind a
-`SandboxProvider` port so it can be swapped.
+**The boundary is HTTP** ([D22](./DECISIONS.md#decision-22-the-sandbox-boundary-is-an-http-contract-not-a-typescript-interface--active-target-v3-shapes-v0)).
+A supervisor inside the box serves a fixed, versioned contract — `exec`, `files/*`, `git/*`,
+`events`, `health`, and `browser/*` reserved for V5. `SandboxProvider` is a client for it.
+
+```
+agent-core ──► sandbox client ──HTTP──► supervisor ──► fs · bash · git
+                                   ▲
+                  local child process · E2B · Fly Machine · Firecracker
+                  all the same caller code
+```
+
+**Provider: E2B**, decided 2026-08-11
+([D25](./DECISIONS.md#decision-25-e2b-is-the-sandbox-provider--active-target-v3-closes-o1)).
+Raw Firecracker was considered and deferred — it needs Linux + KVM, and choosing it means also
+building rootfs images, a kernel, `jailer` config, CNI networking, a snapshot manager, a warm pool,
+and capacity scheduling. Behind the contract above, adopting it later is **a new adapter, not a
+rewrite**. Two triggers would reopen it: sandbox spend becoming a real invoice line, or a customer
+requiring an isolation guarantee E2B will not put in writing.
 
 ### 7.5 Streaming through the layers
 
@@ -793,17 +859,44 @@ selecting a stack, choosing components, composing the workspace — is code, not
                    └─────────────┘
 ```
 
-Each node has: `id, title, description, dependsOn[], status, filesTouched[], verification`.
-Status is persisted, so a crash resumes at the first non-green node instead of restarting.
+Each node has: `id, type, title, dependsOn[], owns[], reads[], status, attempts, riskTier,
+capability, blueprintVersion, verification`. Status is persisted, so a crash resumes at the first
+non-green node instead of restarting.
+
+**The edges are computed, not authored** ([D30](./DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)).
+A task declares the files it writes (`owns`) and the files it must see (`reads`):
+
+```
+T7 checkout   reads  src/auth/**   ← owned by T3
+                     src/cart/**   ← owned by T5
+
+              ⇒  T7 dependsOn T3, T5
+```
+
+`reads` ∩ another task's `owns` **is** the edge. The planner never reasons about dependencies in
+prose — it answers the much easier, much more checkable question of what each task touches. One
+declaration then does four jobs: the graph, the per-task write fence, the context builder's file
+list, and parallel eligibility.
+
+**No integrator.** Two tasks whose `owns` overlap are serialised — one runs, the other waits. There
+is no merge stage, because an LLM resolving another LLM's merge conflict is a coin flip and
+[D8](./DECISIONS.md#decision-8-session--worktree--branch--active-target-v2) already refuses silent
+conflict resolution.
+
+**The graph is validated before anything executes:** no cycles, no dangling `dependsOn`, no two
+tasks owning the same path, every entity and route a task needs present in the blueprint. Rejected,
+not repaired.
 
 ### 8.4 Verification — never trust generated code
 
-After **every** task, inside the sandbox:
+After **every** task, inside the sandbox. How far up the ladder a task climbs is set by its
+**risk tier**, and risk may only ever *add* checks
+([D32](./DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)):
 
 ```
-tsc --noEmit  →  build  →  lint  →  unit tests  →  boot dev server  →  hit /
-     │              │        │           │                │
-     └──────────────┴────────┴───────────┴────────────────┘
+every task   tier 1   tsc --noEmit · prisma validate · lint        ← never skipped
+medium       + tier 2  build · migrate · boot dev server · hit /
+high         + tier 3  interact + security checks        (V5, D21)
                             │
                     any red → structured error
                             │
@@ -812,8 +905,51 @@ tsc --noEmit  →  build  →  lint  →  unit tests  →  boot dev server  → 
                     (bounded retry budget, loop detection)
 ```
 
+`riskTier` comes from the **task type** — `schema`, `auth`, `payment`, `migration` are high — not
+from a model rating itself. Written the other way round (*"low risk → only lint"*), one bad
+prediction skips verification on precisely the task that needed it.
+
 A generated app that compiles is the minimum bar. Verification is what turns a demo into a
-product.
+product — and it gates parallelism, because **parallelism multiplies whatever quality verification
+produces, including negative quality.**
+
+### 8.5 Model routing — capability, not model name
+
+A task carries `capability: strong_reasoning | strong_coding | fast_coding | cheap`, assigned at
+**planning** time from its type and risk tier. A registry resolves that to whatever model is
+currently best ([D31](./DECISIONS.md#decision-31-tasks-request-a-capability-never-a-model-name--active-target-v4)).
+
+```
+task.capability = "strong_coding"  ──►  Model Registry  ──►  today's best model
+```
+
+No model id ever enters a task row, so replacing a provider is a config edit rather than a
+migration. Same habit as [D22](./DECISIONS.md#decision-22-the-sandbox-boundary-is-an-http-contract-not-a-typescript-interface--active-target-v3-shapes-v0)'s
+HTTP contract and [D27](./DECISIONS.md#decision-27-the-agent-is-a-client-of-the-runtime-not-a-resident--active-target-v0-shapes-v3)'s
+`Runtime` seam: **name the requirement, not the thing currently satisfying it.**
+
+Routing is built **last**, behind per-task cost telemetry. Its whole claim is *better quality where
+it matters, cheaper elsewhere* — without tokens and dollars recorded per task, that claim cannot be
+falsified.
+
+### 8.6 The stack is frozen — and unfreezing it is a protocol
+
+A generation agent blocked by the frozen architecture **raises an Architecture Change Request; it
+does not improvise** ([D34](./DECISIONS.md#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6)).
+
+```
+agent hits a wall ──► ACR ──► planner reviews ──► blueprintVersion++
+                                    │                    │
+                                 reject               diff ──► recompute ONLY affected tasks
+                                    │
+                          task fails with a real reason
+```
+
+A stack change needs user confirmation first. Without this channel, "frozen" produces the
+[V4 trap](./versions/V4_APP_BUILDER.md#traps) where task 3 uses Prisma and task 6 invents Drizzle —
+silently. Same shape as [D24](./DECISIONS.md#decision-24-the-agent-may-not-install-packages-it-invented--active-target-v4-enforced-in-v0s-bash-tool)
+(an unlisted package becomes an approval): **an agent that wants more authority asks through a
+mechanism that can say no.**
 
 ---
 
@@ -831,16 +967,24 @@ product.
                   └───────┬───────┘
                           ▼
                   ┌───────────────┐        ┌──────────────┐
-                  │   Planner     │───────►│              │
-                  └───────┬───────┘        │   Postgres   │
-                          ▼                │              │
-                  ┌───────────────┐        │ users        │
-                  │ Orchestrator  │◄──────►│ projects     │
-                  └───────┬───────┘        │ sessions     │
-                          │                │ messages     │
-                          ▼                │ tasks        │
-                  ┌───────────────┐        │ approvals    │
-                  │     Queue     │        └──────────────┘
+                  │   Planner     │───────►│   Postgres   │
+                  └───────┬───────┘        │              │
+       blueprint ─► validate ─► task DAG   │ users        │
+                          ▼                │ projects     │
+                  ┌───────────────┐        │ sessions     │
+                  │ ORCHESTRATOR  │◄──────►│ messages     │
+                  │ run lifecycle │        │ blueprints   │
+                  │ retry · cancel│        │ runs         │
+                  └───────┬───────┘        │ tasks        │
+                          ▼                │ taskAttempts │
+                  ┌───────────────┐        │ runEvents    │
+                  │   SCHEDULER   │        │ approvals    │
+                  │ ready · owns  │        └──────────────┘
+                  │ capacity·prio │
+                  └───────┬───────┘
+                          ▼
+                  ┌───────────────┐
+                  │     Queue     │
                   └───────┬───────┘
                           ▼
                   ┌───────────────┐        ┌──────────────┐
@@ -879,26 +1023,37 @@ Mapping the architecture onto real directories in this repo.
 
 | Component | Directory | Status | Responsibility |
 |---|---|---|---|
-| Web app | `services/web` | 🟡 starter | Project list, session view, chat, diff pane, preview iframe |
+| Web app | `services/web` | 🔴 dead code | 255-line UI from the deleted architecture, pointed at `localhost:4000`. **Delete it at V1**, don't extend it |
 | API | `services/api` | 🟡 stub | REST + SSE, auth, validation, persistence. **Imports the agent directly** |
 | Agent engine | `libs/ts/agent-core` | ❌ | The loop, `Message`/`AgentEvent` types, providers. V0 |
-| Tools | `libs/ts/tools` | ❌ | fs · bash · grep · git · the path fence. V0 |
-| Orchestrator | `services/orchestrator` | ❌ empty | Job state machine, queue producer, sandbox lifecycle. V3 |
-| Worker | *(to create)* `services/worker` | ❌ | Consumes jobs, imports `agent-core`, runs beside a sandbox. V3 |
-| Planner | *(to create)* `libs/ts/planner` | ❌ | Intent → blueprint → task DAG. V4 |
+| Runtime | *(to create)* `libs/ts/agent-core/src/runtime.ts` | ❌ | The execution seam. `Runtime` interface + `LocalRuntime`. V0 ([D27](./DECISIONS.md#decision-27-the-agent-is-a-client-of-the-runtime-not-a-resident--active-target-v0-shapes-v3)) |
+| Tools | `libs/ts/tools` | ❌ `hello()` only | fs · bash · grep · git · the path fence — **all through the Runtime**, never `node:fs`. V0 |
+| Orchestrator | `services/orchestrator` | ❌ empty | **Run lifecycle** — start · pause · resume · cancel · retry policy · honest partial-completion reporting. Queue producer, sandbox lifecycle. V3 |
+| Scheduler | *(to create)* `services/orchestrator/src/scheduler/` | ❌ | **What runs next** — dependency readiness · ownership conflicts · exclusive resources · capacity · priority. A separate module, not a separate service ([D36](./DECISIONS.md#decision-36-dependencies-make-a-task-eligible-not-runnable--and-the-scheduler-is-not-the-orchestrator--active-target-v4)). V4 |
+| Worker | *(to create)* `services/worker` | ❌ | Consumes jobs, imports `agent-core`, runs beside a sandbox. V3. **The V3 doc calls this `services/agent` — same box, and `services/worker` is the name of record** |
+| Planner | *(to create)* `libs/ts/planner` | ❌ | Intent → blueprint → tasks with `owns`/`reads` → computed DAG → validation. V4 ([D30](./DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)) |
+| Context builder | *(to create)* `libs/ts/planner/src/context.ts` | ❌ | Assembles per-task context deterministically from `owns` + `reads` + `dependsOn` + blueprint. **No LLM, and a token budget.** V4 ([D33](./DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4) · [O8](./DECISIONS.md#open--not-yet-decided)) |
+| Model registry | *(to create)* `libs/ts/agent-core/src/models/registry.ts` | ❌ | capability → current best model. The only place a model id appears. V4 ([D31](./DECISIONS.md#decision-31-tasks-request-a-capability-never-a-model-name--active-target-v4)) |
 | Sandbox provider | *(to create)* `libs/ts/sandbox` | ❌ | `SandboxProvider` port + E2B/local adapters. V3 |
+| Browser agent | *(to create)* `libs/ts/browser` | ❌ | Playwright session, accessibility snapshots, visual checks. V5 ([D20](./DECISIONS.md#decision-20-the-browser-agent-drives-by-meaning-not-pixels--active-target-v5)) |
 | DB | `libs/ts/db` | 🟡 wrong shape | Prisma + Postgres; needs Session/Task/Approval models |
-| Contracts | `libs/ts/contracts` | 🟡 partial | Zod schemas. `projectFiles.ts` is ✅ — import it, don't rewrite it |
+| Contracts | `libs/ts/contracts` | 🔴 broken | Zod schemas OK. `projectFiles.ts` fences `libs/apps/projects` (deleted) and **does not export** `safeResolve`/`workspaceRoot`. Fix before V0 Slice 3 — see [§2](#2-where-the-repo-actually-is-today) |
 | Template | `templates/vite-react` | ✅ | Pristine starter copied into each new project |
+| Tests | *(to create)* | ❌ **none** | Zero test files exist. Root `bun test` has no `bunfig.toml`, so it walks `ref-ai/`'s 438 tests and hangs |
 
 ### No language boundary
 
 ```
-   Browser ──SSE──► services/api ──import──► @repo/agent-core ──► @repo/tools ──► files
-                          │                        │
-                          ▼                        └──► LLM providers
-                     Postgres
+   Browser ──SSE──► services/api ──import──► @repo/agent-core ──► @repo/tools ──► Runtime ──► files
+                          │                        │                                 ▲
+                          ▼                        └──► LLM providers                │
+                     Postgres                                      V0: LocalRuntime (same process)
+                                                                   V3: HTTP to the supervisor (D22)
 ```
+
+**The agent is a client of that runtime, not a resident of it**
+([D27](./DECISIONS.md#decision-27-the-agent-is-a-client-of-the-runtime-not-a-resident--active-target-v0-shapes-v3)).
+Same interface both times. V3 swaps what is behind the arrow, not what calls it.
 
 The agent is a **library**, not a service ([D4](./DECISIONS.md#decision-4-typescript-end-to-end--active-supersedes-d1)).
 No serialisation, no second process, no codegen — `Message` and `AgentEvent` are Zod schemas the
@@ -919,26 +1074,83 @@ erDiagram
     User ||--o{ Project : owns
     Project ||--o{ Session : has
     Session ||--o{ Message : contains
-    Session ||--o{ Task : plans
+    Session ||--o{ Blueprint : freezes
+    Session ||--o{ Run : executes
+    Blueprint ||--o{ Task : plans
+    Blueprint ||--o{ ChangeRequest : amends
+    Task ||--o{ TaskAttempt : "tried by"
+    Run ||--o{ TaskAttempt : performs
+    Run ||--o{ RunEvent : emits
     Session ||--o{ Approval : gates
     Project ||--o{ Secret : stores
     Project ||--o| Sandbox : "runs in"
 
-    User { string id string email string hashPassword }
+    User { string id string email string hashPassword float budgetDailyUsd }
     Project { string id string userId string name string repoPath string status }
     Session { string id string projectId string title string model string branch string worktreePath float cost int tokenIn int tokenOut string status }
     Message { string id string sessionId string role string type text content json data int seq }
-    Task { string id string sessionId string title string status json dependsOn json filesTouched }
+    Blueprint { string id string sessionId int blueprintVersion json intent json stack json entities json pages json features json theme }
+    Task { string id string blueprintId string type string title string status json dependsOn json owns json reads string riskTier string capability json verification }
+    Run { string id string sessionId int blueprintVersion string trigger string status float budgetUsd float totalCostUsd datetime startedAt datetime completedAt text error }
+    TaskAttempt { string id string taskId string runId int attemptNumber string status string model float costUsd int tokenIn int tokenOut int durationMs string commitSha text error json verification }
+    RunEvent { string id string runId string type json data int seq datetime createdAt }
+    ChangeRequest { string id string blueprintId string taskId text wanted text why string status }
     Approval { string id string sessionId string messageId string toolName json args string status }
     Sandbox { string id string projectId string providerId string previewUrl string status }
     Secret { string id string projectId string key string encryptedValue }
 ```
+
+### The one distinction to hold onto here
+
+```
+Blueprint ──► Task ──► TaskAttempt ◄── Run
+                 PLAN            EXECUTION
+```
+
+**A Task is what should be built. A TaskAttempt is one time we tried**
+([D35](./DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)).
+A Task is deliberately *not* owned by a Run — a retry run re-executes a task an earlier run created,
+and a follow-up run adds tasks to a new blueprint version while leaving the old ones green
+([D18](./DECISIONS.md#decision-18-the-returning-user-flow--active-target-v4)).
 
 Notes:
 
 - `Message.seq` — a monotonic per-session sequence number. Essential for resuming a stream
   ("send me everything after seq 412") and for ordering when writes are batched.
 - `Session.branch` / `worktreePath` — the session↔worktree equivalence from §5.1.
+- **`Blueprint` is immutable per version.** An approved `ChangeRequest` writes a *new* row with
+  `blueprintVersion + 1`; it never edits the old one. That is what makes "diff the blueprint"
+  possible ([D18](./DECISIONS.md#decision-18-the-returning-user-flow--active-target-v4)) — and
+  diffing two versions is how a follow-up becomes a sub-DAG instead of a rebuild.
+- **`Task.owns` / `Task.reads`** — the declaration that generates `dependsOn`, scopes the write
+  fence, scopes the context, and decides what may run in parallel
+  ([D30](./DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)).
+  `dependsOn` is stored rather than recomputed so the executor never re-derives the graph mid-run.
+- **`Task.riskTier` / `capability`** — written from day one even while unused
+  ([D31](./DECISIONS.md#decision-31-tasks-request-a-capability-never-a-model-name--active-target-v4) ·
+  [D32](./DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)).
+  Adding a column later means migrating every persisted task — the `seq` argument again.
+- **Telemetry lives on `TaskAttempt`, never on `Task`.** `model`, `costUsd`, tokens, duration, and
+  the error are per *execution*. Overwriting them onto the task keeps only the last try — and then
+  D31's routing cannot be evaluated, V6's loop detection has nothing to compare, and the heal rate
+  is uncomputable. `Task.status` is a denormalised roll-up of the latest attempt, written in the
+  same transaction; **the attempt is the source of truth.**
+- **`TaskAttempt.commitSha`** — [D17](./DECISIONS.md#decision-17-recovery-model--git-is-the-checkpoint--active-target-v3)'s
+  checkpoint made queryable. The push that happened when this attempt went green is where a crash
+  resumes.
+- **`Run.trigger`** — `initial | followup | retry | heal`. A run is what the UI shows progress for,
+  what Stop cancels, and what a budget is enforced against.
+- **`RunEvent` is the execution timeline; `Message` is the conversation**
+  ([D40](./DECISIONS.md#decision-40-runevent-is-the-durable-execution-log--message-is-the-conversation--active-target-v1-grows-per-version)).
+  Two ordered logs, two independent `seq` counters. §7.5's durable path writes here. **The type
+  vocabulary grows one version at a time** — V4's task events are not declared at V1.
+- **Budgets nest** ([D38](./DECISIONS.md#decision-38-budgets-nest-user--run--task--active-target-v4)):
+  `User.budgetDailyUsd` → `Run.budgetUsd` → the loop's own `Budget`
+  ([D26](./DECISIONS.md#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0)). A task
+  cannot spend what its run has left; a run cannot spend what its user has left.
+- **Nothing here is duplicated into the generated repo.** No `.project/` directory, no state files
+  shipped to the user ([D33](./DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)).
+  Postgres holds the plan; the repo holds the application.
 - `Approval` is its own table, not a flag on `Message`: approvals are queried, expire, and are
   answered from a different device than the one that asked.
 - `Sandbox.previewUrl` — what the UI iframes.
@@ -953,7 +1165,8 @@ sequenceDiagram
     participant W as Web
     participant A as API
     participant P as Planner
-    participant O as Orchestrator
+    participant O as Orchestrator (run lifecycle)
+    participant SC as Scheduler (what runs next)
     participant Q as Queue
     participant S as Sandbox (Worker+Agent)
     participant L as LLM
@@ -967,35 +1180,48 @@ sequenceDiagram
     L-->>P: structured intent
     P->>W: clarifying questions (SSE)
     U->>W: answers
-    P->>D: save blueprint + task DAG
-    A->>O: start run(sessionId)
-    O->>Q: enqueue job
-    Q->>S: dispatch
+    P->>P: blueprint → validate → compile tasks (owns/reads) → validate graph
+    Note over P: invalid ⇒ reject + re-plan. Never LLM-repair (D39)
+    P->>D: save Blueprint v1 + Tasks
+    A->>O: start Run(sessionId, trigger=initial)
+    O->>D: insert Run
     S->>S: provision sandbox, copy template, git worktree add
 
-    loop for each task in DAG
+    loop until no ready tasks
+        SC->>D: read task statuses + active ownership
+        Note over SC: 5 gates — deps · owns · resources · capacity · budget (D36)
+        SC->>Q: enqueue the eligible tasks (may be several)
+        Q->>S: dispatch
+        S->>D: insert TaskAttempt (runId, attemptNumber, model)
+
         loop agent loop (while tool_calls)
-            S->>L: messages + tools
+            S->>L: task-scoped context + tools
             L-->>S: tool_call(write_file)
-            S->>A: event: tool_call        
+            S->>D: persist Message + RunEvent (seq)
             A-->>W: SSE
-            S->>D: persist message
-            S->>S: execute tool in sandbox
+            S->>S: execute tool — write fence = this task's owns (D30)
         end
-        S->>S: verify (tsc, build, lint, test)
+
+        S->>S: verify to the task's risk floor (D32)
         alt red
-            S->>L: error context → self-heal
+            S->>D: attempt = failed (error, cost)
+            S->>L: error context → retry as a NEW attempt
         else green
-            S->>D: task status = done
+            S->>S: commit + push
+            S->>D: attempt = green (commitSha); Task.status = done
             A-->>W: task ticked off
         end
     end
 
+    O->>D: Run complete (or partial — blocked tasks reported honestly)
     S->>A: preview URL ready
     A-->>W: iframe preview
     U->>W: "make the cart sticky"
     W->>A: POST /conversation (follow-up)
-    A->>P: re-plan (incremental)
+    A->>P: re-plan — diff Blueprint v1 vs v2
+    P->>D: save Blueprint v2 + ONLY the new tasks
+    A->>O: start Run #2 (trigger=followup)
+    Note over O,D: the original tasks stay green and are not re-run (D18)
 ```
 
 ---
@@ -1018,32 +1244,78 @@ as a suspendable loop state.
 
 ---
 
-## 14. Open questions
+## 14. The generated application — what it is, and what it owns
 
-Not yet decided — each one changes what gets built.
+Everything above describes **Appwright**. This section describes **what Appwright produces**, because
+the two are separate systems and conflating them causes real design damage.
 
-1. **Sandbox provider** — E2B (fastest to ship, per-sandbox cost) vs Fly Machines vs raw
-   Firecracker (cheapest at scale, weeks of work). *Recommendation: E2B behind a
-   `SandboxProvider` port so it can be replaced without touching the agent.*
-2. **Sandbox lifetime** — one long-lived sandbox per project (fast follow-ups, expensive idle)
-   vs ephemeral per-run with filesystem snapshot restore (cheap, slower cold start). *Probably:
-   ephemeral + warm pool + object-store snapshots.*
-3. **Full-stack or frontend-only for V4?** The existing `ROADMAP.md` locks "frontend-only, mock
-   data layer" for the MVP. Emergent is full-stack. Pick one and write it down — this decides
-   how many generation agents exist.
-4. **Blueprint vs freeform** — how rigid is the frozen architecture? Can a later task amend it,
-   or does an amendment force a re-plan?
-5. **Worktrees inside sandboxes** — if every session gets its own sandbox, is a worktree still
-   needed, or is the sandbox itself the isolation? *(Worktrees still earn their place for
-   diff/review/merge semantics and for multiple parallel tasks within one project.)*
-6. **Secrets** — `.env` is gitignored, so a fresh worktree/sandbox has none. Who injects them,
-   and how do we keep them out of LLM context? (`libs/ts/db` already has a `Secret` model.)
-7. **Approval timeout** — what happens if nobody answers for an hour? Cancel, or park and resume?
-8. **Cost control** — per-user token budgets, max tasks per plan, sandbox wall-clock caps. Cheap
-   to add in V1 (`Session.cost` exists), painful to retrofit at V4.
+Appwright generates **full-stack** apps — Next.js + Prisma + Postgres + Auth.js + API routes +
+migrations + seed data ([D14](./DECISIONS.md#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1)).
+
+### Two of everything
+
+| Appwright owns | The generated app owns |
+|---|---|
+| one Postgres — users, projects, sessions, messages | **one Postgres per project** — restaurants, orders ([D15](./DECISIONS.md#decision-15-the-generated-apps-database--one-per-project--active-target-v4)) |
+| a bucket — snapshots, dumps ([D19](./DECISIONS.md#decision-19-object-storage--snapshots-and-dumps-not-git--active-target-v3)) | a bucket — restaurant photos, user avatars |
+| our provider API keys | its own `DATABASE_URL` / `AUTH_SECRET` (generated) + the user's third-party keys (open) |
+
+**Per project, never per user.** Ten projects mean ten `User` tables — share a database and they
+collide on day one.
+
+### What the agent may and may not write
+
+```
+prisma/schema/
+├── auth.prisma   ← template. FROZEN. denied by the path fence.
+└── app.prisma    ← the agent's. write_file ONCE, then edit_file forever.
+```
+
+Rewriting a schema is destructive: a forgotten field is not a compile error, it is
+`DROP COLUMN` ([D16](./DECISIONS.md#decision-16-schema-ownership--template-models-are-frozen-app-models-are-edit-only--active-target-v4)).
+
+### Lifecycle
+
+```
+build      db push + seed               preview data is disposable
+deploy     one migrate dev --name init  →  migrate deploy  →  managed Postgres
+after      migrate dev per change       ← now against real user data
+```
+
+### Coming back later
+
+The sandbox is gone; Postgres and git are not
+([D18](./DECISIONS.md#decision-18-the-returning-user-flow--active-target-v4)).
+
+```
+open a project    chat + files + plan from Postgres and git.  NO sandbox. Free.
+send a message    provision → restore → install → migrate → seed → serve  (30–90s)
+                  planner DIFFS the blueprint → sub-DAG of only what changed
+```
+
+A crashed sandbox uses the identical restore path — one checkpoint mechanism, two features
+([D17](./DECISIONS.md#decision-17-recovery-model--git-is-the-checkpoint--active-target-v3)).
 
 ---
 
-*Next:* [VERSIONS.md](./VERSIONS.md) — the version ladder ·
-[versions/](./versions/) — per-version TODOs ·
-[LEARNING.md](./LEARNING.md) — what to learn, in order
+## 15. Open questions
+
+**They live in [DECISIONS.md](./DECISIONS.md#open--not-yet-decided), not here.** This file used to
+keep its own list; it drifted, and three entries stayed "open" for weeks after being decided.
+One list, one place.
+
+Closed since this document was first written: full-stack vs frontend-only
+([D14](./DECISIONS.md#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1)) ·
+worktrees inside sandboxes ([D8](./DECISIONS.md#decision-8-session--worktree--branch--active-target-v2)) ·
+the generated app's secrets ([D15](./DECISIONS.md#decision-15-the-generated-apps-database--one-per-project--active-target-v4)) ·
+the sandbox boundary ([D22](./DECISIONS.md#decision-22-the-sandbox-boundary-is-an-http-contract-not-a-typescript-interface--active-target-v3-shapes-v0)) ·
+**the sandbox provider — E2B** ([D25](./DECISIONS.md#decision-25-e2b-is-the-sandbox-provider--active-target-v3-closes-o1)).
+
+**Cost control now has a home** — [D38](./DECISIONS.md#decision-38-budgets-nest-user--run--task--active-target-v4).
+Three nesting levels (user → run → task), with the innermost already specified as the loop's
+`Budget` at V0 ([D26](./DECISIONS.md#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0)).
+It used to be restated here because nothing else owned it; that is no longer true.
+
+---
+
+*Next:* [VERSIONS.md](./VERSIONS.md) · [versions/](./versions/) · [DECISIONS.md](./DECISIONS.md)

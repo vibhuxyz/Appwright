@@ -3,9 +3,9 @@
 One folder per service. **The build context is always the repo root**, never this folder:
 
 ```bash
-docker build -f docker/api/Dockerfile   -t devian-api   .    # ← note the trailing dot
-docker build -f docker/agent/Dockerfile -t devian-agent .
-docker build -f docker/web/Dockerfile   -t devian-web   .
+docker build -f docker/api/Dockerfile   -t appwright-api   .    # ← note the trailing dot
+docker build -f docker/agent/Dockerfile -t appwright-agent .
+docker build -f docker/web/Dockerfile   -t appwright-web   .
 ```
 
 `docker-compose.yml` does the same thing — `context: .` plus `dockerfile: docker/<svc>/Dockerfile`.
@@ -16,7 +16,7 @@ needs `libs/py/*`. A context scoped to one service couldn't see them.
 | File | Base | Runs |
 |---|---|---|
 | `api/Dockerfile` | `oven/bun:1.3.13-alpine` | `bun --filter api start` |
-| `agent/Dockerfile` | `python:3.12-slim` + `uv` | `devian-serve` |
+| `agent/Dockerfile` | `python:3.12-slim` + `uv` | `appwright-serve` |
 | `web/Dockerfile` | `oven/bun:1.3.13-alpine` | Vite dev server |
 
 ---
@@ -25,7 +25,7 @@ needs `libs/py/*`. A context scoped to one service couldn't see them.
 
 **1. The CMD is the same command you run locally.**
 
-No flags duplicated between the Makefile and the Dockerfile. `devian-serve` reads `HOST`, `PORT`,
+No flags duplicated between the Makefile and the Dockerfile. `appwright-serve` reads `HOST`, `PORT`,
 and `RELOAD` from the environment — dev sets `RELOAD=1`, production doesn't. One command, two
 environments. If you find yourself writing a production-only start script, something has gone wrong.
 

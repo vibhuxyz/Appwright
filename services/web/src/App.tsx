@@ -73,7 +73,7 @@ export default function App() {
   return (
     <div style={S.app}>
       <aside style={S.chat}>
-        <div style={S.header}>Devian</div>
+        <div style={S.header}>Appwright</div>
         <div style={S.messages}>
           {(snapshot?.messageHistory ?? []).map((m, i) => (
             <div

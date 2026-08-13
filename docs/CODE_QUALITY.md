@@ -1,7 +1,9 @@
 # How we write code here
 
 > Every rule below was pulled out of **`ref-ai/packages`** — a real, production-quality agent
-> codebase: 142k lines of TypeScript across 10 packages, 438 test files, MIT licensed.
+> codebase: **252k lines** of TypeScript across 10 packages — 119k of source, 109k across 438 test
+> files. MIT licensed. *(Counted 2026-08-11: `find ref-ai -name '*.ts' -o -name '*.tsx' | xargs wc -l`.
+> Earlier drafts said "142k", which no counting method reproduces.)*
 >
 > Not generic clean-code advice. Each one is a rule they follow consistently, and most exist
 > because of a specific failure they clearly hit once. **We write TypeScript too**
@@ -186,7 +188,7 @@ Threaded through *everything* — `runLoop`, `streamAssistantResponse`, `execute
 `failToolCallsFromTruncatedMessage`. **The loop never calls `console.log`. Not once.**
 
 That's why the same loop serves a CLI *and* a server unchanged. It's exactly the mistake our
-deleted code made — `devianAgent.ts:263` passed a **no-op `emit`** and threw the stream away, which
+deleted code made — `appwrightAgent.ts:263` passed a **no-op `emit`** and threw the stream away, which
 is why "see code in real time" became a milestone instead of being free.
 
 **The test that proves you got it right** — no mocks, no patching:

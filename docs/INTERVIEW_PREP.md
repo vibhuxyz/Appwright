@@ -1,6 +1,6 @@
-# Interview prep — Devian
+# Interview prep — Appwright
 
-> **The point of this file.** Devian touches almost every system-design topic a Senior/Staff
+> **The point of this file.** Appwright touches almost every system-design topic a Senior/Staff
 > interview asks about — streaming, queues, isolation, multi-tenancy, idempotency, state machines,
 > cost. That's not an accident; it's why it's a good project to learn on.
 >
@@ -32,9 +32,9 @@ Two habits that matter more than any single answer:
 
 Practise this until it's smooth. It's the first question in every interview.
 
-> "Devian is an AI app builder — you describe an app in one sentence and it generates, verifies,
+> "Appwright is an AI app builder — you describe an app in one sentence and it generates, verifies,
 > and deploys a working one. A planner turns the prompt into a frozen architecture and a task DAG.
-> A Python agent executes the tasks inside an isolated cloud sandbox, streaming every tool call to
+> A coding agent executes the tasks inside an isolated cloud sandbox, streaming every tool call to
 > the browser over SSE. Each session is its own git worktree, so many agents can work on one repo
 > without collision, and every change is reviewable as a diff before it merges.
 >
@@ -220,13 +220,16 @@ the deterministic side of the line."*
    out loud, in under two minutes. Every layer, in order.
 2. **"What was the hardest bug?"** — Have one real story ready with a diagnosis, not just a symptom.
 3. **"What would you do differently?"** — Have a genuine answer. "Nothing" is a bad answer.
-4. **"Where does this break at 100× the load?"** — Know your actual bottleneck. For Devian it's
+4. **"Where does this break at 100× the load?"** — Know your actual bottleneck. For Appwright it's
    sandbox capacity, not the API.
-5. **"Why Python for the agent and TypeScript for the API?"** — This one is *yours* and it's a
-   great answer, because you can name what it cost you: a real network boundary, and types that
-   would drift if you hand-wrote them on both sides. Then explain the generated-contracts fix
-   ([D10](./DECISIONS.md)). Interviewers love a decision where the candidate names the cost and
-   shows the mitigation.
+5. **"Walk me through a decision you reversed."** — This is your strongest answer, because it is
+   real. You chose Python for the agent, built the scaffolding, then reversed it within a day.
+   The reasoning is what sells it: the justification was *"V5's eval work is easier in Python"* —
+   a benefit months away, paid for immediately in codegen, two toolchains, and a network hop. Then
+   the V5 advantage turned out to be false; the eval library already existed in TypeScript.
+   ([D1](./DECISIONS.md) → [D4](./DECISIONS.md).)
+   **The line to land:** *"I was optimising for a limitation I hadn't felt yet."* Interviewers are
+   testing whether you can change your mind on evidence and articulate the cost of being wrong.
 6. **"Why not SQLite? / Why not LangChain?"** — Both are in [DECISIONS.md](./DECISIONS.md) with
    reasoning. "The reference material said SQLite; I chose Postgres because we're multi-tenant and
    SQLite has one writer" is a strong answer *because* you're disagreeing with a source, with a
@@ -234,7 +237,7 @@ the deterministic side of the line."*
 
 ---
 
-## The topics Devian teaches you, mapped
+## The topics Appwright teaches you, mapped
 
 Use this to answer *"what have you learned?"* concretely.
 

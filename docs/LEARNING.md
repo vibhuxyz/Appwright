@@ -48,6 +48,8 @@ first design to be wrong.
 | **Provider abstraction** | OpenAI/Anthropic/Gemini disagree on tool-call shape | You can add a third provider by writing only an adapter |
 | **Zod → JSON Schema** | Tool definitions must be typed in TS *and* described to the model | One schema, both uses, no drift |
 | **Context-window management** | A 4 MB file in a tool result kills the run | You truncate every tool result on the way into history, by default |
+| **Prompt injection** | The agent reads files; a file can contain instructions ([D23](./DECISIONS.md#decision-23-everything-the-agent-reads-is-untrusted-input--active-target-v0-slice-3)) | You can explain why wrapping tool results is a *mitigation* and the fence is the actual *defence* |
+| **Supply-chain risk** | The model names packages; squatters own the invented names ([D24](./DECISIONS.md#decision-24-the-agent-may-not-install-packages-it-invented--active-target-v4-enforced-in-v0s-bash-tool)) | You can say what `postinstall` does and why `--ignore-scripts` is the default |
 
 **Deliberate exercise:** before writing anything, read `ref-ai/packages/agent/src/agent-loop.ts` end to
 end and write, in your own words, (a) where the loop exits, (b) how truncation is detected,
@@ -150,9 +152,31 @@ to inspect, cache, diff, resume, or debug.
 
 ---
 
-## V5 — Autonomy and Operations
+## V5 — Browser Automation
 
-*Version:* [V5_AUTONOMY_AND_DEPLOY.md](./versions/V5_AUTONOMY_AND_DEPLOY.md)
+*Version:* [V5_BROWSER_AGENT.md](./versions/V5_BROWSER_AGENT.md)
+
+| Concept | Why V5 forces it | You know it when… |
+|---|---|---|
+| **Accessibility tree / ARIA roles** | It is how the agent sees a page | You can explain why `getByRole("button", {name:"Login"})` survives a redesign and a coordinate does not |
+| **Auto-waiting vs sleeping** | A `sleep(2000)` test is a coin flip | You never write a bare timer in a test again |
+| **Deterministic tests** | A flaky suite makes V6's healer chase ghosts | You can run the suite twice and get identical results |
+| **Visual regression** | Layout bugs are invisible to a compiler | You know why you diff against the *previous run*, not a "correct" baseline |
+| **Headless browsers in containers** | Chromium in a sandbox is not free | You can state the cold-start cost it added |
+
+**Deliberate exercise:** take a page the agent built, print its accessibility snapshot, and read it
+aloud. If you cannot tell what the page does from roles and names alone, neither can the agent —
+and neither can a screen-reader user. That is the same defect.
+
+**The trap at this level:** reaching for a vision model first. It feels powerful and is slow,
+expensive, and non-deterministic. Rule-based checks — overflow, negative coordinates, zero-height
+containers — catch most real breakage for almost nothing.
+
+---
+
+## V6 — Autonomy and Operations
+
+*Version:* [V6_AUTONOMY_AND_DEPLOY.md](./versions/V6_AUTONOMY_AND_DEPLOY.md)
 
 | Concept | Why V5 forces it | You know it when… |
 |---|---|---|
@@ -205,7 +229,7 @@ These never belong to one version — they compound.
 | V0 | `ref-ai/packages/agent/src/agent-loop.ts` · your provider's tool-use docs (the real API reference, not a blog post) |
 | V1 | The SSE spec (it's short) · Prisma migrations guide |
 | V2 | `man git-worktree` · Pro Git ch. 7 (tools) and ch. 10 (internals) |
-| V3 | E2B or Firecracker docs · BullMQ docs · anything credible on idempotency and at-least-once delivery |
+| V3 | **E2B docs** (the provider — [D25](./DECISIONS.md#decision-25-e2b-is-the-sandbox-provider--active-target-v3-closes-o1)) · BullMQ docs · anything credible on idempotency and at-least-once delivery. *Firecracker's docs are worth reading for the mental model, but you are not building it* |
 | V4 | Compiler front-end architecture (source → IR → codegen — the analogy is exact) · your provider's structured-output docs |
 | V5 | Deployment provider APIs · RAG evaluation writeups · SRE-style error-budget thinking |
 

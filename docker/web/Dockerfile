@@ -4,10 +4,6 @@ FROM oven/bun:1.3.13-alpine
 
 WORKDIR /app
 
-# Copy EVERY workspace manifest before installing.
-# Bun resolves the whole workspace graph from the root package.json, so a missing
-# member fails the install even if this service never imports it.
-# Manifests only (no source) so this layer caches until a dependency changes.
 COPY package.json bun.lock* ./
 COPY services/api/package.json                 services/api/
 COPY services/web/package.json                 services/web/

@@ -1,8 +1,8 @@
 ---
-description: Start a Devian session — load the docs, show the tracker, continue where we left off
+description: Start a Appwright session — load the docs, show the tracker, continue where we left off
 ---
 
-Start a working session on **Devian**.
+Start a working session on **Appwright**.
 
 ## Step 1 — Read these, in this order. Actually read them, don't skim.
 
@@ -10,9 +10,10 @@ Start a working session on **Devian**.
 2. `docs/versions/V*.md` — **only the current version's file.** Not all of them.
    ⭐ **Its checkboxes are the progress record.** `[x]` = done and verified. `[ ]` = not started.
    That list, not my memory and not yours, is where we pick up.
-3. `docs/LEARNING.md` — **what I already know vs. what is new to me.** This decides how much
-   you explain. Don't teach me something listed under "Mastered". Do say *"this is new for you"*
-   for anything on the gap list.
+3. **`~/.ai/SKILLS.md`** — the live skill profile. **This decides how much you explain.**
+   ✅ Solid → skip the explanation, go straight to design. 🟡 Learning → explain briefly, then make
+   me design it. ⬜ New → say *"this is new for you"* and use the full 7-step order.
+   `docs/LEARNING.md` has the per-version detail.
 4. `docs/VERSIONS.md` — the acceptance test for this version. It is the definition of done.
 5. `docs/DECISIONS.md` — what is locked (don't reopen it) and what is still open (may block us)
 6. `docs/CODE_QUALITY.md` — how we write code here (at least Part 1 + the checklist)
@@ -26,7 +27,7 @@ Read the most recent `docs/SESSION_0N.md` if you need context on what happened l
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━
-📍 PROJECT: Devian
+📍 PROJECT: Appwright
 📦 PHASE: [V0 / V1 / V2 / V3 / V4 / V5] — [slice]
 ━━━━━━━━━━━━━━━━━━━━━━━━━
 

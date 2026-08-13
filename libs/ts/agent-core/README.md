@@ -10,7 +10,7 @@ This package is the product's core algorithm. Everything else is transport.
 src/
 ├── types.ts           Message, AgentEvent, ToolSpec  (Zod — the source of truth)
 ├── loop.ts            runAgentLoop()  ← the while-not-if loop
-├── cli.ts             the V0 harness — `bun devian "…"`
+├── cli.ts             the V0 harness — `bun appwright "…"`
 ├── engine/
 │   ├── sink.ts        AgentEventSink
 │   └── truncate.ts    keep tool results out of the context window
@@ -38,7 +38,7 @@ export async function runAgentLoop(opts: {
 In V0 `emit` prints to the terminal. In V1 the same loop streams to a browser with **zero
 changes**. That boundary is the whole reason V1 is cheap.
 
-> The deleted `devianAgent.ts:263` got this wrong — it passed a no-op `emit` and threw the event
+> The deleted `appwrightAgent.ts:263` got this wrong — it passed a no-op `emit` and threw the event
 > stream away, which turned "see code in real time" into a whole milestone. Don't repeat it.
 
 ## Who imports this

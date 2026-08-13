@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "devian",
+      "name": "appwright",
       "devDependencies": {
         "@types/node": "^25.9.3",
         "prettier": "^3.7.4",
@@ -14,7 +14,7 @@
       "name": "@repo/agent-core",
       "version": "0.0.0",
       "bin": {
-        "devian": "./src/cli.ts",
+        "appwright": "./src/cli.ts",
       },
       "dependencies": {
         "@repo/contracts": "workspace:*",
