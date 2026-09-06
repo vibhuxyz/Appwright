@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "@repo/contracts": "workspace:*",
+    "@repo/tools": "workspace:*",
+    "@repo/ui-system": "workspace:*",
     "zod": "^4.4.3"
   }
 }

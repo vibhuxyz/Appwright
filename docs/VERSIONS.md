@@ -1,6 +1,6 @@
 # Appwright — Version Ladder
 
-> Target: an **Emergent/Lovable-style AI app builder**. Seven versions, each one shippable and
+> Target: an **Emergent/Lovable-style AI app builder**. Nine versions, each one shippable and
 > demoable on its own. Full architecture in [ARCHITECTURE.md](./ARCHITECTURE.md).
 > Detailed TODOs per version live in [versions/](./versions/).
 
@@ -15,6 +15,9 @@
  V1  WEB APP + MEMORY      "I can drive it from a browser and my history survives"
   │                        Projects/Sessions/Messages · REST · SSE · 3-pane UI · preview
   ▼
+V1.1 UI SYSTEM             "what it builds stops looking like a first draft"
+  │                        shadcn · Radix · Lucide · design tokens · component registry
+  ▼
  V2  ISOLATION & CONTROL   "the agent can't wreck anything and I approve what it does"
   │                        git worktrees · approvals · diffs · verification
   ▼
@@ -23,6 +26,10 @@
   ▼
  V4  APP BUILDER           "one prompt → a whole working full-stack app"   ◄ EMERGENT PARITY
   │                        planner · blueprint · task DAG · Next+Prisma+auth generation
+  │                        + UI system · design tokens · UI blueprint · design review
+  ▼
+V4.5 VISUAL EDITOR         "I drag it, and it changes — no prompt, no tokens"
+  │                        component graph · property panel · ChangeSet · exact edits
   ▼
  V5  BROWSER AGENT         "it USES the app it built, and finds real bugs"
   │                        semantic clicks · E2E tests · visual checks
@@ -39,9 +46,11 @@
 |---|---|---|---|---|
 | **V0** | Agent Loop | Terminal: *"add a dark mode toggle"* → agent reads, edits, and reports. Multi-step tool chains complete unattended | 1–2 wks | — |
 | **V1** | Web App + Memory | Browser: open a project → chat → watch tool calls stream live → refresh the page → history is intact → preview pane shows the running app | 2–3 wks | V0 |
+| **V1.1** | UI System | Same prompt on **both** templates → *"build a pricing page with three tiers"* → both use shadcn `Card`/`Button` and Lucide icons, neither diff contains an arbitrary bracket value, and the two previews side by side **look like the same product** | 1 wk | V1 |
 | **V2** | Isolation & Control | Two agent sessions run in parallel on the same repo without collision; a `bash` call pauses for approval; a diff view shows exactly what changed; bad code is caught by `tsc` before it reaches the user | 2 wks | V1 |
 | **V3** | Cloud Sandbox | Sign up on a deployed URL from a machine that has never seen the repo → build an app → it runs in **our** sandbox → preview loads from a public URL | 3–4 wks | V2 |
 | **V4** | App Builder | *"Build me a food delivery app"* → clarifying questions → visible task list → tasks tick off → a **full-stack** app in the preview (Next.js + Prisma + Postgres + auth, with seeded data) → *"make the cart sticky"* → it updates | 5–7 wks | V3 |
+| **V4.5** | Visual Editor | Click a card in the preview → drag its width to 286px, set padding and radius → click the navbar, set its height → header reads *4 pending changes · 2 components* → Submit once → the rendered width **measures exactly 286px**, and `git diff` on the generated repo contains no `data-aw-id` | 3–4 wks | V4 |
 | **V5** | Browser Agent | *"Build a signup page"* → it builds it, then **uses** it: valid email, invalid email, duplicate email, empty password — and finds a 500 the compiler could never catch, plus a layout break at 375px | 3–4 wks | V4 |
 | **V6** | Autonomy & Deploy | Plant a bug → the agent detects it from browser + logs and self-heals → click Deploy → app is live on a real domain | 4+ wks | V5 |
 
@@ -68,6 +77,16 @@ the loop continues on its own — is what V0 exists to prove.**
 Browser at `localhost:3000`: project list → session → chat. Tool calls appear as they execute.
 Hard-refresh mid-run and the transcript is still there. Preview iframe shows the edited app.
 
+### V1.1 — [details →](./versions/V1_1_UI_SYSTEM.md)
+Two templates, one prompt, one look. The agent reaches for `Button` instead of writing one, and
+the token scale is defined exactly once and imported twice.
+
+**The trigger was felt, not predicted:** V1 shipped, and its output reads as a first draft. The
+taste-independent evidence is that the pristine `vite-react` starter already ships `rounded-[30px]`
+and `text-[32px]` in hand-rolled utilities — **the template was inventing off-scale values before
+the agent ever did.** Vocabulary ships here; the validator that *rejects* waits for V4, because
+there is no `design` block to validate against until the Blueprint exists.
+
 ### V2 — [details →](./versions/V2_ISOLATION_AND_CONTROL.md)
 Start two sessions on the same project. Each gets its own worktree/branch. Both run at once.
 Neither sees the other's files. A `bash rm -rf` request blocks on an approval prompt. Merge one
@@ -81,6 +100,17 @@ requeues and the user sees a reconnect, not a crash.
 ### V4 — [details →](./versions/V4_APP_BUILDER.md)
 One sentence in → a working multi-page app out, with a visible plan that ticked off task by task,
 and every task verified green before the next started.
+
+### V4.5 — [details →](./versions/V4_5_VISUAL_EDITOR.md)
+Four properties changed across two components by dragging and typing, submitted once, applied in
+one run — and the rendered width is **measured** at exactly the number that was asked for. Exact
+edits cost zero LLM tokens. The exported repo contains no Appwright markers.
+
+**Placed at 4.5 deliberately, and the cost is recorded:** an editor built before V5 cannot check
+its own output the way the browser agent will. It does not need to — it verifies *the request that
+was made* (`boundingBox().width === 286`), which is one measurement, not a quality judgement
+([D51](./DECISIONS.md#decision-51-verification-checks-the-request-that-was-made-not-a-general-notion-of-good--active-target-v45-deepens-at-v5)).
+**Do not let V5's ambition leak backwards into this rung.**
 
 ### V5 — [details →](./versions/V5_BROWSER_AGENT.md)
 The agent opens the app it just built, fills the signup form five different ways, and reports two

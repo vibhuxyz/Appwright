@@ -6,10 +6,15 @@ import { fileURLToPath } from "node:url";
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
 
-const PROJECTS_DIR = path.resolve(
-  currentDirectory,
-  "../../../../apps/projects",
-);
+// D28 — /workspace is the only root, presented identically by every runtime
+// (local, Docker, E2B). Locally that constant maps onto wherever the actual
+// project template lives; that mapping is this one line, not one per tool.
+// `apps/projects` was deleted 2026-08-10 — do not repoint at another
+// relative path, it will rot the same way.
+const PROJECTS_DIR =
+  process.env.WORKSPACE_ROOT ??
+  // currentDirectory: libs/ts/contracts/src/utils — five levels up is the repo root.
+  path.resolve(currentDirectory, "../../../../../templates");
 
 const editableExtensions = new Set([
   ".css",
@@ -21,9 +26,9 @@ const editableExtensions = new Set([
   ".tsx",
 ]);
 
-const ignoredDirectories = new Set(["node_modules", "dist", ".vite", ".turbo"]);
+const ignoredDirectories = new Set(["node_modules", "dist", ".vite", ".turbo", ".next"]);
 
-function workspaceRoot(projectId: string): string {
+export function workspaceRoot(projectId: string): string {
   if (!/^[a-z0-9-]+$/.test(projectId)) {
     throw new Error(`Invalid project id: ${projectId}`);
   }
@@ -71,7 +76,7 @@ function toProjectPath(projectId: string, filePath: string): string {
     .join("/");
 }
 
-function safeResolve(projectId: string, relPath: string): string {
+export function safeResolve(projectId: string, relPath: string): string {
   const root = workspaceRoot(projectId);
   const full = path.resolve(root, relPath);
 

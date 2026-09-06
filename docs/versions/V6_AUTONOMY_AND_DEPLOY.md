@@ -2,13 +2,13 @@
 
 > **Goal:** the system fixes its own mistakes and ships the result to a real URL.
 >
-> **Status:** 🔴 not started · **Est.** 4+ weeks · **Depends on:** [V6](./V5_BROWSER_AGENT.md)
+> **Status:** 🔴 not started · **Est.** 4+ weeks · **Depends on:** [V5](./V5_BROWSER_AGENT.md)
 
 ---
 
 ## Why this version exists
 
-After V6 the agent can generate an app **and prove it works in a browser**. V6 is about the two things that decide whether people *keep*
+After V5 the agent can generate an app **and prove it works in a browser**. V6 is about the two things that decide whether people *keep*
 using it:
 
 1. **It doesn't hand you broken code.** When something is red, the system diagnoses and fixes it
@@ -106,14 +106,37 @@ Self-healing on top of an unreliable planner just automates the wrong thing fast
       what a heal needs recorded, and what makes the heal rate computable.
 
 ### Slice 4 — Deployment
-- [ ] Targets: Vercel/Netlify (frontend), Railway/Fly (backend), Neon/Supabase (Postgres),
-      Upstash (Redis). Start with **one** path end to end.
-- [ ] Pipeline: production build in the sandbox → provision DB → run migrations → inject env →
-      deploy → smoke-test the live URL → return it.
-- [ ] Secrets: encrypted at rest (the `Secret` model already exists in `libs/ts/db`), injected at
-      deploy time, **never** in LLM context and never printed to logs.
-- [ ] Rollback: keep the last N deployments; one click to revert.
+
+**One target, in the user's own account** ([D41](../DECISIONS.md#decision-41-deployment-targets-the-users-own-accounts-and-the-connect-moment-is-at-deploy--active-target-v6-slice-4)).
+A generated app is Next.js with API routes inside it, so there is no separate backend to ship —
+the Railway/Fly row that used to be here is gone.
+
+```
+app  →  the user's Vercel, via the deploy API      no GitHub in the path
+db   →  the user's managed Postgres                connected at Deploy, never at build
+```
+
+- [ ] **Connect flow, triggered by the Deploy button only.** Nothing during generation —
+      the sandbox has its own Postgres ([D14](../DECISIONS.md#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1),
+      [D29](../DECISIONS.md#decision-29-the-environment-is-prepared-before-the-agent-starts--active-target-v3)),
+      so there is nothing to ask for until the user wants a real URL.
+- [ ] **Check which providers actually offer OAuth before naming a default Postgres.** Vercel does.
+      Where only a programmatic API key exists, the user pastes a key and D41's no-custody property
+      breaks for that provider. This is a five-minute check that changes the answer.
+- [ ] Pipeline: production build in the sandbox → connect DB → `migrate deploy` → inject env →
+      Vercel deploy API → smoke-test the live URL → return it.
+- [ ] **Write-through secrets**: push the user's keys into their Vercel project env and keep no
+      copy. **Never** in LLM context, never printed to logs, never in our database. The `Secret`
+      model in `libs/ts/db` is then only needed for what [O5](../DECISIONS.md#open--not-yet-decided)
+      leaves — preview-time keys, if we hold them at all.
+- [ ] Write to the `production` [`Environment`](../DECISIONS.md#decision-42-environment-is-a-first-class-entity-and-it-ships-with-two-rows--active-target-v4-tables-used-at-v6),
+      never to the project. `development` keeps the sandbox's generated `DATABASE_URL`.
+- [ ] Rollback: Vercel keeps deployment history — promote an earlier one. Without Git integration
+      there is no rollback-by-revert, so this is the mechanism, not a fallback.
 - [ ] Custom domains + TLS.
+- [ ] **Export project** — a downloadable `git bundle` or archive of the repo. **Not optional.**
+      D41 puts git inside the sandbox and snapshots to our bucket, with no GitHub anywhere; without
+      an export, Appwright disappearing takes the user's application with it. See Definition of done.
 
 ### Slice 5 — Memory
 - [ ] Per-project memory: decisions made, conventions adopted, errors already fixed.
@@ -159,6 +182,9 @@ EDIT libs/ts/db/prisma/schema.prisma Deployment, Memory   (HealAttempt = TaskAtt
 | Fix without diagnosis | Agent rewrites random files hoping something works | Classify first, then a targeted fix |
 | Silent partial success | User ships an app with a broken checkout | Report blocked tasks loudly |
 | Secrets in LLM context | Production credentials in a model provider's logs | Inject at deploy time only |
+| Asking for a database mid-build | Signup wall before the first preview; kills the magic moment and breaks D29 | Connect at Deploy. The sandbox has its own Postgres |
+| Storing a key we could have passed through | A vault to encrypt, rotate, and eventually leak | Write-through: push to their Vercel env, keep no copy |
+| Shipping B without an export | The user's app cannot outlive us | Export project is a definition-of-done item |
 | Memory as a dumping ground | Context bloat, worse output, higher cost | Curate; measure retrieval quality |
 | Deploying unverified builds | Broken production | Smoke-test the live URL before returning it |
 
@@ -191,5 +217,10 @@ From the old M1–M5 / P2–P11 board (now folded into
 
 - [ ] Measured heal rate on planted errors, per error class.
 - [ ] Unfixable errors terminate cleanly and honestly.
-- [ ] One-click deploy produces a live, working URL with a real database.
-- [ ] No secret ever enters an LLM prompt.
+- [ ] One-click deploy produces a live, working URL with a real database, **in the user's own
+      Vercel and Postgres accounts** ([D41](../DECISIONS.md#decision-41-deployment-targets-the-users-own-accounts-and-the-connect-moment-is-at-deploy--active-target-v6-slice-4)).
+- [ ] **Nothing is asked of the user before the preview works.** The connect flow fires on Deploy.
+- [ ] **The user can export their project and it builds outside Appwright.** Download it, `bun
+      install`, `bun run build` — green. This is the check that Option B did not quietly become
+      lock-in.
+- [ ] No secret ever enters an LLM prompt — and no *deployed* secret is stored by us at all.

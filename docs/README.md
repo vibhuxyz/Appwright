@@ -10,8 +10,29 @@ preview, review, iterate, deploy.
 
 ## Status
 
-**Now:** V0 — Slice 1. The agent loop.
-**Next:** V1 — web app + persistence.
+**Now:** V1.1 — done. Two templates, one prompt, one look; V1's acceptance test re-run and still green.
+**Next:** V2 — isolation & control (git worktrees, approvals, diffs, verification).
+
+- [x] **V0 — done.** Both acceptance tests pass against `templates/vite-react` with a real OpenAI provider.
+- [x] **V1 — done 2026-08-16.** Postgres schema (Project/Session/Message), CRUD + conversation
+      routes, SSE streaming with reconnect buffer, two-directory workspace model, dev-server
+      manager, 3-pane web UI. Verified live in-browser: project create → prompt → tool calls stream
+      → **hard refresh mid-run → full transcript recovered** → preview iframe shows the change.
+      **Gap closed 2026-08-22:** cost/token tracking now populates. See V1.1 below.
+
+- [x] **V1.1 — done 2026-08-22.** `libs/ts/ui-system` — token scale, nine-primitive registry,
+      shadcn/Radix/Lucide vendored once and emitted into both templates, registry injected into the
+      system prompt. Acceptance test passed: same prompt on `vite-react` and `nextjs-fullstack`,
+      both composed `Card`/`Button`/`Badge`, **zero arbitrary bracket values**, and the two
+      previews read as one product. V1's dark-mode test re-run live and still passes — the toggle
+      works by flipping one class, because `.dark` in the generated `tokens.css` redefines every
+      semantic colour.
+      **Also closed here:** V1's `$0.0000` gap. Real `usage` parsing → a priced `usage` event →
+      an atomic `increment` on `Session` → a live SSE frame. Verified in-browser: a Gemini run
+      moved the header to `$0.0550 · 41732↑ 281↓` while it ran. **`maxCostUsd` is reachable for
+      the first time.**
+      **Deleted:** `libs/ts/ui` (`@repo/ui`), the Turborepo leftover — zero importers re-verified
+      before removal.
 
 - [x] Architecture extracted from the *Coding Agents + Cloud* deck
 - [x] V0–V6 ladder defined, each with one acceptance test
@@ -38,24 +59,81 @@ preview, review, iterate, deploy.
       home · plan validation as a gate that never LLM-repairs · `RunEvent` as the execution log,
       distinct from `Message`. **`ARCHITECTURE.md` §11 had no `Blueprint` table at all** — the data
       model is now the eleven entities V4 actually needs. Deferred: a generic `Artifact` table (O11)
-- [ ] **Slice 1 — `Message`, `AgentEvent` (with `seq`), `AgentEventSink` in `libs/ts/agent-core/src/types.ts`**
-- [ ] Slice 2–7 — provider, tools, loop, prompt, CLI, proof
+- [x] **D41–D43 added 2026-08-16** — deploy into the **user's own** Vercel + Postgres, connected at
+      Deploy and never at build · `Environment` as an entity with two rows · **agent decides /
+      executor runs / user authorises**, which is the standing test for "should this be a tool?"
+      and closes the MCP question with no MCP decision. **O5 shrank to preview-time only** —
+      deployed secrets are write-through and never stored. Rejected the same day: MCP as the
+      integration backbone (contradicts [D24](./DECISIONS.md)), EC2 for the backend (contradicts
+      [D25](./DECISIONS.md)), a `DeploymentProvider` interface before two implementations exist,
+      and a mid-build pause to provision a database (contradicts [D29](./DECISIONS.md))
+- [x] **D44–D45 added 2026-08-22**, from a latency and system-design review of the docs — **a
+      restored checkpoint invalidates the transcript written after it** (a worker dying mid-task
+      left Postgres describing 30 edits the git restore had already undone, and V3's
+      `(sessionId, seq)` idempotency could never have caught it — a replay re-calls the LLM and
+      gets different text, so there is no key to collide on) · **budgets are seat holds, not
+      balance checks** — a run atomically reserves `budgetUsd` in the `WHERE` clause, because
+      read-then-check lets N concurrent runs each pass the same test. D40 amended: **`text_delta`
+      is never written to a row**, or `RunEvent` grows at token rate rather than event rate.
+      **Eight open questions raised (O12–O19)** — `seq` allocation under two writers · what is
+      inside a snapshot · a latency budget per version · LLM provider backpressure · tenant
+      fairness · connection pooling · preview-URL auth · where the reconnect buffer lives once the
+      API has two instances
+- [x] **New rung: [V1.1 UI System](./versions/V1_1_UI_SYSTEM.md)** (2026-08-22). **D46's target
+      moved V4 → V1.1**, split into *vocabulary now, enforcement at V4*. The trigger was felt, not
+      predicted: V1 is shipped and its output reads as a first draft — and the taste-independent
+      evidence is that the **pristine** `vite-react` starter already ships `rounded-[30px]`,
+      `leading-[72px]`, and `text-[32px]` in hand-rolled `.btn`/`.head-text` utilities. The
+      template was inventing off-scale values before the agent ever did. **Both templates share one
+      token library** so two token files cannot become two design systems; recorded cost is two
+      shadcn installs and `vite-react` possibly becoming dead weight at V4. Also found:
+      **`libs/ts/ui` (`@repo/ui`) is a Turborepo starter leftover with zero importers** — delete or
+      rename it before `ui-system` lands, or §14's *two of everything* blurs
+- [x] **D46–D53 added 2026-08-22** — the UI system as a **registry + token scale** the agent
+      composes from, never invents ([D9](./DECISIONS.md)'s determinism argument applied to pixels,
+      [D24](./DECISIONS.md)'s allowlist shape applied to components) · a `design` block in the
+      Blueprint, frozen like the stack, with **responsive declared not retrofitted** · **`DesignState`
+      is a staging buffer, discarded on green** — a durable design layer would be
+      [D44](./DECISIONS.md) in a new costume · **`data-aw-id` injected at dev-build time**, so the
+      exported repo never contains a marker and there is no strip pass to forget · **exact edits
+      never reach the model** (`width = 286px` is a codemod; *"feel more premium"* is a prompt) ·
+      **verification checks the request that was made**, not a quality score — and a UI score stays
+      advisory and deterministic, because a model rating its own UI is [D32](./DECISIONS.md)'s
+      refused mistake · references compiled to structure **once** · the design **reviewed before it
+      is built**. **New rung: [V4.5 Visual Editor](./versions/V4_5_VISUAL_EDITOR.md)**, placed
+      before V5 by the user against the recommendation to place it after V6 — the recorded cost and
+      its mitigation are written into the version doc. Raised O20–O23: id stability · variant budget
+      · visual-verification cost · the token-scale escape hatch
+- [x] Slice 1 — `Message`, `AgentEvent` (with `seq`), `StopReason`, `Budget`, `AgentEventSink` in `libs/ts/agent-core/src/types.ts`
+- [x] Slice 2 — provider abstraction (`providers/types.ts`), `FakeProvider`, `OpenAiProvider` (real, streaming, fetch-based, no SDK dep)
+- [x] Slice 3 — tools (`list_files`, `read_file`, `write_file`, `edit_file`, `grep`, `bash`), path fence + deny-list, `wrapUntrusted`, `deps.allow.json` guard
+- [x] Slice 4 — the loop (`loop.ts`): six exits, sequential/parallel tool execution, length-stop handling
+- [x] Slice 5 — system prompt (`prompts/system.md`), injected with the live project file tree
+- [x] Slice 6 — CLI harness (`cli.ts`) wired end to end: real provider, real tools, `SIGINT` → `AbortController`
+- [x] Slice 7 — both acceptance tests pass against `templates/vite-react`; 24 tests green in `bun test`
 
-> ⚠️ **The honest number, re-counted 2026-08-13: 6,362 lines of docs, 316 lines of TypeScript** —
-> and `agent-core/src/types.ts` is still **0 bytes**. The architecture is not the risk; that ratio
-> is, and it got worse this session, not better. Slice 1 is one file. Write it.
+> ✅ **2026-08-16: V0 is done.** The gap this note used to describe — scaffolding with no loop
+> behind it — is closed. `runAgentLoop` and `FakeProvider` were TODO stubs at session start; both
+> are implemented and tested now, plus the real `OpenAiProvider` and full tool wiring that didn't
+> exist at all.
 
-### Known broken — verified against the code 2026-08-11
+### Known broken — verified against the code 2026-08-16
 
 Not "todo". These are things the docs claimed were working and are not.
 
 | What | Where | Fix in |
 |---|---|---|
-| `safeResolve` / `workspaceRoot` are **not exported** — three docs said "import it, don't rewrite it" | `libs/ts/contracts/src/utils/projectFiles.ts` | V0 Slice 3 |
-| The fence root points at `libs/apps/projects` — `apps/` was deleted 2026-08-10 | same file | V0 Slice 3 |
-| `bun test` walks `ref-ai/`'s 438 tests and hangs; **zero** project tests exist | no `bunfig.toml` | V0 Slice 3 |
-| `bun run check-types` covers 4 of 11 packages — `contracts`, `db`, `config`, `web`, `orchestrator` have no script | `package.json` × 5 | V0 Slice 7 |
+| `bun run check-types` covers 4 of 11 packages — `db`, `config`, `orchestrator` have no script (contracts and web now do) | `package.json` × 3 | V0 Slice 7 |
 | `services/web` is a 255-line UI from the deleted architecture, wired to `:4000`; nothing listens there | `services/web/src/App.tsx` | V1 — delete, don't extend |
+| Preview iframe blank: dev-server port allocation had no liveness check, orphans survived API restarts, and dead processes stayed in the port map. **Fixed 2026-08-22** — `allocatePort()` probes the OS, `stopAllDevServers()` runs on exit, `exitCode` is checked before reusing a port, and both spawns use `inherit` instead of an undrained pipe | `services/api/src/workspace/manager.ts` | fixed |
+| `MODEL_PROVIDERS` lists `llama-3.1-8b-instant`, which Groq no longer serves — picking it returns `model_not_found`. The xAI key in `.env` is also rejected. Found while verifying usage reporting; **not** fixed, because neither is about V1.1 | `libs/ts/agent-core/src/providers/openai.ts` · `.env` | next session |
+
+**Fixed this session, previously listed here:**
+- `safeResolve` / `workspaceRoot` — already exported when checked; the real bug was the fallback
+  path in `PROJECTS_DIR` being off by one directory level (`../../../../templates` resolved to
+  `libs/templates`, not the repo root) — fixed to `../../../../../templates`.
+- `bun test` walking `ref-ai/`'s 438 tests — fixed via explicit roots in the `test` script
+  (`bun test services libs`) plus `--path-ignore-patterns 'ref-ai/**'`.
 
 **Rule that caused all of this:** *"if a doc disagrees with the code, the code wins — then fix the
 doc that session."* It was written after the first two drifts and not applied. Re-run the audit at
@@ -73,9 +151,12 @@ Detail: [versions/V0_AGENT_LOOP.md](./versions/V0_AGENT_LOOP.md)
 ```
  V0  AGENT LOOP           while-not-if · tools · streaming · providers
  V1  WEB APP + MEMORY     Projects/Sessions/Messages · SSE · 3-pane UI · preview
+V1.1 UI SYSTEM           shadcn · Radix · Lucide · design tokens · component registry
  V2  ISOLATION & CONTROL  git worktrees · approvals · diffs · verification
  V3  CLOUD SANDBOX        queue · orchestrator · sandbox · auth · multi-tenant   ◄ the wall
  V4  APP BUILDER          planner · blueprint · task DAG · full-stack generation ◄ Emergent parity
+                          + UI system · design tokens · UI blueprint · design review
+V4.5 VISUAL EDITOR        component graph · property panel · ChangeSet · exact edits ◄ the differentiator
  V5  BROWSER AGENT        drive the app · semantic clicks · E2E tests · visual checks
  V6  AUTONOMY & DEPLOY    self-heal · memory · observability · one-click deploy
 
@@ -91,9 +172,9 @@ Every version has **one** acceptance test. No partial credit. Never skip a rung.
 | | |
 |---|---|
 | **[ARCHITECTURE.md](./ARCHITECTURE.md)** | The system. Diagrams, data model, every layer, where we deviate from the deck |
-| **[VERSIONS.md](./VERSIONS.md)** | The ladder: ship criteria, estimates, sequencing rules |
+| **[VERSIONS.md](./VERSIONS.md)** | The ladder: eight rungs, ship criteria, estimates, sequencing rules |
 | **[versions/](./versions/)** | The actual TODO list per version, with traps and definition of done |
-| **[DECISIONS.md](./DECISIONS.md)** | 40 decisions with trade-offs, plus what's still open |
+| **[DECISIONS.md](./DECISIONS.md)** | 53 decisions with trade-offs, plus 14 open questions that block work when reached |
 | **[CODE_QUALITY.md](./CODE_QUALITY.md)** | How we write code here — patterns from `ref-ai/packages`. Keep it open while coding |
 | **[CRASH_COURSE.md](./CRASH_COURSE.md)** | Every concept explained so far, six lines each, dated. Written the moment it's taught |
 | **[LEARNING.md](./LEARNING.md)** | What to learn at each version, and what's actually been mastered |

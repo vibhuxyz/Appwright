@@ -22,6 +22,7 @@
 6. [Track B — Remote control & handoff (deferred)](#6-track-b--remote-control--handoff-deferred)
 7. [Layer 3 — The cloud pivot](#7-layer-3--the-cloud-pivot)
 8. [Layer 4 — The App Builder / Planner](#8-layer-4--the-app-builder--planner)
+   · [8.7 UI system](#87-the-ui-system--a-registry-and-a-scale-not-a-style-guide) · [8.8 design block](#88-the-blueprints-design-block) · [8.9 UI DAG](#89-the-ui-task-dag) · [8.10 component graph](#810-the-component-graph--layer-45) · [8.11 visual editor](#811-the-visual-editor-and-designstate)
 9. [Full target architecture](#9-full-target-architecture)
 10. [Component responsibility map](#10-component-responsibility-map)
 11. [Data model](#11-data-model)
@@ -953,6 +954,145 @@ mechanism that can say no.**
 
 ---
 
+### 8.7 The UI system — a registry and a scale, not a style guide
+
+Everything above plans *what the app does*. This plans *what it looks like*, and it uses the
+identical move: **push the decision out of the prompt into a structure the machine can check**
+([D46](./DECISIONS.md#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4)).
+
+```
+libs/ts/ui-system/
+├── tokens/     colors · spacing · typography · radius · shadows · breakpoints
+├── registry/   Button → shadcn/ui · variants [default|secondary|outline|ghost] · allowed
+├── layouts/    predefined shells
+└── rules/      accessibility · responsive
+```
+
+The fixed ecosystem — Next.js · React · TypeScript · Tailwind · shadcn/ui · Radix · Lucide — says
+what may be used. The registry says **which primitives exist and in what shapes**, so the agent
+never writes a `Button` that already exists. The token scale says **which numbers exist**:
+
+```
+p-4   gap-4   rounded-lg          composed from the scale
+px-[17px]  rounded-[11px]         invented — defensible alone, incoherent across 30 files
+```
+
+Same shape as [D24](./DECISIONS.md#decision-24-the-agent-may-not-install-packages-it-invented--active-target-v4-enforced-in-v0s-bash-tool):
+**a list the model chooses from beats an instruction the model is asked to honour.**
+
+### 8.8 The Blueprint's `design` block
+
+The IR gains visual decisions, frozen at plan time exactly like the stack
+([D47](./DECISIONS.md#decision-47-the-blueprint-has-a-design-section-and-it-is-the-source-of-truth-for-visual-decisions--active-target-v4)).
+
+```json
+{
+  "design": { "style": "minimal-premium", "density": "comfortable", "fontFamily": "Inter",
+              "colorMode": "light", "primaryColor": "#111111", "accentColor": "#6366F1",
+              "radius": "md", "maxContentWidth": "1280px" },
+  "layout": { "header": "72px", "sidebar": "240px", "content": "12-column",
+              "mobileNavigation": "bottom" },
+  "responsive": { "desktop": {}, "tablet": {}, "mobile": {} }
+}
+```
+
+`§8.6`'s frozen-stack trap has a visual twin that is harder to see: page 3 comfortable, page 6
+dense, and the app feels wrong with no bug to point at. **An ACR covers a design change too** — no
+new mechanism. And **responsive is declared, never retrofitted**, or every session ends with the
+same "now fix mobile" task that nobody verifies.
+
+A reference image (screenshot, sketch, Figma export) is **parsed once into that block** and never
+re-shown to the model ([D52](./DECISIONS.md#decision-52-a-visual-reference-is-compiled-to-structure-once-never-re-shown-to-the-model--active-target-v4)) —
+a recurring per-turn cost becomes a fixed one, and a varying answer becomes a stable one.
+
+Because the design is frozen before anything renders, it is **reviewed before it is built**
+([D53](./DECISIONS.md#decision-53-the-design-is-reviewed-before-it-is-built--active-target-v4)):
+two or three directions, the user picks one, then thirty tasks run. *"I don't like this layout"*
+costs one planner call instead of one application.
+
+### 8.9 The UI task DAG
+
+`§8.3`'s graph, with the shape UI work actually has:
+
+```
+T1 Design System
+ ├── T2 App Shell
+ ├── T3 Typography
+ ├── T4 Layout
+ └── T5 Shared Components
+          ▼
+       T6 Pages  ──►  T7 Responsive  ──►  T8 Visual Verification
+```
+
+Edges are still computed from `owns`/`reads`
+([D30](./DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)) —
+nothing new is invented for UI. For a later edit the same compiler runs backwards:
+
+```
+ChangeSet ──► affected components ──► affected files ──► the sub-DAG that must re-run
+```
+
+### 8.10 The component graph — Layer 4.5
+
+Knowing that `src/components/Card.tsx` exists is not enough to answer *"the user clicked **that**"*.
+The generated app's **UI tree** is built deterministically from the AST at generation time:
+
+```
+Dashboard
+└── DashboardShell
+    ├── Sidebar
+    ├── Header
+    └── Main
+        ├── RevenueCard        id: dashboard.revenue-card
+        ├── OrdersCard             file: src/components/revenue-card.tsx
+        └── ActivityTable          route: /dashboard  ·  parent: dashboard.metrics-grid
+```
+
+```
+user clicks ──► data-aw-id ──► component graph ──► file + range
+```
+
+`data-aw-id` is **injected by an SWC plugin during the dev build only**
+([D49](./DECISIONS.md#decision-49-appwright-identity-is-injected-at-build-time-never-written-into-source--active-target-v45)).
+The generated repo never contains one — §14's export promise and
+[D33](./DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)'s
+*no agent state in the user's repo* both hold, with no strip pass to forget.
+
+### 8.11 The visual editor and `DesignState`
+
+```
+drag ──► DesignState (PENDING) ──► Submit ──► ChangeSet compiler (deterministic)
+                                                  │
+                                    ┌─────────────┴─────────────┐
+                                    ▼                           ▼
+                            exact → codemod              intent → agent loop
+                            zero tokens                  a normal task
+                                    └─────────────┬─────────────┘
+                                                  ▼
+                                    verify the request that was made
+                                                  ▼
+                                    DesignState DISCARDED — repo is the truth
+```
+
+Three rules carry this, and each one is an existing decision applied to a new input:
+
+| Rule | Decision | The older decision it echoes |
+|---|---|---|
+| The buffer is not a source of truth | [D48](./DECISIONS.md#decision-48-designstate-is-a-staging-buffer--the-repo-is-the-only-durable-visual-truth--active-target-v45) | [D44](./DECISIONS.md#decision-44-a-restored-checkpoint-invalidates-the-transcript-written-after-it--active-target-v3-schema-at-v4) — two writers, one fact, guaranteed drift |
+| Exact edits never reach the model | [D50](./DECISIONS.md#decision-50-two-interaction-modes--exact-edits-never-reach-the-model--active-target-v45) | [D43](./DECISIONS.md#decision-43-three-kinds-of-operation--the-agent-decides-the-executor-runs-the-user-authorises--active-target-v0-onward-the-test-for-every-new-capability) — `286px` is not a judgement call |
+| Conflicts are surfaced, never resolved | [D50](./DECISIONS.md#decision-50-two-interaction-modes--exact-edits-never-reach-the-model--active-target-v45) | [D39](./DECISIONS.md#decision-39-plan-validation-is-a-gate-never-a-repair--active-target-v4) — reject and ask, never repair |
+
+**Verification checks the request, not a vibe**
+([D51](./DECISIONS.md#decision-51-verification-checks-the-request-that-was-made-not-a-general-notion-of-good--active-target-v45-deepens-at-v5)):
+asked `286px` → `boundingBox().width === 286`. That narrow check needs no browser agent, which is
+what lets the editor ship at V4.5 rather than waiting for V5. A UI quality score may exist, but
+every dimension is **measured** — contrast from computed colors, spacing from distance to the
+scale, reuse from registry hits — and it generates optimisation tasks rather than gating them.
+A model scoring its own UI is [D32](./DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)'s
+refused mistake with a friendlier number on it.
+
+---
+
 ## 9. Full target architecture
 
 ```
@@ -1084,6 +1224,8 @@ erDiagram
     Session ||--o{ Approval : gates
     Project ||--o{ Secret : stores
     Project ||--o| Sandbox : "runs in"
+    Project ||--o{ Component : "renders as"
+    Component ||--o{ DesignState : "staged edits"
 
     User { string id string email string hashPassword float budgetDailyUsd }
     Project { string id string userId string name string repoPath string status }
@@ -1098,6 +1240,8 @@ erDiagram
     Approval { string id string sessionId string messageId string toolName json args string status }
     Sandbox { string id string projectId string providerId string previewUrl string status }
     Secret { string id string projectId string key string encryptedValue }
+    Component { string id string projectId string parentId string route string sourceFile string sourceRange int blueprintVersion }
+    DesignState { string id string componentId string property string from string to string breakpoint string status }
 ```
 
 ### The one distinction to hold onto here
@@ -1144,7 +1288,7 @@ Notes:
   ([D40](./DECISIONS.md#decision-40-runevent-is-the-durable-execution-log--message-is-the-conversation--active-target-v1-grows-per-version)).
   Two ordered logs, two independent `seq` counters. §7.5's durable path writes here. **The type
   vocabulary grows one version at a time** — V4's task events are not declared at V1.
-- **Budgets nest** ([D38](./DECISIONS.md#decision-38-budgets-nest-user--run--task--active-target-v4)):
+- **Budgets nest** ([D38](./DECISIONS.md#decision-38-budgets-nest--user--run--task--active-target-v4)):
   `User.budgetDailyUsd` → `Run.budgetUsd` → the loop's own `Budget`
   ([D26](./DECISIONS.md#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0)). A task
   cannot spend what its run has left; a run cannot spend what its user has left.
@@ -1154,6 +1298,16 @@ Notes:
 - `Approval` is its own table, not a flag on `Message`: approvals are queried, expire, and are
   answered from a different device than the one that asked.
 - `Sandbox.previewUrl` — what the UI iframes.
+- **`Component` is derived, never authored.** Built from the AST at generation time and rebuilt
+  after any task that touches a component file. A stale graph maps a click to the file that used
+  to be there, which is the worst failure V4.5 has. Note it carries `sourceFile`/`sourceRange` but
+  **no visual values** — those live only in the code
+  ([D48](./DECISIONS.md#decision-48-designstate-is-a-staging-buffer--the-repo-is-the-only-durable-visual-truth--active-target-v45)).
+- **`DesignState` is the one table here that is meant to be empty.** Rows exist between *drag* and
+  *applied*, and are discarded when the run goes green. It is a staging buffer, not a design layer
+  — a durable one would be two writers over one fact, which is
+  [D44](./DECISIONS.md#decision-44-a-restored-checkpoint-invalidates-the-transcript-written-after-it--active-target-v3-schema-at-v4)
+  in a new costume. A non-empty `DesignState` outside an active editing session is a bug.
 
 ---
 
@@ -1258,7 +1412,8 @@ migrations + seed data ([D14](./DECISIONS.md#decision-14-the-generator-produces-
 |---|---|
 | one Postgres — users, projects, sessions, messages | **one Postgres per project** — restaurants, orders ([D15](./DECISIONS.md#decision-15-the-generated-apps-database--one-per-project--active-target-v4)) |
 | a bucket — snapshots, dumps ([D19](./DECISIONS.md#decision-19-object-storage--snapshots-and-dumps-not-git--active-target-v3)) | a bucket — restaurant photos, user avatars |
-| our provider API keys | its own `DATABASE_URL` / `AUTH_SECRET` (generated) + the user's third-party keys (open) |
+| our provider API keys | its own `DATABASE_URL` / `AUTH_SECRET` (generated) + the user's third-party keys — write-through at deploy ([D41](./DECISIONS.md#decision-41-deployment-targets-the-users-own-accounts-and-the-connect-moment-is-at-deploy--active-target-v6-slice-4)), open only for preview ([O5](./DECISIONS.md#open--not-yet-decided)) |
+| one row per project | **two `Environment` rows** — `development` (sandbox Postgres) and `production` (the user's) ([D42](./DECISIONS.md#decision-42-environment-is-a-first-class-entity-and-it-ships-with-two-rows--active-target-v4-tables-used-at-v6)). ⚠️ **§11's ER diagram does not have this entity yet** — add it when V4's tables are written |
 
 **Per project, never per user.** Ten projects mean ten `User` tables — share a database and they
 collide on day one.
@@ -1311,7 +1466,7 @@ the generated app's secrets ([D15](./DECISIONS.md#decision-15-the-generated-apps
 the sandbox boundary ([D22](./DECISIONS.md#decision-22-the-sandbox-boundary-is-an-http-contract-not-a-typescript-interface--active-target-v3-shapes-v0)) ·
 **the sandbox provider — E2B** ([D25](./DECISIONS.md#decision-25-e2b-is-the-sandbox-provider--active-target-v3-closes-o1)).
 
-**Cost control now has a home** — [D38](./DECISIONS.md#decision-38-budgets-nest-user--run--task--active-target-v4).
+**Cost control now has a home** — [D38](./DECISIONS.md#decision-38-budgets-nest--user--run--task--active-target-v4).
 Three nesting levels (user → run → task), with the innermost already specified as the loop's
 `Budget` at V0 ([D26](./DECISIONS.md#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0)).
 It used to be restated here because nothing else owned it; that is no longer true.

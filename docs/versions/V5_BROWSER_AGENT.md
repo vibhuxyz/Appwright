@@ -159,6 +159,23 @@ Playwright's `getByRole` is built on exactly this.
       baseline — there isn't one for a freshly generated app.
 - [ ] A vision-model pass (*"does this look broken?"*) is the last resort, not the first tool.
 
+### Slice 4b — Requested-change and regression checking
+- [ ] **Deepen [V4.5](./V4_5_VISUAL_EDITOR.md)'s requested-change verification**, do not rebuild it.
+      V4.5 already asserts `asked 286 → rendered 286`
+      ([D51](../DECISIONS.md#decision-51-verification-checks-the-request-that-was-made-not-a-general-notion-of-good--active-target-v45-deepens-at-v5)).
+      V5 adds the checks that need a driven browser: *"sticky"* → scroll and re-measure,
+      *"side by side"* → same row.
+- [ ] **UI regression detection.** An agent fixing a button must not silently break the navbar —
+      compare DOM snapshots and screenshots against **the previous run**, never an absolute ideal.
+- [ ] Full-page checks across the four viewports: 390 · 768 · 1024 · 1440. Overflow, alignment,
+      clipping, text wrapping, hierarchy, contrast, focus, label presence, target size.
+- [ ] **The UI quality score is advisory and deterministic.** Every dimension is measured —
+      contrast from computed colors, spacing from distance to the token scale, reuse from registry
+      hits over total elements. It generates optimisation tasks; **it never gates a task**, and no
+      model rates its own output ([D32](../DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)).
+- [ ] Cap the per-run cost. Screenshots at four viewports across every changed route, retained,
+      adds up fast ([O22](../DECISIONS.md#open--not-yet-decided)).
+
 ### Slice 5 — Wire it into verification
 - [ ] Extend the verification tiers ([D21](../DECISIONS.md)): compile → run → **interact** → **look**.
 - [ ] A task is not green until its tier passes.

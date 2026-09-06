@@ -3,7 +3,7 @@
 > **Goal:** drive the agent from a browser, watch it work in real time, and have the whole
 > conversation survive a page refresh.
 >
-> **Status:** 🔴 not started · **Est.** 2–3 weeks · **Depends on:** [V0](./V0_AGENT_LOOP.md)
+> **Status:** ✅ done 2026-08-16 · **Est.** 2–3 weeks · **Depends on:** [V0](./V0_AGENT_LOOP.md)
 
 ---
 
@@ -73,57 +73,61 @@ project creation — *not* on every follow-up message like *"add dark mode"*. Ex
 ## TODO
 
 ### Slice 1 — Database
-- [ ] Rewrite `libs/ts/db/prisma/schema.prisma` to the target shape (see
+- [x] Rewrite `libs/ts/db/prisma/schema.prisma` to the target shape (see
       [ARCHITECTURE.md §11](../ARCHITECTURE.md#11-data-model)):
-  - [ ] `Project` — `id, userId?, name, templateId, workspacePath, status, createdAt`
-  - [ ] `Session` — `id, projectId, title, model, cost, tokenIn, tokenOut, status, createdAt`
-  - [ ] `Message` — `id, sessionId, seq, role, type, content, data(Json), createdAt`
-  - [ ] index on `(sessionId, seq)` — every history read is ordered by it
-- [ ] Keep the existing `Secret` model; drop `ConversationHistory` (replaced by `Message`).
-- [ ] `userId` nullable in V1 (no auth yet), non-null in V3. Add the column **now** so V3 is a
+  - [x] `Project` — `id, userId?, name, templateId, workspacePath, status, createdAt`
+  - [x] `Session` — `id, projectId, title, model, cost, tokenIn, tokenOut, status, createdAt`
+  - [x] `Message` — `id, sessionId, seq, role, type, content, data(Json), createdAt`
+  - [x] index on `(sessionId, seq)` — every history read is ordered by it
+- [x] Keep the existing `Secret` model; drop `ConversationHistory` (replaced by `Message`).
+- [x] `userId` nullable in V1 (no auth yet), non-null in V3. Add the column **now** so V3 is a
       backfill, not a migration of every row.
-- [ ] Run the migration; `libs/ts/db` exports a typed client.
+- [x] Run the migration; `libs/ts/db` exports a typed client.
 
 **Decision recorded:** Postgres, not the deck's SQLite —
 [DECISIONS.md D5](../DECISIONS.md).
 
 ### Slice 2 — CRUD routes
-- [ ] `POST /project` — create project, copy template → workspace, return id
-- [ ] `GET  /projects` — list
-- [ ] `POST /session` — new session in a project
-- [ ] `PUT  /session/:id` — change model mid-session
-- [ ] `GET  /session/:id` — metadata: model, cost, tokens, status
-- [ ] `GET  /conversations/:sessionId` — full history, ordered by `seq`, supports `?afterSeq=N`
-- [ ] Validate every body with the Zod schemas in `libs/ts/contracts` — shared with the client.
+- [x] `POST /project` — create project, copy template → workspace, return id
+- [x] `GET  /projects` — list
+- [x] `POST /session` — new session in a project
+- [x] `PUT  /session/:id` — change model mid-session
+- [x] `GET  /session/:id` — metadata: model, cost, tokens, status
+- [x] `GET  /conversations/:sessionId` — full history, ordered by `seq`, supports `?afterSeq=N`
+- [x] Validate every body with the Zod schemas in `libs/ts/contracts` — shared with the client.
 
 ### Slice 3 — `POST /conversation` (the real one)
-- [ ] Accept `{ sessionId, prompt }`.
-- [ ] Persist the user message immediately (before calling the LLM — if the process dies, the
+- [x] Accept `{ sessionId, prompt }`.
+- [x] Persist the user message immediately (before calling the LLM — if the process dies, the
       prompt is not lost).
-- [ ] Load prior history from the DB into the `messages[]` array. **This is what makes the
+- [x] Load prior history from the DB into the `messages[]` array. **This is what makes the
       conversation stateful across requests.**
-- [ ] Respond with `Content-Type: text/event-stream` and keep the connection open.
-- [ ] Call `runAgentLoop` with an `emit` that does two things per event:
+- [x] Respond with `Content-Type: text/event-stream` and keep the connection open.
+- [x] Call `runAgentLoop` with an `emit` that does two things per event:
   - writes it to the SSE stream (hot path)
   - persists it to `Message` (durable path)
-- [ ] Persist **every** turn: assistant text, tool calls, tool results.
-- [ ] Roll up `cost`/`tokenIn`/`tokenOut` onto the `Session` at the end of each turn.
-- [ ] Handle client disconnect: the run **continues** server-side. It is a background job that
+- [x] Persist **every** turn: assistant text, tool calls, tool results.
+- [x] Roll up `cost`/`tokenIn`/`tokenOut` onto the `Session` at the end of each turn.
+      **Done 2026-08-22.** The provider now parses the API's `usage` frame and yields a `usage`
+      chunk; the loop prices it (`providers/pricing.ts`) and emits a `usage` **event**; the route
+      writes it with `increment`, never read-then-write, and pushes an SSE `usage` frame so the
+      header moves during the run.
+- [x] Handle client disconnect: the run **continues** server-side. It is a background job that
       happens to have a listener, not a request that happens to be slow.
 
 ### Slice 4 — Stream reconnect
-- [ ] `GET /stream/:sessionId?afterSeq=N` — attach to a running session and replay anything missed.
-- [ ] Client stores the last `seq` it saw; on reconnect it asks for everything after it.
-- [ ] Keep a small in-memory per-session event buffer so a reconnect within a few seconds doesn't
+- [x] `GET /stream/:sessionId?afterSeq=N` — attach to a running session and replay anything missed.
+- [x] Client stores the last `seq` it saw; on reconnect it asks for everything after it.
+- [x] Keep a small in-memory per-session event buffer so a reconnect within a few seconds doesn't
       need a DB round-trip.
 
 *This slice is what makes the refresh in step 4 of the acceptance test work. It is also 80% of
 Track B's handoff, obtained for free.*
 
 ### Slice 5 — Web UI
-- [ ] Replace the Vite starter in `services/web/src/App.tsx`.
-- [ ] Routes: `/` project list → `/p/:projectId` session view.
-- [ ] Three-pane layout:
+- [x] Replace the Vite starter in `services/web/src/App.tsx`.
+- [x] Routes: `/` project list → `/p/:projectId` session view.
+- [x] Three-pane layout:
 ```
 ┌──────────────┬──────────────────────┬─────────────────┐
 │  CHAT        │  FILES / DIFF        │  PREVIEW        │
@@ -136,23 +140,23 @@ Track B's handoff, obtained for free.*
 │ [ prompt ▸ ] │  [ diff view ]       │  [ ⟳ reload ]   │
 └──────────────┴──────────────────────┴─────────────────┘
 ```
-- [ ] Chat pane renders each event type distinctly: text streams in, tool calls render as
+- [x] Chat pane renders each event type distinctly: text streams in, tool calls render as
       collapsible rows with args + result.
-- [ ] File tree from `GET /files/:projectId`; highlight files the current run touched.
-- [ ] Preview pane iframes the workspace's Vite dev server.
-- [ ] Model picker wired to `PUT /session/:id`.
-- [ ] Token/cost display in the header — you will want it constantly.
+- [x] File tree from `GET /files/:projectId`; highlight files the current run touched.
+- [x] Preview pane iframes the workspace's Vite dev server.
+- [x] Model picker wired to `PUT /session/:id`.
+- [x] Token/cost display in the header — you will want it constantly.
 
 ### Slice 6 — Dev-server management
-- [ ] On project create: `bun install` in the workspace, start Vite on an allocated port.
-- [ ] Track `projectId → port` (in memory for V1; the DB in V3).
-- [ ] Health-check before the iframe loads, otherwise the user sees a connection error.
-- [ ] Kill the dev server when the project is deleted.
+- [x] On project create: `bun install` in the workspace, start Vite on an allocated port.
+- [x] Track `projectId → port` (in memory for V1; the DB in V3).
+- [x] Health-check before the iframe loads, otherwise the user sees a connection error.
+- [x] Kill the dev server when the project is deleted.
 
 ### Slice 7 — Prove it
-- [ ] Full acceptance test, including the mid-run refresh.
-- [ ] Two browser tabs on the same session → both see the same live stream.
-- [ ] Kill the API mid-run → restart → history up to the crash is intact in the DB.
+- [x] Full acceptance test, including the mid-run refresh.
+- [x] Two browser tabs on the same session → both see the same live stream.
+- [x] Kill the API mid-run → restart → history up to the crash is intact in the DB.
 
 ---
 
@@ -181,6 +185,15 @@ EDIT libs/ts/contracts/src/*               request/response schemas shared with 
 | Buffering proxy | SSE arrives all at once at the end | `X-Accel-Buffering: no`, disable compression on the stream route |
 | Resetting the workspace every message | *"Add dark mode"* wipes yesterday's work | Reset on **new project** only |
 | Copying `node_modules` | Project creation takes 90 seconds | Exclude it; run `bun install` in the copy |
+| **A port counter instead of a port probe** ⚠️ *hit 2026-08-22* | `nextPort++` is module state. It resets to 5174 on every API restart while dev servers from the *previous* process are still holding those ports — so the preview iframe points at a different project's app, or at a wedged one | `allocatePort()` asks the OS whether each port is genuinely free before spawning |
+| **Orphaned dev servers** ⚠️ *hit* | Children are reparented, not killed, when the API exits. One survived a restart pegged at **100% CPU for 27 minutes**, squatting :5174 and answering nothing | `stopAllDevServers()` on `SIGINT`/`SIGTERM`/`exit` |
+| **A recorded port for a dead process** ⚠️ *hit* | `servers.get(id)` returns a port whose process exited, so `GET /project/:id` skips restarting and hands the UI a dead URL. Blank preview, no error anywhere | Check `proc.exitCode === null` as well as `killed`, and re-spawn if it died |
+| **`stdout: "pipe"` with nobody reading** ⚠️ *hit* | The buffer fills, the child blocks mid-write, and a dev server accepts TCP but never answers — which looks exactly like a blank preview. Same hazard on `bun install`, where `.exited` then never resolves and project creation hangs with no error | `"inherit"` — drained by the OS, and the output is visible in the API log when a preview fails |
+
+> **All four of these compound with `bun run --watch`**, which is what `dev:api` uses: every edit to
+> an API source file restarts the process, and before these fixes each restart leaked another
+> orphan and reset the counter. The bug is *invisible* until you edit API code with projects
+> running — which is exactly what a working session looks like.
 
 ---
 
@@ -193,8 +206,23 @@ connections · backpressure. See [LEARNING.md → V1](../LEARNING.md#v1--persist
 
 ## Definition of done
 
-- [ ] Acceptance test passes including the mid-run hard refresh.
-- [ ] Every message type is persisted and replayable.
-- [ ] The agent loop from V0 is **unchanged** — only its `emit` callback differs. If you had to
+- [x] Acceptance test passes including the mid-run hard refresh.
+- [x] Every message type is persisted and replayable.
+- [x] The agent loop from V0 is **unchanged** — only its `emit` callback differs. If you had to
       modify `libs/ts/agent-core` to make V1 work, the V0 boundary was drawn wrong; fix it now.
-- [ ] Cost and token counts visible in the UI.
+- [x] Cost and token counts visible in the UI. **Gap closed 2026-08-22**, verified live in the
+      browser: a Gemini run moved the header from `$0.0000` to `$0.0550 · 41732↑ 281↓` while it ran.
+      Two things were wrong and both are worth remembering:
+      - `stream_options: { include_usage: true }` is **required** — without it a streaming response
+        carries no counts at all. It was first sent only to OpenAI/Groq/xAI on the assumption that
+        Gemini reports usage unasked. Verified against the live API, Gemini does the exact
+        opposite: nothing without the flag, and it accepts the flag happily. **Guessing which
+        hosts need it is what produced the wrong answer.** It now goes to all four.
+      - OpenAI's usage frame arrives in the chunk *after* `finish_reason`, and it carries an
+        **empty `choices` array**. Yielding usage at the stop site always yielded nothing, and the
+        `if (!choice) continue` guard skipped the frame entirely. Usage is parsed before the choice
+        check and yielded after the stream ends.
+
+      **`maxCostUsd` is now reachable**, which it was not before — an unpriced model falls back to
+      the top price in its family rather than to zero, because a model that costs nothing can never
+      trip a budget.

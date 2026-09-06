@@ -17,7 +17,7 @@ preview, review, iterate, deploy.
 |---|---|
 | `docs/README.md` | **Start here.** Current version, current slice, and the known-broken list |
 | `docs/versions/V*.md` | Only the current version. **Its checkboxes are the progress record** |
-| `docs/DECISIONS.md` | 29 entries. What is locked (don't reopen) and what is open (may block) |
+| `docs/DECISIONS.md` | 53 entries. What is locked (don't reopen) and what is open (may block) |
 | `docs/SESSION_PROTOCOL.md` | The `/start` and `/wrap` rituals, tool-neutral |
 | `docs/CRASH_COURSE.md` | Every concept explained so far, six lines each |
 | `docs/ARCHITECTURE.md` | Only when the task touches a layer you're unsure about |
@@ -31,9 +31,12 @@ preview, review, iterate, deploy.
 ```
 V0  AGENT LOOP           while-not-if · tools · runtime seam · the path fence
 V1  WEB APP + MEMORY     Postgres · SSE · seq · 3-pane UI · preview
+V1.1 UI SYSTEM           shadcn · Radix · Lucide · tokens · component registry
 V2  ISOLATION & CONTROL  git worktrees · approvals · diffs · verify tier 1
 V3  CLOUD SANDBOX        queue · orchestrator · sandbox mgr · auth       ◄ the wall
 V4  APP BUILDER          planner · blueprint · task DAG · full-stack gen ◄ Emergent parity
+                         + UI system · design tokens · UI blueprint
+V4.5 VISUAL EDITOR       component graph · property panel · ChangeSet   ◄ the differentiator
 V5  BROWSER AGENT        drive the app · semantic clicks · verify 3 + 4
 V6  AUTONOMY & DEPLOY    self-heal · memory · observability · deploy
 ```

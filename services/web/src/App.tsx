@@ -1,255 +1,148 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { api, getToken, setToken, type Project, type User } from "./api";
+import { AuthScreen } from "./AuthScreen";
+import { ProjectView } from "./ProjectView";
 
-const API = "http://localhost:4000";
+function useHashRoute(): string {
+  const [hash, setHash] = useState(() => window.location.hash);
+  useEffect(() => {
+    const onChange = () => setHash(window.location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  return hash;
+}
 
-type Message = {
-  role: "user" | "assistant";
-  content: string;
-  createdAt: string;
-};
-type ProjectFile = { path: string; content: string };
-type ProjectSnapshot = {
-  summary: string;
-  messageHistory: Message[];
-  files: ProjectFile[];
-  updatedAt: string;
-  previewUrl: string;
-};
-
-export default function App() {
-  const [snapshot, setSnapshot] = useState<ProjectSnapshot | null>(null);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [provider, setProvider] = useState<"gemini" | "openai">("gemini");
+function ProjectList({ user, onSignOut }: { user: User; onSignOut: () => void }) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [name, setName] = useState("");
+  const [template, setTemplate] = useState("vite-react");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/api/project`)
-      .then((r) => r.json())
-      .then(setSnapshot)
-      .catch(() => setError("Cannot reach backend on :4000"));
+    api.listProjects().then(setProjects);
   }, []);
 
-  const send = async () => {
-    const content = input.trim();
-    if (!content || loading) return;
-    setInput("");
-    setLoading(true);
-    setError(null);
-    setSnapshot((s) =>
-      s
-        ? {
-            ...s,
-            messageHistory: [
-              ...s.messageHistory,
-              { role: "user", content, createdAt: new Date().toISOString() },
-            ],
-          }
-        : s,
-    );
+  const create = async () => {
+    if (!name.trim() || creating) return;
+    setCreating(true);
     try {
-      const res = await fetch(`${API}/api/messages`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ content, provider }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error ?? "request failed");
-      setSnapshot(data);
-    } catch (e: any) {
-      setError(e?.message ?? "request failed");
+      const project = await api.createProject(name.trim(), template);
+      setName("");
+      setProjects((p) => [project, ...p]);
+      window.location.hash = `#/p/${project.id}`;
     } finally {
-      setLoading(false);
+      setCreating(false);
     }
   };
 
-  const files = snapshot?.files ?? [];
-  const current =
-    files.find((f) => f.path === selected) ??
-    files.find((f) => f.path === "src/App.tsx") ??
-    files[0];
-
   return (
-    <div style={S.app}>
-      <aside style={S.chat}>
-        <div style={S.header}>Appwright</div>
-        <div style={S.messages}>
-          {(snapshot?.messageHistory ?? []).map((m, i) => (
-            <div
-              key={i}
-              style={{
-                ...S.msg,
-                ...(m.role === "user" ? S.user : S.assistant),
-              }}
-            >
-              <div style={S.role}>{m.role}</div>
-              <div style={{ whiteSpace: "pre-wrap" }}>{m.content}</div>
-            </div>
-          ))}
-          {loading && <div style={{ ...S.msg, ...S.assistant }}>building…</div>}
-          {error && <div style={{ ...S.msg, ...S.errorMsg }}>{error}</div>}
-        </div>
-        <div style={S.inputRow}>
-          <select
-            style={S.select}
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as "gemini" | "openai")}
-            title="Model provider"
-          >
-            <option value="gemini">Gemini</option>
-            <option value="openai">OpenAI</option>
-          </select>
-          <input
-            style={S.input}
-            value={input}
-            placeholder="Build a todo app…"
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
-          />
-          <button style={S.send} onClick={send} disabled={loading}>
-            {loading ? "…" : "Send"}
+    <div className="mx-auto max-w-2xl p-8 text-zinc-100">
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Appwright</h1>
+        <div className="flex items-center gap-3 text-xs text-zinc-500">
+          <span>{user.email}</span>
+          <button className="hover:text-zinc-200" onClick={onSignOut}>
+            Sign out
           </button>
         </div>
-      </aside>
+      </div>
+      <div className="mb-8 flex gap-2">
+        <input
+          className="flex-1 rounded border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none"
+          placeholder="Project name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && create()}
+        />
+        <select
+          className="rounded border border-zinc-700 bg-zinc-900 px-3 py-2 outline-none text-sm"
+          value={template}
+          onChange={(e) => setTemplate(e.target.value)}
+          disabled={creating}
+        >
+          <option value="vite-react">Vite (React)</option>
+          <option value="nextjs-fullstack">Next.js</option>
+        </select>
+        <button
+          className="rounded bg-blue-600 px-4 py-2 font-medium disabled:opacity-50"
+          onClick={create}
+          disabled={creating}
+        >
+          {creating ? "Creating…" : "Create"}
+        </button>
+      </div>
 
-      <section style={S.filesPane}>
-        <div style={S.header}>Files</div>
-        <div style={S.fileList}>
-          {files.map((f) => (
-            <div
-              key={f.path}
-              onClick={() => setSelected(f.path)}
-              style={{
-                ...S.fileItem,
-                ...(current?.path === f.path ? S.fileActive : {}),
-              }}
-            >
-              {f.path}
+      <div className="flex flex-col gap-2">
+        {projects.map((p) => (
+          <a
+            key={p.id}
+            href={`#/p/${p.id}`}
+            className="group flex items-center justify-between rounded border border-zinc-800 bg-zinc-900 px-4 py-3 hover:border-zinc-600"
+          >
+            <span>{p.name}</span>
+            <div className="flex items-center gap-4">
+              <span className="text-xs text-zinc-500">{p.status}</span>
+              <button
+                className="text-sm font-medium text-red-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (confirm(`Delete project "${p.name}"?`)) {
+                    await api.deleteProject(p.id);
+                    setProjects((curr) => curr.filter((proj) => proj.id !== p.id));
+                  }
+                }}
+              >
+                Delete
+              </button>
             </div>
-          ))}
-        </div>
-        <pre style={S.code}>{current?.content ?? ""}</pre>
-      </section>
-
-      <section style={S.previewPane}>
-        <div style={S.header}>Preview · {snapshot?.previewUrl ?? ""}</div>
-        {snapshot?.previewUrl ? (
-          <iframe title="preview" src={snapshot.previewUrl} style={S.iframe} />
-        ) : (
-          <div style={{ padding: 16 }}>no preview</div>
+          </a>
+        ))}
+        {projects.length === 0 && (
+          <div className="text-zinc-500">No projects yet — create one above.</div>
         )}
-      </section>
+      </div>
     </div>
   );
 }
 
-const S: Record<string, CSSProperties> = {
-  app: {
-    display: "grid",
-    gridTemplateColumns: "320px 1fr 1fr",
-    height: "100vh",
-    fontFamily: "ui-sans-serif, system-ui",
-    color: "#e5e7eb",
-    background: "#0b0f17",
-  },
-  chat: {
-    display: "flex",
-    flexDirection: "column",
-    borderRight: "1px solid #1f2937",
-    minWidth: 0,
-  },
-  filesPane: {
-    display: "flex",
-    flexDirection: "column",
-    borderRight: "1px solid #1f2937",
-    minWidth: 0,
-  },
-  previewPane: { display: "flex", flexDirection: "column", minWidth: 0 },
-  header: {
-    padding: "12px 14px",
-    fontWeight: 700,
-    borderBottom: "1px solid #1f2937",
-    background: "#0f1623",
-    fontSize: 13,
-    color: "#9ca3af",
-  },
-  messages: {
-    flex: 1,
-    overflow: "auto",
-    padding: 12,
-    display: "flex",
-    flexDirection: "column",
-    gap: 8,
-  },
-  msg: { padding: "8px 10px", borderRadius: 8, fontSize: 13, lineHeight: 1.4 },
-  user: { background: "#1d4ed8", alignSelf: "flex-end", maxWidth: "85%" },
-  assistant: {
-    background: "#1f2937",
-    alignSelf: "flex-start",
-    maxWidth: "85%",
-  },
-  errorMsg: { background: "#7f1d1d", alignSelf: "stretch" },
-  role: {
-    fontSize: 10,
-    textTransform: "uppercase",
-    opacity: 0.6,
-    marginBottom: 2,
-  },
-  inputRow: {
-    display: "flex",
-    gap: 6,
-    padding: 10,
-    borderTop: "1px solid #1f2937",
-  },
-  input: {
-    flex: 1,
-    padding: "8px 10px",
-    borderRadius: 8,
-    border: "1px solid #374151",
-    background: "#111827",
-    color: "#e5e7eb",
-    outline: "none",
-  },
-  select: {
-    padding: "8px 6px",
-    borderRadius: 8,
-    border: "1px solid #374151",
-    background: "#111827",
-    color: "#e5e7eb",
-    cursor: "pointer",
-  },
-  send: {
-    padding: "8px 14px",
-    borderRadius: 8,
-    border: "none",
-    background: "#2563eb",
-    color: "white",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  fileList: {
-    maxHeight: "32%",
-    overflow: "auto",
-    borderBottom: "1px solid #1f2937",
-  },
-  fileItem: {
-    padding: "6px 14px",
-    fontSize: 12,
-    cursor: "pointer",
-    fontFamily: "ui-monospace, monospace",
-    color: "#9ca3af",
-  },
-  fileActive: { background: "#111827", color: "#e5e7eb" },
-  code: {
-    flex: 1,
-    overflow: "auto",
-    margin: 0,
-    padding: 14,
-    fontSize: 12,
-    fontFamily: "ui-monospace, monospace",
-    color: "#d1d5db",
-    whiteSpace: "pre",
-  },
-  iframe: { flex: 1, border: "none", background: "white" },
-};
+export default function App() {
+  const hash = useHashRoute();
+  const [user, setUser] = useState<User | null>(null);
+  // Three states, not two: "checking" matters because rendering the login
+  // screen while a valid token is still being verified makes every reload
+  // flash a sign-in form at an already-signed-in user.
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    if (!getToken()) {
+      setChecking(false);
+      return;
+    }
+    api
+      .me()
+      .then(setUser)
+      .catch(() => setToken(null))
+      .finally(() => setChecking(false));
+  }, []);
+
+  const signOut = useCallback(() => {
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  // Any 401 from any call drops us back to the login screen, so an expired
+  // token cannot leave the UI stuck on a page that will never load.
+  useEffect(() => {
+    window.addEventListener("appwright:unauthorized", signOut);
+    return () => window.removeEventListener("appwright:unauthorized", signOut);
+  }, [signOut]);
+
+  if (checking) return null;
+  if (!user) return <AuthScreen onAuthed={setUser} />;
+
+  const match = hash.match(/^#\/p\/(.+)$/);
+  if (match) return <ProjectView projectId={match[1]} />;
+  return <ProjectList user={user} onSignOut={signOut} />;
+}

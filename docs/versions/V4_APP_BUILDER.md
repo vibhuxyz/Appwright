@@ -211,6 +211,43 @@ duration estimates that do not exist** — without them it degrades into longest
 - [ ] Persist blueprints (`Blueprint` table, one per session, immutable + revisions).
 - [ ] A blueprint viewer in the UI — a user should be able to read the plan before code exists.
 
+### Slice 1b — The UI system: enforcement and the design block
+> **`libs/ts/ui-system` already exists from [V1.1](./V1_1_UI_SYSTEM.md)** — tokens, registry, and
+> both templates wired to it. V4 does **not** rebuild it. V4 gives it consequences: a vocabulary
+> becomes a grammar that can reject
+> ([D46](../DECISIONS.md#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4)).
+
+- [ ] Extend `layouts/` and `rules/` (accessibility · responsive) — the two directories V1.1 left
+      as stubs because nothing consumed them yet.
+- [ ] Add `design`, `layout`, and `responsive` blocks to the Blueprint schema
+      ([D47](../DECISIONS.md#decision-47-the-blueprint-has-a-design-section-and-it-is-the-source-of-truth-for-visual-decisions--active-target-v4)).
+      **Responsive is declared here, not fixed later** — desktop-first with a mobile cleanup pass
+      means every session ends with the task nobody verifies.
+- [ ] A **validator**, not a prompt instruction: an off-scale value or an unregistered component
+      fails the task. [D46](../DECISIONS.md#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4)
+      is only worth its cost if something enforces it.
+- [ ] Record raw-value escapes rather than forbidding them outright — three occurrences of the same
+      raw value is a missing token, and the system should say so ([O23](../DECISIONS.md#open--not-yet-decided)).
+- [ ] Visual reference input: image → **parsed once** into the design block, never re-sent in
+      context ([D52](../DECISIONS.md#decision-52-a-visual-reference-is-compiled-to-structure-once-never-re-shown-to-the-model--active-target-v4)).
+
+### Slice 3b — Design review before generation
+- [ ] Emit the `design` block plus **2–3 directions** and let the user pick one
+      ([D53](../DECISIONS.md#decision-53-the-design-is-reviewed-before-it-is-built--active-target-v4)).
+- [ ] Directions are **descriptions and a preview, not three generated applications** — building
+      three to discard two costs three times the thing this exists to save.
+- [ ] Skippable, with the default visible. Same discipline as the 3-question cap in Slice 2: a
+      decision in front of the magic moment must never be mandatory.
+- [ ] Open: how many directions, and what a preview *is* before code exists ([O21](../DECISIONS.md#open--not-yet-decided)).
+
+### Slice 4c — The UI task DAG and the component graph
+- [ ] UI-shaped task types: design system → app shell → typography → layout → shared components →
+      pages → responsive → visual verification. Edges still computed from `owns`/`reads`
+      ([D30](../DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)) — nothing new is invented for UI.
+- [ ] Build the `Component` graph from the **AST** at generation time, not by asking the model what
+      it wrote. Rebuild after any task that touches a component file — **a stale graph is what makes
+      V4.5 map a click to the wrong file.**
+
 ### Slice 2 — Intent + requirements
 - [ ] Intent classifier: prompt → structured JSON. **Use structured output / tool-calling, never
       "return JSON" in prose.**
@@ -337,7 +374,7 @@ high          + tier 3  interact + security checks           (tier 3 lands at V5
       ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)) —
       not per task, or attempt 3 erases what attempts 1 and 2 taught you.
 - [ ] **Budgets nest: user → run → task**
-      ([D38](../DECISIONS.md#decision-38-budgets-nest-user--run--task--active-target-v4)).
+      ([D38](../DECISIONS.md#decision-38-budgets-nest--user--run--task--active-target-v4)).
       The innermost level is D26's loop `Budget`, which already exists. A task exceeding it returns
       `budgetExceeded`; the **run** then decides whether to continue with independent tasks or stop.
 - [ ] Re-calibrate the budget defaults from real attempt telemetry. The first numbers are estimates
@@ -472,6 +509,18 @@ the agent adds *models and routes*, it does not invent session handling.
 **Slice 0 is non-negotiable and easy to skip.** If the baseline template does not boot, log in, and
 query the database **by hand**, no amount of generation will fix it — you will be debugging the
 planner and the template simultaneously, with no way to tell which is wrong.
+
+**Every bug the template can eliminate is a bug class the agent cannot introduce.** Hunt these
+while hand-building it, because each one otherwise repeats in every generated app forever:
+
+| Trap | Why it bites here | Template's answer |
+|---|---|---|
+| **`Decimal` for money** | Prisma's `Decimal` is a Decimal.js object; Next.js cannot serialise it across the Server → Client Component boundary. **Every e-commerce app has a product page**, so this fires on app one | `priceCents Int` — `4999` is `$49.99`. Verify against the Prisma version pinned here |
+| `Date` across the same boundary | The same serialisation class of bug, quieter | Decide the convention once, in the template |
+| Prisma client instantiated per request | Connection exhaustion under any real traffic | Singleton ships in the template ([D14](../DECISIONS.md#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1)) |
+
+The point is not these three. It is the pass itself: **write a page that reads every field type the
+schema can produce, and run it, before any AI runs.**
 
 **Seed data is a task, not polish.** A generated app with empty tables looks broken. Seeded rows are
 most of what makes a preview feel like a real application.

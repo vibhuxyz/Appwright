@@ -1114,7 +1114,7 @@ Overwrite that onto the Task and you keep only the last row. Then: [D31](#decisi
 
 ### Run
 
-`{ id, sessionId, blueprintVersion, trigger, status, startedAt, completedAt, totalCostUsd, error }`. `trigger` is `initial | followup | retry | heal`. A run is what the UI shows progress for, what a Stop button cancels, and what a budget is enforced against ([D38](#decision-38-budgets-nest-user--run--task--active-target-v4)).
+`{ id, sessionId, blueprintVersion, trigger, status, startedAt, completedAt, totalCostUsd, error }`. `trigger` is `initial | followup | retry | heal`. A run is what the UI shows progress for, what a Stop button cancels, and what a budget is enforced against ([D38](#decision-38-budgets-nest--user--run--task--active-target-v4)).
 
 **`TaskAttempt.commitSha`** is [D17](#decision-17-recovery-model--git-is-the-checkpoint--active-target-v3)'s checkpoint made queryable: the push that happened when this attempt went green is the point a crash resumes from.
 
@@ -1220,7 +1220,7 @@ Blueprint ─► BlueprintValidator ─► TaskCompiler ─► TaskGraphValidato
 | Stage | Checks |
 |---|---|
 | **Blueprint** | schema + `blueprintVersion` valid · stack is the supported one ([D14](#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1)) · packages on the allowlist ([D24](#decision-24-the-agent-may-not-install-packages-it-invented--active-target-v4-enforced-in-v0s-bash-tool)) · entities and routes well-formed |
-| **Task graph** | no cycles · no dangling `dependsOn` · no ownership overlap ([D37](#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9)) · every task has `capability`, `riskTier`, and a verification policy · task count under limit · **estimated cost under the run budget** ([D38](#decision-38-budgets-nest-user--run--task--active-target-v4)) |
+| **Task graph** | no cycles · no dangling `dependsOn` · no ownership overlap ([D37](#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9)) · every task has `capability`, `riskTier`, and a verification policy · task count under limit · **estimated cost under the run budget** ([D38](#decision-38-budgets-nest--user--run--task--active-target-v4)) |
 
 **Why never repair with an LLM.** A model asked to fix its own cyclic graph produces a graph that passes the check and means something else. The failure moves from a loud rejection at plan time to a silent wrong build at task 9. Re-planning is cheap — it is one model call before any sandbox exists.
 
@@ -1251,7 +1251,364 @@ Conflating them means a UI that cannot render a task timeline without parsing ch
 
 Declaring V4's task events at V1 means versioning a vocabulary for machinery that does not exist.
 
+**`text_delta` is listed in the vocabulary but is never written to a row.** [V1 Slice 4](./versions/V1_WEB_APP.md) already drew this line for SSE — *"deltas are ephemeral, never buffered; a refresh loses the mid-word animation, which is fine, the final text is a message."* The same rule binds the durable path, and it is stated here because *"durable execution log"* otherwise reads as an instruction to persist every token. **Deltas are a hot-path frame only. What survives is the assembled message.** Without this line `RunEvent` grows at token rate rather than event rate, which is roughly three orders of magnitude, and [O10](#open--not-yet-decided) stops being a retention question and becomes a cost incident.
+
 **Trade-offs:** two ordered logs per session means two `seq` counters and a decision about whether they share a sequence (they do not — a `Message` and a `RunEvent` are ordered within their own stream). Event volume also grows much faster than message volume, so `RunEvent` needs a retention policy well before `Message` does. **Raises [O10](#open--not-yet-decided).**
+
+---
+
+## Decision 41: Deployment targets the user's own accounts, and the connect moment is at Deploy ✅ ACTIVE *(target: V6 Slice 4)*
+**Decision:** a deployed app lives in **the user's** Vercel project and **the user's** managed Postgres — never in an Appwright-owned account. Appwright holds a revocable OAuth token, not a raw provider credential. The user is asked to connect anything **only when they click Deploy**, never during generation. Code reaches Vercel through the **deploy API directly** — no GitHub repo in the path.
+
+**Decided by:** the user, 2026-08-16.
+
+```
+build + preview     sandbox Postgres, generated DATABASE_URL, disposable   (D14, D15, D29)
+                    NO user account, NO pause, NO signup wall
+        │
+        ▼
+   user clicks DEPLOY  ◄── the only connect moment
+        │
+        ▼
+deploy              connect their Postgres · migrate deploy · Vercel deploy API
+```
+
+### Why the connect moment is at Deploy, not at build
+
+The obvious design pauses the run when the schema task needs a database. It is wrong twice. [D29](#decision-29-the-environment-is-prepared-before-the-agent-starts--active-target-v3) says the environment — *database up, migrations, seed* — is deterministic code that finishes **before the first LLM call**; a mid-run provisioning pause is exactly what it forbids. And [D14](#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1) already gives the build its own Postgres inside the sandbox, so there is nothing to ask for. A signup wall before the first working preview also breaks [V4](./versions/V4_APP_BUILDER.md)'s acceptance test, which is one sentence in and a working app out.
+
+### Write-through secrets — the vault we do not build
+
+The user's third-party keys are pushed straight into their Vercel project's environment and **not persisted by us**.
+
+```
+user provides key ──► POST to their Vercel project env ──► discard
+```
+
+Vercel holds it, in their account. There is no vault to encrypt, rotate, or breach. **Custody is the risk; encryption is only a mitigation for having taken custody.** This is what shrinks [O5](#open--not-yet-decided) rather than solving it.
+
+### What Option B costs — recorded, because a decision without a cost is a preference
+
+| Cost | Detail |
+|---|---|
+| **The user's code has no home outside us** | [D17](#decision-17-recovery-model--git-is-the-checkpoint--active-target-v3) puts git inside the sandbox and [D19](#decision-19-object-storage--snapshots-and-dumps-not-git--active-target-v3) snapshots it to our bucket. With no GitHub in the path, Appwright disappearing takes their app with it. **Mitigated by making Export project a definition-of-done item for [V6 Slice 4](./versions/V6_AUTONOMY_AND_DEPLOY.md), not a later nicety** |
+| **We own the deploy pipeline** | Vercel's Git integration does the build, the preview-per-commit, and the rollback for you. Direct deploys mean we do those, or do without |
+| **No developer-normal workflow** | The user cannot `git clone` their app, branch it, or open a PR against it |
+| **Token lifecycle** | A user who disconnects Vercel breaks every future redeploy. Expiry, refresh, and revocation are ours to handle |
+| **Onboarding friction remains, just later** | Two connects (Vercel, Postgres) still stand between the user and a live URL — moved after the magic moment, not removed |
+
+**Rejected — Option A, push to the user's GitHub and let Vercel build from it.** Better long-term ownership story and it deletes the export problem, at the price of a third OAuth connect before anyone can deploy. Revisit when a user asks for their repo, which is the trigger; the deploy path is an adapter behind [D22](#decision-22-the-sandbox-boundary-is-an-http-contract-not-a-typescript-interface--active-target-v3-shapes-v0)'s reasoning, so adding it later is additive.
+**Rejected — deploying into Appwright-owned accounts.** Cleanest UX, and it makes us a hosting company: their infra scales into our bill, and their users' data leaks on our account.
+
+**Amended 2026-08-17 — the callback is a trust boundary, not a router.** The first cut folded `projectId` into the OAuth `state` unsigned, reasoning that with no sessions before V3 there was nothing to bind a nonce to. That reasoning was wrong about the *severity*: an unsigned state is not a missing CSRF defence, it is an unauthenticated write — a stranger calling `/vercel/callback` with any `projectId` plants their own Vercel token in someone else's project. `state` is now HMAC-signed with `SECRETS_ENCRYPTION_KEY` and expires in 10 minutes, so the callback only accepts a state Appwright issued. Session binding still arrives with auth at V3; this is the floor, not the ceiling.
+
+**Also amended — the redirect URI is derived, never configured twice.** Vercel redirects *the user's browser* to the callback, so a `localhost` value sends every user who is not on the host machine to their own laptop and the flow dies with no error anywhere. `PUBLIC_API_URL` is now the single public origin, `VERCEL_REDIRECT_URI` is derived from it, and a localhost value under `NODE_ENV=production` throws at boot instead of failing silently per user.
+
+**Open inside this decision:** not every provider offers a consumer OAuth consent flow. Vercel does. **MongoDB Atlas and the managed-Postgres candidates must each be checked** — where only a programmatic API key exists, the user pastes a key and we are back in custody for that one credential. Check before naming a default provider in V6 Slice 4.
+
+---
+
+## Decision 42: `Environment` is a first-class entity, and it ships with two rows ✅ ACTIVE *(target: V4 tables, used at V6)*
+**Decision:** a `Project` has many `Environment`s. An environment owns its own database URL, env vars, secrets, deployment, and status. It ships in the schema from the first version that has the tables — **`development` and `production`, exactly two.**
+
+**Decided by:** the user, 2026-08-16.
+
+```
+Project
+  ├── Environment: development   sandbox Postgres · generated DATABASE_URL · test keys
+  └── Environment: production    user's Postgres · their Vercel · live keys · domain
+```
+
+**Why an entity and not a field on `Project`.** The moment a returning user says *"add Stripe"*, the system must know that a test key belongs to one environment and a live key to the other. A boolean cannot hold a second connection string, a second set of secrets, and a second deployment. This is [D31](#decision-31-tasks-request-a-capability-never-a-model-name--active-target-v4)'s note in a different costume — *the field ships from the first version that has the table, even while unused, because adding it later means migrating every persisted row*. Same argument as `seq` ([D10](#decision-10-one-type-definition-shared-by-import--active-replaces-the-codegen-plan)).
+
+**Two rows, and none of them may be called `preview`.** "Preview" already means the sandbox dev-server iframe at [V1](./versions/V1_WEB_APP.md), and it separately means a deployment type in Vercel's own vocabulary. A third meaning inside our schema guarantees a conversation where nobody is talking about the same thing. Add a third row when a third environment actually exists, and name it then.
+
+**Trade-offs:** every query about "the project's database" becomes "which environment's database", including in code paths that only ever meant one of them. Two rows also imply two migration states that can diverge — `development` on the new schema and `production` on the old one is the normal state of a real app, and the UI has to show it rather than pretend there is one truth.
+
+---
+
+## Decision 43: Three kinds of operation — the agent decides, the executor runs, the user authorises ✅ ACTIVE *(target: V0 onward, the test for every new capability)*
+**Decision:** every operation in Appwright belongs to exactly one of three categories, and the category decides who may trigger it.
+
+**Decided by:** the user, 2026-08-16.
+
+| | Who triggers it | Examples |
+|---|---|---|
+| 🧠 **Agent-controlled** | the LLM chooses | what to build · which files change · what the schema should say |
+| ⚙️ **Executor-controlled** | deterministic code, no model in the path | install deps · start Postgres · `prisma migrate` · `tsc` · build · boot · health check |
+| 👤 **User-authorised** | a human clicks | connect production database · connect Vercel · provide live secrets · deploy · destructive infra |
+
+**This is the test that settles "should this be a tool?"** — asked and re-asked three times about MCP on 2026-08-16, and answerable in one line: *if the operation is deterministic, it belongs to the executor and giving the model a tool for it is a regression.* [V4](./versions/V4_APP_BUILDER.md) already states the correct shape — the agent writes `schema.prisma`, **the executor** runs `prisma migrate dev`, and failure is a red task. A `database.run_migration` tool would hand the model a choice that [D9](#decision-9-deterministic-engines-over-bigger-prompts--active-target-v4) and [D29](#decision-29-the-environment-is-prepared-before-the-agent-starts--active-target-v3) deliberately took away.
+
+**Where MCP could legitimately sit:** the boundary of the first row only — an external capability the agent genuinely needs and the executor does not already own. Nothing in V0–V5 qualifies, because the one candidate (*read the live schema before writing a migration*) is answered by `read_file` on `app.prisma` until file and database can drift, which is post-deploy. **No MCP decision is recorded, because there is no felt limitation to record a trade-off against.**
+
+**Trade-offs:** the boundary moves. An operation that is deterministic today becomes a judgement call the day it has three valid strategies, and the categories must be re-argued rather than assumed. The split also makes some flows feel rigid — an agent that hits an unprepared environment fails instead of fixing it, which is [D29](#decision-29-the-environment-is-prepared-before-the-agent-starts--active-target-v3)'s accepted cost, paid again here.
+
+---
+
+## Decision 44: A restored checkpoint invalidates the transcript written after it ✅ ACTIVE *(target: V3, schema at V4)*
+**Decision:** when a run is recovered from a git checkpoint, every `Message` belonging to the failed `TaskAttempt` is **tombstoned, not deleted and not replayed**. The attempt row goes to `failed`; its messages stay in the table, render collapsed in the UI, and are **excluded when the context builder assembles the next prompt**.
+
+**Decided by:** the user, 2026-08-22.
+
+**The problem this closes.** [D17](#decision-17-recovery-model--git-is-the-checkpoint--active-target-v3) checkpoints at **task** granularity. There is no checkpoint *inside* a task. So a worker dying 30 tool calls in leaves two halves of the system disagreeing:
+
+```
+disk        restored from the last commit    ← 30 edits GONE
+Postgres    still holds 30 messages          ← 30 edits DESCRIBED
+                        │
+                        ▼
+        the next LLM call is told files exist that do not
+```
+
+The model then edits a file it believes it already wrote. [V3 Slice 3](./versions/V3_CLOUD_SANDBOX.md)'s *"key writes on `(sessionId, seq)` and make the write idempotent"* does not help here: a requeued job re-calls the LLM and gets **different** text with a different number of tool calls, so there is no matching key to collide on. Idempotency dedupes retries of one write. It cannot reconcile two divergent histories.
+
+**The mechanism.** `Message` carries `attemptId`. [D35](#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4) already separated plan from execution — that separation is exactly what makes this expressible, and this decision is what makes it load-bearing rather than bookkeeping.
+
+```
+context builder   WHERE attempt.status != 'failed'      ← the fence
+UI                renders failed attempts greyed + collapsed
+retention         nothing is destroyed
+```
+
+**Why not the two alternatives.** *Hard delete* keeps transcript and disk in sync with no join, but destroys the evidence in a repeating failure and contradicts D35's *"the attempt is the source of truth."* *Keep and replay* costs nothing to build and **is the bug**, not a fix for it.
+
+**Trade-offs:** every context read now joins on attempt status — one more place the filter can be forgotten, so it belongs in a repository method, not in each caller (same argument as [V3 Slice 5](./versions/V3_CLOUD_SANDBOX.md)'s ownership filter). The transcript also accumulates dead branches, which makes [O10](#open--not-yet-decided)'s retention question arrive sooner than message volume alone would suggest. **Recovery is no longer only a filesystem operation** — restore and tombstone are one transaction, and a restore that skips the tombstone is worse than no recovery at all.
+
+---
+
+## Decision 45: A run reserves its budget up front — budgets are seat holds, not balance checks ✅ ACTIVE *(target: V4, unblocked by cost telemetry)*
+**Decision:** starting a run **atomically decrements** `User.budgetDailyUsd` by `Run.budgetUsd` before the run is admitted. Zero rows affected means rejected. Unspent budget is **refunded** when the run reaches a terminal state.
+
+**Decided by:** the user, 2026-08-22.
+
+**The problem this closes.** [D38](#decision-38-budgets-nest--user--run--task--active-target-v4) nests three levels but never says *how* the outer level is enforced. Read-then-check is not a cap:
+
+```
+t0   run A reads remaining = $5    run B reads remaining = $5
+t1   A: 5 >= 3 ✓  proceed          B: 5 >= 3 ✓  proceed
+t2                    both running, $6 committed against a $5 cap
+```
+
+Worst-case overspend is `N × runBudget`, bounded only by how many runs happen to start at once — which is to say, unbounded by design. The read-modify-write race is the same one IRCTC has on the last seat.
+
+```sql
+BEGIN
+  UPDATE "User" SET remaining = remaining - :runBudget
+  WHERE id = :userId AND remaining >= :runBudget;   -- 0 rows ⇒ reject
+  INSERT INTO "Run" (..., budgetUsd) VALUES (...);
+COMMIT
+-- run ends having spent $2 of a $5 hold
+  UPDATE "User" SET remaining = remaining + 3;
+```
+
+The condition lives **in the `WHERE` clause**, not in application code. That is the whole decision — the database does the compare-and-set, so no two transactions can both win.
+
+**This is also admission control**, which the alternative gives up entirely. Debiting actual cost per LLM call charges honestly but lets a 20-task run start with $0.40 left and die at task 2, mid-build — a worse user experience than being told up front.
+
+**Trade-offs:** a crashed run **leaks its reservation** until something refunds it, so this decision creates an obligation it does not itself discharge — a sweeper that refunds holds belonging to runs in a terminal state, and a hold that expires on its own if the sweeper is down. That is the price of a real cap, and it is the same shape as [V3 Slice 3](./versions/V3_CLOUD_SANDBOX.md)'s lease: **a hold nobody renews must expire, or it is a leak with better manners.** Reserving also means a user's headroom is smaller than their unspent balance while runs are in flight — correct, and worth surfacing in the UI as *held* rather than *spent*.
+
+> ⚠️ **Blocked on telemetry that does not exist.** [README](./README.md) records that `Session.cost` always reads `$0.0000` — nothing parses the provider's `usage` field. Every level of D38 and this decision computes against a number nobody writes. **Wire real token accounting before either is believed**, and until then treat budget enforcement as unproven, not as configured.
+
+---
+
+## Decision 46: The UI system is a registry and a token scale, and the agent composes from it ✅ ACTIVE *(target: V1.1, enforced at V4)*
+**Decision:** `libs/ts/ui-system` holds a **component registry** (what exists, its variants, whether it is allowed) and a **token scale** (spacing, radius, typography, color, shadow, breakpoints). The generation agent **selects from these; it does not invent them.** An unregistered component or an off-scale value is a validation failure, not a style preference.
+
+**Decided by:** the user, 2026-08-22.
+
+```
+libs/ts/ui-system/
+├── tokens/     colors · spacing · typography · radius · shadows · breakpoints
+├── registry/   Button → shadcn/ui, variants [default|secondary|outline|ghost], allowed: true
+├── layouts/    predefined shells
+└── rules/      accessibility · responsive
+```
+
+**This is [D9](#decision-9-deterministic-engines-over-bigger-prompts--active-target-v4) applied to pixels.** Left free, a model produces `px-[17px]`, `rounded-[11px]`, `gap-[13px]` — each defensible alone, incoherent across thirty files. The registry is the same move as [D24](#decision-24-the-agent-may-not-install-packages-it-invented--active-target-v4-enforced-in-v0s-bash-tool): **a list the model chooses from beats a instruction the model is asked to honour.** D24 stops invented packages; this stops invented components and invented numbers.
+
+```
+p-4   gap-4   rounded-lg          ← composed from the scale
+px-[17px]  rounded-[11px]         ← invented, and now permanent
+```
+
+Consistency here is not aesthetics. It is the difference between an app that reads as one product and thirty files that each read as a first draft.
+
+**Amended 2026-08-22 — the target moved from V4 to V1.1, and the decision split in two.** The trigger was a felt limitation, not a plan: V1 shipped, and its output reads as a first draft. The evidence that does not depend on taste is that `templates/vite-react/src/index.css` — the **pristine** starter every project is copied from — already ships `rounded-[30px]`, `leading-[72px]`, and `text-[32px]` in hand-rolled `.btn` and `.head-text` utilities. **The agent is not the first thing inventing off-scale values here; the template is.**
+
+```
+V1.1   ecosystem + tokens + registry + prompt rules    depends on NOTHING
+V4     the validator that REJECTS · Blueprint design block · review · variants
+```
+
+**A vocabulary at V1.1, a grammar with consequences at V4.** The registry is guidance the agent reads and the token scale is what the template teaches by example; nothing fails a build until V4's per-task verification exists to fail it. Building the validator earlier means a linter with no [D47](#decision-47-the-blueprint-has-a-design-section-and-it-is-the-source-of-truth-for-visual-decisions--active-target-v4) `design` block to validate against.
+
+**Both templates, one token library** (decided 2026-08-22). `libs/ts/ui-system` is defined once and consumed by `vite-react` and `nextjs-fullstack` alike. Two token files would be two design systems sharing a name, diverging on the first edit nobody mirrors. The recorded cost: two shadcn installs to keep in sync, and `vite-react` may be dead weight once [D14](#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1)'s full-stack generation lands. Accepted — it leaves V1's shipped default untouched and **proves the library is template-agnostic**, a property V4 depends on and would otherwise discover late. Details in [V1.1](./versions/V1_1_UI_SYSTEM.md).
+
+> ✅ **Name collision cleared 2026-08-22** — `libs/ts/ui` deleted at V1.1 Slice 1, zero importers
+> re-verified immediately before removal. Original note kept below for the reasoning.
+>
+> ⚠️ **Name collision to clear first.** `libs/ts/ui` is `@repo/ui`, a Turborepo starter leftover — `button.tsx`, `card.tsx`, `code.tsx`, **zero importers**, verified 2026-08-22. [§14](./ARCHITECTURE.md#14-the-generated-application--what-it-is-and-what-it-owns)'s rule is *two of everything*: Appwright owns one set of things, the generated app owns another. `ui` beside `ui-system` invites exactly that confusion. Delete or rename it **before** the second package exists.
+
+**Trade-offs:** the registry is **inventory to maintain** — every new primitive is a registry entry before it is usable, and a stale registry blocks work that should have been trivial. It also imposes a real ceiling: a design that genuinely needs an off-scale value must have an escape, or the system quietly teaches the agent to fight it ([O23](#open--not-yet-decided)). The scale is only worth its cost if it is enforced by a validator, not by a sentence in the system prompt.
+
+**Shipped at V1.1, 2026-08-22 — and one assumption in that last sentence was wrong.** The vocabulary half went in without a validator, and the output was already right: two templates, one prompt, zero arbitrary bracket values, primitives composed rather than hand-rolled. What actually did the work was **not** the sentence in the system prompt. It was deleting the counterexample. `system.md` had been *instructing* the agent to use `.btn` and `.head-text` — utilities defined with `rounded-[30px]` and `leading-[72px]` — so the rules and the starter were saying opposite things, and **the starter was winning.** A model imitates what it reads more reliably than it obeys what it is told.
+
+The validator is still the right thing at V4, because guidance cannot *guarantee*. But the ordering lesson is worth keeping: **remove the counterexample before adding the rule.** A rule competing with a demonstration loses.
+
+---
+
+## Decision 47: The Blueprint has a `design` section, and it is the source of truth for visual decisions ✅ ACTIVE *(target: V4)*
+**Decision:** the Blueprint gains `design` and `layout` blocks, frozen at plan time exactly like the stack. **Every visual decision is made once, in the IR, before any component is generated.** Responsive is part of that block — not a later pass.
+
+**Decided by:** the user, 2026-08-22.
+
+```json
+{
+  "design": { "style": "minimal-premium", "density": "comfortable", "fontFamily": "Inter",
+              "colorMode": "light", "primaryColor": "#111111", "accentColor": "#6366F1",
+              "radius": "md", "maxContentWidth": "1280px" },
+  "layout": { "header": "72px", "sidebar": "240px", "content": "12-column",
+              "mobileNavigation": "bottom" },
+  "responsive": { "desktop": {}, "tablet": {}, "mobile": {} }
+}
+```
+
+Without this, [V4's trap](./versions/V4_APP_BUILDER.md#traps) *"task 3 uses Prisma, task 6 invents Drizzle"* has a visual twin that is harder to see and more damaging: page 3 is comfortable and page 6 is dense, and the app feels wrong without anyone being able to point at a bug. [D34](#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6) already built the channel for a task that must change a frozen decision — **an ACR covers a design change too**, no new mechanism required.
+
+**Responsive is declared, never retrofitted.** Generating desktop and fixing mobile afterwards means every session ends with the same cleanup task, and the cleanup is always the version nobody verifies. Each UI task declares its responsive requirement, and [D51](#decision-51-verification-checks-the-request-that-was-made-not-a-general-notion-of-good--active-target-v45-deepens-at-v5) checks it at the declared breakpoints.
+
+**Trade-offs:** the Blueprint grows, and it was already the widest object in the system — [O8](#open--not-yet-decided)'s context-budget question gets harder, because `design` now competes with `entities` and `pages` for the same per-task token cap. Freezing visual decisions before anything is rendered also means freezing them **before anyone has seen them**, which is precisely why [D53](#decision-53-the-design-is-reviewed-before-it-is-built--active-target-v4) puts a review in front of it.
+
+---
+
+## Decision 48: `DesignState` is a staging buffer — the repo is the only durable visual truth ✅ ACTIVE *(target: V4.5)*
+**Decision:** visual edits accumulate in `DesignState` as **pending** rows. On Submit they compile to a ChangeSet, the ChangeSet is applied to code, and once the run is verified green **the rows are discarded.** The code is the only durable record of what a component looks like. The property panel reads current values **from the rendered result**, never from a design layer.
+
+**Decided by:** the user, 2026-08-22.
+
+```
+drag ──► DesignState (pending) ──► ChangeSet ──► code ──► verified ──► DISCARDED
+                                                                  truth = the repo
+```
+
+**Why not a durable design layer.** It is genuinely attractive — visual history, undo across sessions, an editor that never parses Tailwind. It is also **[D44](#decision-44-a-restored-checkpoint-invalidates-the-transcript-written-after-it--active-target-v3-schema-at-v4) again, in a new costume.** Two writers, one fact:
+
+```
+visual editor ──► DesignState        the agent also edits these files by prompt
+        code ◄── agent                        │
+                                              ▼
+            which one is the card's real width?
+```
+
+D44 was about a transcript and a disk disagreeing. This would be a design layer and a repo disagreeing, and it needs a reconciler that nobody has designed. **The cheapest fix for drift is to have only one durable copy.**
+
+**Batching survives the choice** — the buffer *is* the batch. `4 pending changes · 2 components` behind one Submit is what makes ten drags cost one build instead of ten, which is the version's latency argument.
+
+**Trade-offs:** *"what did I set last week"* is unanswerable — that history lives in `git log`, in Tailwind classes, which is a worse interface for the question but a correct answer. A failed apply must **roll the buffer back**, or pending rows survive describing a state that no longer exists. And the panel must read computed values from the live DOM, which is more work than reading a row.
+
+---
+
+## Decision 49: Appwright identity is injected at build time, never written into source ✅ ACTIVE *(target: V4.5)*
+**Decision:** `data-aw-id` is added by an **SWC plugin during the dev build only**. The generated repo never contains one. Production builds omit the plugin entirely — it is absent from the config, not switched off inside it.
+
+**Decided by:** the user, 2026-08-22.
+
+```
+source      <RevenueCard />              ← what the repo holds, forever
+dev build   <div data-aw-id="dash.rev">  ← injected, for the editor
+prod build  <div>                        ← plugin not present
+```
+
+**The trap this avoids is already written down.** [D33](#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)'s is *"the user downloads their app and finds `errors.json`."* An attribute on every element is the same violation, spread across every file instead of concentrated in one, and therefore harder to notice and harder to remove. [V6](./versions/V6_AUTONOMY_AND_DEPLOY.md)'s **Export project** is a definition-of-done item — *the user's app must be able to outlive us* — and a repo full of our markers fails that quietly.
+
+**A strip pass is not the same thing.** Stripping is a step that can be skipped, mis-ordered, or forgotten on one path; injection is a step that can only be *added*. Prefer the design where the failure mode is "the editor stops working" over the one where it is "our markers shipped to production."
+
+**Trade-offs:** a build plugin is real code to write, and it must run in the sandbox's dev build for every generated project. Ids must be **stable across rebuilds** or every pending edit points at nothing after the next task — derive them from `route + component path + ordinal`, never a counter, never a content hash ([O20](#open--not-yet-decided)). And debugging is worse: the attribute is not in any file you can `grep`.
+
+---
+
+## Decision 50: Two interaction modes — exact edits never reach the model ✅ ACTIVE *(target: V4.5)*
+**Decision:** a visual change is sorted **at the door** into one of two paths, and the sort is deterministic:
+
+| | Input | Path | Cost |
+|---|---|---|---|
+| **Exact** | `width = 286px`, `radius = 8`, `color = #6366F1` | AST codemod | zero tokens |
+| **Intent** | *"make this feel more premium"* | the V4 agent loop | a normal task |
+
+**Decided by:** the user, 2026-08-22.
+
+**A number the user typed does not need a model to interpret it.** Routing it through one is a lossy encode (gesture → English) followed by a lossy decode (English → number), and the model returns `280px` because that is a rounder number. The user's own value was destroyed in transit, for tokens and forty seconds.
+
+This is [D43](#decision-43-three-kinds-of-operation--the-agent-decides-the-executor-runs-the-user-authorises--active-target-v0-onward-the-test-for-every-new-capability)'s sort — *the agent decides, the executor runs, the user authorises* — applied to visual work. **`width = 286px` is not a judgement call, so nothing should be judging it.**
+
+**Conflicts are caught before either path runs.** `width: 100%` and *"place it beside OrdersCard"* cannot both hold. The ChangeSet compiler detects it deterministically and **asks the user to choose** — [D39](#decision-39-plan-validation-is-a-gate-never-a-repair--active-target-v4)'s *reject, never repair*, applied to a new input. An LLM asked to reconcile two contradictory instructions will satisfy one and never mention the other.
+
+**Trade-offs:** two paths to build and keep behaving alike — a codemod and a prompt must produce the same class names, or the diff reveals which route a change took. The sort also has a **grey middle**: *"make it a bit narrower"* is neither, and the honest answer is to resolve it in the UI (show a slider) rather than guess. Mixed ChangeSets must run codemods **first**, so the model sees settled exact values instead of re-litigating them.
+
+---
+
+## Decision 51: Verification checks the request that was made, not a general notion of good ✅ ACTIVE *(target: V4.5, deepens at V5)*
+**Decision:** every applied visual change is verified against **what was asked for**, by measurement, with the real numbers in the failure. A UI quality score may exist, but it is **advisory and computed deterministically** — it never gates a task, and no model ever rates its own output.
+
+**Decided by:** the user, 2026-08-22.
+
+```
+asked   width = 286px          →  boundingBox().width === 286        ✅
+asked   "navbar sticky"        →  scroll 500px, still in viewport    ✅
+asked   "cards side by side"   →  same y, different x                ✅
+
+failure reads:  asked 286, rendered 320
+not:            "the change did not apply correctly"
+```
+
+**This is what lets V4.5 ship before [V5](./versions/V5_BROWSER_AGENT.md).** The general question — *is this page good?* — needs the browser agent, the accessibility tree, and eventually a vision model. The narrow question — *is it 286?* — needs one `boundingBox()` call. **The narrow one is also the more useful of the two here:** a user who dragged a value to 286 wants their number, not a score of 91.
+
+**The quality score stays advisory, and the reason is [D32](#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4).** D32 refuses `riskTier` from a model rating itself; a model scoring its own UI is the identical error with a friendlier number attached. Each dimension must be **measured** — contrast from computed colors, spacing compliance from distance to the token scale, component reuse from registry hits over total elements — or it is not a dimension, it is an opinion. Its job is to **generate optimisation tasks**, never to pass or fail one.
+
+**Trade-offs:** measurement only covers what is measurable. *"Feels premium"* has no assertion, so intent edits fall back to human review, and the version is honest about that rather than inventing a proxy. Screenshot and DOM comparison across four viewports on every change is also **real time and real storage** — the regression baseline is the previous run, never an absolute ideal ([V5 trap](./versions/V5_BROWSER_AGENT.md#traps)), and the per-run cost needs a cap ([O22](#open--not-yet-decided)).
+
+---
+
+## Decision 52: A visual reference is compiled to structure once, never re-shown to the model ✅ ACTIVE *(target: V4)*
+**Decision:** a screenshot, sketch, or Figma export goes through a **visual parser once**, producing a small structured specification that feeds the UI Blueprint. The raw image is **not** carried in context and not re-sent on later turns.
+
+**Decided by:** the user, 2026-08-22.
+
+```
+reference image ──► visual parser ──► { viewport: "1440x900",
+                                        header: { height: 72 },
+                                        sidebar: { width: 240 },
+                                        grid: { columns: 3, gap: 24 },
+                                        cards: { radius: 12 } }
+                                              │
+                                              ▼
+                                        UI Blueprint
+```
+
+An image is thousands of tokens on **every** turn that carries it, and the model re-derives the same five facts each time, slightly differently. **Extracting once turns a recurring cost into a fixed one, and a varying answer into a stable one.** Exactly [D33](#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)'s shape — *assembled, not regenerated* — and it is the same reason [D30](#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4) stores `dependsOn` instead of recomputing the graph mid-run.
+
+**Trade-offs:** the parse is lossy, and what it drops is gone — nothing downstream can recover a detail the extractor did not name, so the extracted schema is a **hard ceiling on fidelity**. That schema is also a new versioned artifact: widen it later and old references do not gain the new fields. Accept re-parsing on an explicit user request (*"look at the image again"*), and treat that as the escape hatch rather than the default.
+
+---
+
+## Decision 53: The design is reviewed before it is built ✅ ACTIVE *(target: V4)*
+**Decision:** for a full app build, the planner emits the `design` block **plus a small number of directions**, the user picks one, and only then does code generation start. The rejected directions are never implemented.
+
+**Decided by:** the user, 2026-08-22.
+
+```
+request ──► UI Blueprint ──► 2–3 directions ──► user picks ──► 30 tasks generate
+                                    │
+                            "I don't like this layout"
+                            costs one planner call, not one app
+```
+
+**The economics are the entire argument.** *"I don't like this dashboard layout"* arriving after thirty tasks have generated is a rebuild — tokens, sandbox minutes, and the user's patience. Arriving before is one cheap planner call. This is [D18](#decision-18-the-returning-user-flow--active-target-v4)'s instinct pushed one step earlier: **the cheapest task is the one that was never generated.**
+
+Directions are **descriptions and a preview, not three built applications.** Generating three apps to throw two away costs three times as much and is the opposite of the point.
+
+**Trade-offs:** it puts a decision in front of the magic moment, and a user who wanted one sentence to become an app now has a choice to make — so it must be **skippable with a visible default**, the same discipline [V4's traps](./versions/V4_APP_BUILDER.md#traps) impose on clarifying questions (*"cap at 3; default the rest visibly"*). How many directions, and what a preview actually is when no code exists yet, are open ([O21](#open--not-yet-decided)). Freezing a design a user approved from a description also raises the ACR rate — they approved a paragraph, not a screen.
 
 ---
 
@@ -1265,22 +1622,35 @@ These block work when they're reached. Each needs an entry above before the rele
 | O2 | **Sandbox lifetime** — long-lived per project vs ephemeral + snapshot restore | V3 Slice 6 | *Lean: ephemeral + warm pool + object-store snapshots.* |
 | O3 | **Queue** — BullMQ/Redis vs pg-boss/Postgres | V3 Slice 3 | Redis is likely needed anyway for pub/sub. |
 | O4 | **Approval timeout** — expire, or park indefinitely? | V2 Slice 3 | Affects the session state machine. |
-| O5 | **User-supplied secrets** — the user's own Stripe / SendGrid / third-party keys. How are they stored, how do they reach the sandbox, and how are they kept out of LLM context *and* out of git? | V4/V5 | The `Secret` model in `libs/ts/db` exists but nothing specifies encryption-at-rest, injection, or rotation. **Distinct from the generated app's own secrets** (`DATABASE_URL`, `AUTH_SECRET`), which are answered by [D15](#decision-15-the-generated-apps-database--one-per-project--active-target-v4): generated at provision, injected as env vars, never in a prompt. |
+| O5 | **User-supplied secrets, at preview time only** — the user's own Stripe / SendGrid keys, needed inside the sandbox *before* a Vercel project exists to write them through to. | V4/V5 | **Shrunk 2026-08-16 by [D41](#decision-41-deployment-targets-the-users-own-accounts-and-the-connect-moment-is-at-deploy--active-target-v6-slice-4).** For *deployed* apps the answer is write-through: push the key into the user's Vercel env and keep no copy, so there is no vault, no rotation, and no encryption-at-rest problem. What remains is the sandbox, which has no destination to write through to. Three candidates, in order of preference: **preview only ever uses test keys** (cleanest — live keys go straight to Vercel at deploy) · hold in memory for the sandbox's lifetime, never persist · [V3 Slice 6](./versions/V3_CLOUD_SANDBOX.md)'s proxy pattern, real credential outside, scoped token in. **Distinct from the generated app's own secrets** (`DATABASE_URL`, `AUTH_SECRET`), answered by [D15](#decision-15-the-generated-apps-database--one-per-project--active-target-v4). |
 | ~~O6~~ | ~~**Blueprint mutability**~~ | — | ✅ **Closed 2026-08-13** by [D34](#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6) — an agent proposes, the planner amends, `blueprintVersion` bumps, only affected tasks recompute. |
 | O8 | **Context budget and drop order** — [D33](#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4) assembles context deterministically with no ability to compress. What is the per-task token cap, and what gets dropped first when `reads` is wide? | V4 (context builder) | Raised by D33. Without an answer, "assemble everything relevant" becomes dollars per task. |
 | ~~O9~~ | ~~**Ownership breadth**~~ | — | ✅ **Closed 2026-08-13** by [D37](#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9) — canonicalise before accepting the graph; breadth above a threshold is a validator warning. |
 | O10 | **`RunEvent` retention** — event volume grows far faster than message volume. How long are events kept, and is the timeline rebuilt from them or from a roll-up? | V4 (when the timeline UI exists) | Raised by [D40](#decision-40-runevent-is-the-durable-execution-log--message-is-the-conversation--active-target-v1-grows-per-version). Cheap to decide before there are millions of rows. |
 | O11 | **A generic `Artifact` table** — screenshots, test reports, build outputs, migration records. Deferred at V4 in favour of one `TaskAttempt.commitSha` column. | V5 | Raised by [D35](#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4). Decide when V5's screenshots and test reports arrive with real query patterns — not before. |
 | O7 | **Which stop reasons must be persisted?** `cancelled` arrives from *another process* — a Stop click in a browser cannot be an in-memory promise, or it dies with the worker. The other five are computed inside the loop. Where exactly is that line, and what row does a Stop button write? | V1 (the Stop button) | Raised by [D26](#decision-26-the-agent-loop-has-six-exits-not-one--active-target-v0). **Blocks nothing in V0** — the union ships either way. |
+| O12 | **Who allocates `seq` when there are two writers?** From V3 the worker writes messages and run events while the API also writes. Two concurrent `max(seq)+1` reads return the same number. | V3 Slice 4 | Raised by the 2026-08-22 review. A Postgres sequence per session, or an atomic insert that computes `seq` inside the statement. **One line now, a painful backfill later** — same argument [D40](#decision-40-runevent-is-the-durable-execution-log--message-is-the-conversation--active-target-v1-grows-per-version) makes for declaring `seq` at all. Note this needs answering **twice**, once per log. |
+| O13 | **What is inside a snapshot?** Code only, code + `node_modules` + a pg dump, or code plus a content-addressed dependency cache keyed by lockfile hash and shared across projects. | V3 Slice 6 | Raised by the 2026-08-22 review. This is the question that decides whether [§14](./ARCHITECTURE.md#14-the-generated-application--what-it-is-and-what-it-owns)'s documented **30–90s wake-up** stands. A warm pool cannot touch `bun install`, `prisma generate`, migrate, or seed — those are project-specific, and they are most of the 90 seconds. Storage cost per project versus seconds per message. |
+| O14 | **What is the latency budget per version?** Every version has one acceptance test and not one of them is a time. | V1 onward, retro-fit | Raised by the 2026-08-22 review. [V3 Slice 6](./versions/V3_CLOUD_SANDBOX.md) already won this argument for **cost** — *"load-bearing, not nice-to-have"* — and the identical case holds for time. Needs three numbers: time-to-first-token, time-to-first-preview, per-task duration. Note that [D25](#decision-25-e2b-is-the-sandbox-provider--active-target-v3-closes-o1)'s two reopen triggers are both cost-shaped, so today a latency regression can never reopen the sandbox choice. |
+| O15 | **What backpressures the LLM provider?** The queue bounds sandbox capacity and [V3 Slice 5](./versions/V3_CLOUD_SANDBOX.md) rate-limits per user, but provider limits are **per account** and every sandbox shares one. | V3 Slice 3 | Raised by the 2026-08-22 review. Needs a token bucket in front of the provider and a written retry policy. **Retry without jitter is a thundering herd** — every worker fails together, waits the same interval, and re-fails together. Nothing in the docs currently mentions backoff at all. |
+| O16 | **How is capacity shared between tenants?** [D36](#decision-36-dependencies-make-a-task-eligible-not-runnable--and-the-scheduler-is-not-the-orchestrator--active-target-v4)'s five gates are all about one run's correctness. None is about *whose* run. | V4 (scheduler) | Raised by the 2026-08-22 review. One user's 40-task DAG can occupy all capacity while ten users queue behind it. Needs a per-tenant slice, not only a global ceiling. Classic noisy neighbour, and it appears the day the second user does. |
+| O17 | **Where is the connection pooler?** [D15](#decision-15-the-generated-apps-database--one-per-project--active-target-v4) gives every project its own Postgres, and every sandbox dev server opens a Prisma pool against it. | V4 | Raised by the 2026-08-22 review. Concurrent projects exhaust `max_connections` long before they exhaust CPU — connection count scales with *projects*, not with load. PgBouncer, a provider-side pooler, or a hard `connection_limit` in each generated `DATABASE_URL`. |
+| O18 | **Is a preview URL authenticated, or only unguessable?** [V3 Slice 5](./versions/V3_CLOUD_SANDBOX.md) says *"random ids and ideally auth-gated."* | V3 Slice 5 | Raised by the 2026-08-22 review. **"Ideally" is an adjective, not a decision**, and it will quietly resolve as *we did not*. A preview fronts an app wired to a live development database with real seed data. Decide it, or record the exposure as accepted. |
+| O19 | **Where does the reconnect buffer live once the API has more than one instance?** [V1 Slice 4](./versions/V1_WEB_APP.md)'s per-session buffer is in one process's memory. | V3 Slice 4 | Raised by the 2026-08-22 review. A reconnect load-balanced to a second instance finds neither the buffer nor the live listener. [V3 Slice 4](./versions/V3_CLOUD_SANDBOX.md) moves the *live* stream to Redis pub/sub but leaves the buffer local. **Related client-contract change:** at V1 the browser's live listener is the `POST /conversation` response itself; at V3 that request becomes an enqueue that returns immediately, so the browser must always attach via `GET /stream`. The docs schedule that as if it were free. |
+| O20 | **How does a component keep its id across rebuilds?** [D49](#decision-49-appwright-identity-is-injected-at-build-time-never-written-into-source--active-target-v45) injects `data-aw-id` at dev-build time. If the agent edits the file and the id changes, every pending edit and every stored `Component` row points at nothing. | V4.5 Slice 2 | Raised by [D49](#decision-49-appwright-identity-is-injected-at-build-time-never-written-into-source--active-target-v45). Lean: derive from `route + component path + ordinal`, never a counter and never a content hash. The hard case is a component that genuinely moves — a reparent must be a **rename**, not a new identity, or the user's history silently detaches. |
+| O21 | **How many design directions, and what is a preview before any code exists?** [D53](#decision-53-the-design-is-reviewed-before-it-is-built--active-target-v4) reviews the design first, but a preview that is not built code is either a rendered token sample or a description. | V4 (design review) | Raised by [D53](#decision-53-the-design-is-reviewed-before-it-is-built--active-target-v4). Three directions is a guess, not a decision. Note the constraint that makes this answerable: whatever a preview is, **it must not be a generated application** — generating three to discard two costs three times the thing the decision exists to save. |
+| O22 | **What does visual verification cost per run?** Screenshots and DOM snapshots at four viewports across every changed route, on every change. | V4.5 Slice 7 / V5 | Raised by [D51](#decision-51-verification-checks-the-request-that-was-made-not-a-general-notion-of-good--active-target-v45-deepens-at-v5). Needs a cap and a retention policy — this is [O10](#open--not-yet-decided)'s problem with images attached, and images do not compress the way rows do. Also decide whether the baseline is the previous run (cheap, drifts) or a pinned approved run (accurate, needs approval). |
+| O23 | **What is the escape hatch from the token scale?** [D46](#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4) rejects off-scale values, but some designs genuinely need one. | V4 (validator) | Raised by [D46](#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4). With no escape, the agent learns to fight the validator, which is worse than no validator. With a free escape, the scale is decorative. Lean: a raw value is allowed but **recorded** — if one appears three times it is a missing token, and the system should say so. **Evidence arrived early, 2026-08-22.** V1.1's first acceptance run: one prompt, two templates, and **both** independently wrote `tracking-[0.2em]` — because the scale had no letter-spacing at all and Tailwind's own stops at `0.1em`. The lean held. `tracking-caps` was added to the scale once and the re-run was clean. **Sharpened:** the signal is not "a raw value appeared three times", it is *the same* raw value appearing independently. Convergence means a hole in the scale; a one-off usually means a careless value. V4's validator should **report the repeat as a feature request**, not just reject the diff. |
 
 > **Note on secrets — there are two kinds, and only one is open.**
 >
 > | | Example | Status |
 > |---|---|---|
 > | **The generated app's own** | `DATABASE_URL`, `AUTH_SECRET` | ✅ answered by [D15](#decision-15-the-generated-apps-database--one-per-project--active-target-v4) — generated at provision, injected as env vars, never in a prompt, `.env` denied by the fence |
-> | **The user's third-party keys** | Stripe, SendGrid, OpenAI | ⬜ **O5** — storage, injection, and rotation all unspecified |
+> | **The user's third-party keys — deployed** | Stripe, SendGrid, OpenAI | ✅ **write-through** ([D41](#decision-41-deployment-targets-the-users-own-accounts-and-the-connect-moment-is-at-deploy--active-target-v6-slice-4)) — pushed into their Vercel project env, never persisted here |
+> | **The user's third-party keys — at preview** | the same keys, inside the sandbox | ⬜ **O5**, now the only remaining half |
 >
-> They are unrelated problems. The first is ours to generate and therefore fully controllable. The second is the user handing us a credential that can move real money, which makes encryption at rest, an audit trail, and revocation table stakes rather than polish.
+> They are unrelated problems. The first is ours to generate and therefore fully controllable. The second was the user handing us a credential that can move real money — which is why D41 arranges never to hold it. What survives is the preview window, where there is no Vercel project to write through to yet.
 
 ---
 

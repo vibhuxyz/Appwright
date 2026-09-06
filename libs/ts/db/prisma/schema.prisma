@@ -12,34 +12,85 @@ model User {
   email        String    @unique
   hashPassword String
   projects     Project[]
+  // One Vercel account link per user, not per project. Connecting is a
+  // property of the person, deploying is a property of the app.
+  vercelConnection VercelConnection?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @default(now()) @updatedAt
 }
 
-model Project {
-  id                  String                @id @default(cuid()) @db.VarChar(30)
-  title               String
-  initialPrompt       String
-  userId              String
-  user                User                  @relation(fields: [userId], references: [id])
-  conversationHistory ConversationHistory[]
-  secret              Secret[]
-  status              ProjectStatus         @default(PROVISIONING)
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @default(now()) @updatedAt
+// D41 amendment — the connection outlives any single project. It used to be
+// a Secret row keyed by projectId, which meant (a) the user reconnected for
+// every new app and (b) deleting a project cascade-deleted their Vercel
+// link. Both were the same modelling error: one table holding two facts with
+// different lifetimes.
+//
+// `configurationId` is Vercel's handle for *this installation* — it is what
+// makes Disconnect and "reinstalled vs two installs" answerable. D41 lists
+// token lifecycle as a recorded cost; this column is the part that pays it.
+model VercelConnection {
+  id              String   @id @default(cuid()) @db.VarChar(30)
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  encryptedToken  String
+  teamId          String?
+  configurationId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt
 }
 
-model ConversationHistory {
-  id        String           @id @default(cuid()) @db.VarChar(30)
+model Project {
+  id            String        @id @default(cuid()) @db.VarChar(30)
+  name          String
+  templateId    String        @default("vite-react")
+  workspacePath String
+  status        ProjectStatus @default(READY)
+  // Non-null since auth landed. A project with no owner is unreachable by
+  // every route, so allowing the state at all only invited rows nobody could
+  // see. Deleting the user takes their projects with them.
+  userId        String
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Which Vercel project this app deploys to. The connection half lives on
+  // the User; this is the link half, and it dies with the project.
+  vercelProjectId String?
+  sessions      Session[]
+  secret        Secret[]
+  // Deleting a project cleans up its sessions/messages/secrets too — there's
+  // no route that deletes a session or secret on its own in V1.
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+}
+
+model Session {
+  id        String        @id @default(cuid()) @db.VarChar(30)
   projectId String
-  project   Project          @relation(fields: [projectId], references: [id])
-  type      ConversationType
-  from      MessageFrom
-  contents  String
-  hidden    Boolean          @default(false)
-  toolCall  ToolCall?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @default(now()) @updatedAt
+  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title     String?
+  model     String        @default("gpt-5.4-mini")
+  cost      Float         @default(0)
+  tokenIn   Int           @default(0)
+  tokenOut  Int           @default(0)
+  status    SessionStatus @default(IDLE)
+  messages  Message[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @default(now()) @updatedAt
+}
+
+model Message {
+  id        String   @id @default(cuid()) @db.VarChar(30)
+  sessionId String
+  session   Session  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  // Monotonic per session — every history read is ordered by it, and it's
+  // what a stream reconnect asks for ("everything after seq N").
+  seq       Int
+  role      String
+  type      String
+  content   String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, seq])
+  @@index([sessionId, seq])
 }
 
 model Secret {
@@ -47,7 +98,7 @@ model Secret {
   key            String
   encryptedValue String
   projectId      String
-  project        Project  @relation(fields: [projectId], references: [id])
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
 
@@ -61,19 +112,8 @@ enum ProjectStatus {
   ERROR
 }
 
-enum ConversationType {
-  TOOL_CALL
-  TEXT_MESSAGE
-}
-
-enum MessageFrom {
-  USER
-  ASSISTANT
-}
-
-enum ToolCall {
-  READ_FILE
-  WRITE_FILE
-  DELETE_FILE
-  UPDATE_FILE
+enum SessionStatus {
+  IDLE
+  RUNNING
+  ERROR
 }
