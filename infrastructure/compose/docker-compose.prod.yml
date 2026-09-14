@@ -1,0 +1,65 @@
+# Production shape of the dev stack (repo root docker-compose.yml): built
+# images, no bind-mounted source, restart policies set. Standalone rather
+# than a merge override of the dev file, so there's no dependency on Compose
+# merge-tag behavior to get right.
+#
+# Run from the repo root so the build contexts resolve:
+#   docker compose -f infrastructure/compose/docker-compose.prod.yml up
+#
+# Still uses the same Dockerfiles as dev, which is a known gap, not an
+# oversight — see infrastructure/docker/README.md "Known gaps": the web
+# image still runs Vite's dev server, and images are unoptimized (no
+# multi-stage build, no --production). Both are V3's job, not this file's.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: appwright
+      POSTGRES_PASSWORD: appwright
+      POSTGRES_DB: appwright
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U appwright"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/api/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://appwright:appwright@postgres:5432/appwright
+      REDIS_URL: redis://redis:6379
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/web/Dockerfile
+    environment:
+      VITE_API_URL: https://api.example.com # set to the real public API origin
+    ports:
+      - "5173:5173"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  pgdata:

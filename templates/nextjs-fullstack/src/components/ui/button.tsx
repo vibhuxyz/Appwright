@@ -16,12 +16,15 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground shadow-sm hover:opacity-90",
+        default:
+          "bg-primary text-primary-foreground shadow-sm hover:opacity-90",
         secondary: "bg-secondary text-secondary-foreground hover:opacity-90",
-        outline: "border border-border bg-background hover:bg-accent hover:text-accent-foreground",
+        outline:
+          "border border-border bg-background hover:bg-accent hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        destructive: "bg-destructive text-destructive-foreground shadow-sm hover:opacity-90",
+        destructive:
+          "bg-destructive text-destructive-foreground shadow-sm hover:opacity-90",
       },
       size: {
         sm: "h-8 px-3 text-xs",
@@ -35,14 +38,19 @@ const buttonVariants = cva(
 );
 
 export interface ButtonProps
-  extends React.ComponentProps<"button">,
-    VariantProps<typeof buttonVariants> {
+  extends React.ComponentProps<"button">, VariantProps<typeof buttonVariants> {
   /** Render the child element instead of a <button> — use it to style a
    *  link without nesting an <a> inside a <button>, which is invalid HTML. */
   asChild?: boolean;
 }
 
-export function Button({ className, variant, size, asChild = false, ...props }: ButtonProps) {
+export function Button({
+  className,
+  variant,
+  size,
+  asChild = false,
+  ...props
+}: ButtonProps) {
   const Comp = asChild ? Slot : "button";
   return (
     <Comp

@@ -6,31 +6,38 @@
     "node": ">=20"
   },
   "workspaces": [
-    "services/web",
-    "services/api",
-    "services/orchestrator",
-    "libs/ts/*"
+    "apps/web",
+    "apps/api",
+    "apps/orchestrator",
+    "packages/*",
+    "workers/*",
+    "scripts"
   ],
   "scripts": {
-    "agent": "bun libs/ts/agent-core/src/cli.ts",
-    "ui:emit": "bun libs/ts/ui-system/bin/emit.ts",
-    "ui:check": "bun libs/ts/ui-system/bin/emit.ts --check",
-    "dev": "bun run dev:api && bun run dev:web",
+    "agent": "bun packages/agent-core/src/cli.ts",
+    "ui:emit": "bun packages/ui-system/bin/emit.ts",
+    "ui:check": "bun packages/ui-system/bin/emit.ts --check",
+    "dev": "turbo run dev --filter=api --filter=web",
     "dev:api": "bun --filter api dev",
     "dev:web": "bun --filter web dev",
+    "dev:workers": "turbo run dev --filter=worker-indexing --filter=worker-evaluation --filter=worker-maintenance",
     "down": "docker compose down",
     "logs": "docker compose logs -f",
-    "build": "bun --filter '*' build",
-    "test": "bun test services libs --path-ignore-patterns 'ref-ai/**'",
-    "lint": "bun --filter '*' lint",
-    "check-types": "bun --filter '*' check-types",
+    "build": "turbo run build",
+    "test": "bun test apps packages --path-ignore-patterns 'ref-ai/**'",
+    "lint": "turbo run lint",
+    "check-types": "turbo run check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "db:migrate": "cd libs/ts/db && bunx prisma migrate dev",
-    "db:studio": "cd libs/ts/db && bunx prisma studio"
+    "db:migrate": "cd packages/db && bunx prisma migrate dev",
+    "db:studio": "cd packages/db && bunx prisma studio",
+    "health:check": "bun scripts/health-check.ts",
+    "bootstrap": "bun scripts/bootstrap.ts",
+    "db:seed": "bun scripts/seed.ts"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",
     "prettier": "^3.7.4",
+    "turbo": "^2.5.4",
     "typescript": "5.9.2"
   }
 }

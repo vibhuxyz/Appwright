@@ -6,44 +6,46 @@ import { stripAnsi } from "../src/utils/ansi.ts";
 import { createHarness, type Harness } from "./suite/harness.ts";
 
 function createFakeTui(): TUI {
-	return { requestRender: () => {} } as unknown as TUI;
+  return { requestRender: () => {} } as unknown as TUI;
 }
 
 describe("model selector", () => {
-	let harness: Harness | undefined;
+  let harness: Harness | undefined;
 
-	beforeAll(() => {
-		initTheme("dark");
-	});
+  beforeAll(() => {
+    initTheme("dark");
+  });
 
-	afterEach(() => {
-		harness?.cleanup();
-		harness = undefined;
-	});
+  afterEach(() => {
+    harness?.cleanup();
+    harness = undefined;
+  });
 
-	it("lists every catalog that failed to refresh", async () => {
-		harness = await createHarness();
-		vi.spyOn(harness.session.modelRuntime, "refresh").mockResolvedValue({
-			aborted: false,
-			errors: new Map([
-				["openai", new Error("unavailable")],
-				["anthropic", new Error("unavailable")],
-			]),
-		});
+  it("lists every catalog that failed to refresh", async () => {
+    harness = await createHarness();
+    vi.spyOn(harness.session.modelRuntime, "refresh").mockResolvedValue({
+      aborted: false,
+      errors: new Map([
+        ["openai", new Error("unavailable")],
+        ["anthropic", new Error("unavailable")],
+      ]),
+    });
 
-		const selector = new ModelSelectorComponent(
-			createFakeTui(),
-			harness.getModel(),
-			harness.settingsManager,
-			harness.session.modelRuntime,
-			[],
-			() => {},
-			() => {},
-		);
+    const selector = new ModelSelectorComponent(
+      createFakeTui(),
+      harness.getModel(),
+      harness.settingsManager,
+      harness.session.modelRuntime,
+      [],
+      () => {},
+      () => {},
+    );
 
-		await vi.waitFor(() => {
-			const rendered = stripAnsi(selector.render(120).join("\n"));
-			expect(rendered).toContain("Could not refresh 2 model catalogs (openai, anthropic); showing cached models.");
-		});
-	});
+    await vi.waitFor(() => {
+      const rendered = stripAnsi(selector.render(120).join("\n"));
+      expect(rendered).toContain(
+        "Could not refresh 2 model catalogs (openai, anthropic); showing cached models.",
+      );
+    });
+  });
 });

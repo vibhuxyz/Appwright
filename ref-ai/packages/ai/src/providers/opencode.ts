@@ -7,18 +7,21 @@ import { createProvider, type Provider } from "../models.ts";
 import { OPENCODE_MODELS } from "./opencode.models.ts";
 
 export function opencodeProvider(): Provider<
-	"anthropic-messages" | "google-generative-ai" | "openai-completions" | "openai-responses"
+  | "anthropic-messages"
+  | "google-generative-ai"
+  | "openai-completions"
+  | "openai-responses"
 > {
-	return createProvider({
-		id: "opencode",
-		name: "OpenCode Zen",
-		auth: { apiKey: envApiKeyAuth("OpenCode API key", ["OPENCODE_API_KEY"]) },
-		models: Object.values(OPENCODE_MODELS),
-		api: {
-			"anthropic-messages": anthropicMessagesApi(),
-			"google-generative-ai": googleGenerativeAIApi(),
-			"openai-completions": openAICompletionsApi(),
-			"openai-responses": openAIResponsesApi(),
-		},
-	});
+  return createProvider({
+    id: "opencode",
+    name: "OpenCode Zen",
+    auth: { apiKey: envApiKeyAuth("OpenCode API key", ["OPENCODE_API_KEY"]) },
+    models: Object.values(OPENCODE_MODELS),
+    api: {
+      "anthropic-messages": anthropicMessagesApi(),
+      "google-generative-ai": googleGenerativeAIApi(),
+      "openai-completions": openAICompletionsApi(),
+      "openai-responses": openAIResponsesApi(),
+    },
+  });
 }

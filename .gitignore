@@ -34,6 +34,7 @@ __pycache__/
 coverage
 
 # ─── Tooling ───
+.turbo
 # Track .claude/commands/ (shared slash commands); ignore local-only settings.
 .claude/*
 !.claude/commands/

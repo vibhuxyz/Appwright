@@ -42,19 +42,19 @@ V4.5 VISUAL EDITOR         "I drag it, and it changes — no prompt, no tokens"
 
 ## At a glance
 
-| V | Name | Ship criterion (the demo) | Est. | Depends on |
-|---|---|---|---|---|
-| **V0** | Agent Loop | Terminal: *"add a dark mode toggle"* → agent reads, edits, and reports. Multi-step tool chains complete unattended | 1–2 wks | — |
-| **V1** | Web App + Memory | Browser: open a project → chat → watch tool calls stream live → refresh the page → history is intact → preview pane shows the running app | 2–3 wks | V0 |
-| **V1.1** | UI System | Same prompt on **both** templates → *"build a pricing page with three tiers"* → both use shadcn `Card`/`Button` and Lucide icons, neither diff contains an arbitrary bracket value, and the two previews side by side **look like the same product** | 1 wk | V1 |
-| **V2** | Isolation & Control | Two agent sessions run in parallel on the same repo without collision; a `bash` call pauses for approval; a diff view shows exactly what changed; bad code is caught by `tsc` before it reaches the user | 2 wks | V1 |
-| **V3** | Cloud Sandbox | Sign up on a deployed URL from a machine that has never seen the repo → build an app → it runs in **our** sandbox → preview loads from a public URL | 3–4 wks | V2 |
-| **V4** | App Builder | *"Build me a food delivery app"* → clarifying questions → visible task list → tasks tick off → a **full-stack** app in the preview (Next.js + Prisma + Postgres + auth, with seeded data) → *"make the cart sticky"* → it updates | 5–7 wks | V3 |
-| **V4.5** | Visual Editor | Click a card in the preview → drag its width to 286px, set padding and radius → click the navbar, set its height → header reads *4 pending changes · 2 components* → Submit once → the rendered width **measures exactly 286px**, and `git diff` on the generated repo contains no `data-aw-id` | 3–4 wks | V4 |
-| **V5** | Browser Agent | *"Build a signup page"* → it builds it, then **uses** it: valid email, invalid email, duplicate email, empty password — and finds a 500 the compiler could never catch, plus a layout break at 375px | 3–4 wks | V4 |
-| **V6** | Autonomy & Deploy | Plant a bug → the agent detects it from browser + logs and self-heals → click Deploy → app is live on a real domain | 4+ wks | V5 |
+| V        | Name                | Ship criterion (the demo)                                                                                                                                                                                                                                                                       | Est.    | Depends on |
+| -------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | ---------- |
+| **V0**   | Agent Loop          | Terminal: _"add a dark mode toggle"_ → agent reads, edits, and reports. Multi-step tool chains complete unattended                                                                                                                                                                              | 1–2 wks | —          |
+| **V1**   | Web App + Memory    | Browser: open a project → chat → watch tool calls stream live → refresh the page → history is intact → preview pane shows the running app                                                                                                                                                       | 2–3 wks | V0         |
+| **V1.1** | UI System           | Same prompt on **both** templates → _"build a pricing page with three tiers"_ → both use shadcn `Card`/`Button` and Lucide icons, neither diff contains an arbitrary bracket value, and the two previews side by side **look like the same product**                                            | 1 wk    | V1         |
+| **V2**   | Isolation & Control | Two agent sessions run in parallel on the same repo without collision; a `bash` call pauses for approval; a diff view shows exactly what changed; bad code is caught by `tsc` before it reaches the user                                                                                        | 2 wks   | V1         |
+| **V3**   | Cloud Sandbox       | Sign up on a deployed URL from a machine that has never seen the repo → build an app → it runs in **our** sandbox → preview loads from a public URL                                                                                                                                             | 3–4 wks | V2         |
+| **V4**   | App Builder         | _"Build me a food delivery app"_ → clarifying questions → visible task list → tasks tick off → a **full-stack** app in the preview (Next.js + Prisma + Postgres + auth, with seeded data) → _"make the cart sticky"_ → it updates                                                               | 5–7 wks | V3         |
+| **V4.5** | Visual Editor       | Click a card in the preview → drag its width to 286px, set padding and radius → click the navbar, set its height → header reads _4 pending changes · 2 components_ → Submit once → the rendered width **measures exactly 286px**, and `git diff` on the generated repo contains no `data-aw-id` | 3–4 wks | V4         |
+| **V5**   | Browser Agent       | _"Build a signup page"_ → it builds it, then **uses** it: valid email, invalid email, duplicate email, empty password — and finds a 500 the compiler could never catch, plus a layout break at 375px                                                                                            | 3–4 wks | V4         |
+| **V6**   | Autonomy & Deploy   | Plant a bug → the agent detects it from browser + logs and self-heals → click Deploy → app is live on a real domain                                                                                                                                                                             | 4+ wks  | V5         |
 
-*Estimates assume solo, part-time, learning as you go. They are ranges, not promises.*
+_Estimates assume solo, part-time, learning as you go. They are ranges, not promises._
 
 ---
 
@@ -64,59 +64,69 @@ Each version has **one** acceptance test. If it doesn't pass, the version isn't 
 partial credit, no "mostly working".
 
 ### V0 — [details →](./versions/V0_AGENT_LOOP.md)
+
 ```
 $ appwright "read package.json, then add a `clean` script to it"
   ● read_file(package.json)
   ● edit_file(package.json)
   ✓ Added a `clean` script.
 ```
+
 Two chained tool calls in one turn, no human intervention between them. **That single fact —
 the loop continues on its own — is what V0 exists to prove.**
 
 ### V1 — [details →](./versions/V1_WEB_APP.md)
+
 Browser at `localhost:3000`: project list → session → chat. Tool calls appear as they execute.
 Hard-refresh mid-run and the transcript is still there. Preview iframe shows the edited app.
 
 ### V1.1 — [details →](./versions/V1_1_UI_SYSTEM.md)
+
 Two templates, one prompt, one look. The agent reaches for `Button` instead of writing one, and
 the token scale is defined exactly once and imported twice.
 
 **The trigger was felt, not predicted:** V1 shipped, and its output reads as a first draft. The
 taste-independent evidence is that the pristine `vite-react` starter already ships `rounded-[30px]`
 and `text-[32px]` in hand-rolled utilities — **the template was inventing off-scale values before
-the agent ever did.** Vocabulary ships here; the validator that *rejects* waits for V4, because
+the agent ever did.** Vocabulary ships here; the validator that _rejects_ waits for V4, because
 there is no `design` block to validate against until the Blueprint exists.
 
 ### V2 — [details →](./versions/V2_ISOLATION_AND_CONTROL.md)
+
 Start two sessions on the same project. Each gets its own worktree/branch. Both run at once.
 Neither sees the other's files. A `bash rm -rf` request blocks on an approval prompt. Merge one
 session back to `main` from the UI.
 
 ### V3 — [details →](./versions/V3_CLOUD_SANDBOX.md)
+
 Deployed. Two different user accounts. Each build boots its own sandbox. User A cannot read
 user B's files. Preview at `https://preview-<id>.<domain>`. Kill a worker mid-run → the job
 requeues and the user sees a reconnect, not a crash.
 
 ### V4 — [details →](./versions/V4_APP_BUILDER.md)
+
 One sentence in → a working multi-page app out, with a visible plan that ticked off task by task,
 and every task verified green before the next started.
 
 ### V4.5 — [details →](./versions/V4_5_VISUAL_EDITOR.md)
+
 Four properties changed across two components by dragging and typing, submitted once, applied in
 one run — and the rendered width is **measured** at exactly the number that was asked for. Exact
 edits cost zero LLM tokens. The exported repo contains no Appwright markers.
 
 **Placed at 4.5 deliberately, and the cost is recorded:** an editor built before V5 cannot check
-its own output the way the browser agent will. It does not need to — it verifies *the request that
-was made* (`boundingBox().width === 286`), which is one measurement, not a quality judgement
+its own output the way the browser agent will. It does not need to — it verifies _the request that
+was made_ (`boundingBox().width === 286`), which is one measurement, not a quality judgement
 ([D51](./DECISIONS.md#decision-51-verification-checks-the-request-that-was-made-not-a-general-notion-of-good--active-target-v45-deepens-at-v5)).
 **Do not let V5's ambition leak backwards into this rung.**
 
 ### V5 — [details →](./versions/V5_BROWSER_AGENT.md)
+
 The agent opens the app it just built, fills the signup form five different ways, and reports two
 real defects — one runtime, one visual. Every action targets a role and name, never a coordinate.
 
 ### V6 — [details →](./versions/V6_AUTONOMY_AND_DEPLOY.md)
+
 The app fixes its own errors within a retry budget, and deploys to a public URL.
 
 ---
@@ -159,15 +169,15 @@ There is no `ROADMAP.md` in this repo — it was folded into
 [versions/V4_APP_BUILDER.md](./versions/V4_APP_BUILDER.md), which now holds the older
 M1–M5 / P2–P11 board plus the detailed frontend-registry design. Mapping:
 
-| Old | New |
-|---|---|
-| M1 create from scratch, M3 realtime, M4 preview, M5 end-to-end | **V1** |
-| Phase A (two-directory model), Phase B (event stream → WS) | **V1** |
-| P4 Verification Engine | **V2** (compile) → **V5** (interact + look) |
-| P2 E2B sandbox, P10 fleet/scale-out | **V3** |
-| Phase C (blueprint, registry, selector), P8 thinking front-end | **V4** |
-| P5 self-healing, P6 observability, P7 memory, P11 deploy | **V6** |
-| P3 repo intelligence, P9 quality agents | **V6+** |
+| Old                                                            | New                                         |
+| -------------------------------------------------------------- | ------------------------------------------- |
+| M1 create from scratch, M3 realtime, M4 preview, M5 end-to-end | **V1**                                      |
+| Phase A (two-directory model), Phase B (event stream → WS)     | **V1**                                      |
+| P4 Verification Engine                                         | **V2** (compile) → **V5** (interact + look) |
+| P2 E2B sandbox, P10 fleet/scale-out                            | **V3**                                      |
+| Phase C (blueprint, registry, selector), P8 thinking front-end | **V4**                                      |
+| P5 self-healing, P6 observability, P7 memory, P11 deploy       | **V6**                                      |
+| P3 repo intelligence, P9 quality agents                        | **V6+**                                     |
 
 `V4_APP_BUILDER.md` stays as the deep design reference for the frontend-builder/registry thinking.
 **`docs/VERSIONS.md` (this file) is the schedule of record.**

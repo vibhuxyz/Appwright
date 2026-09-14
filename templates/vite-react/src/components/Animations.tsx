@@ -1,17 +1,22 @@
-import { motion, type HTMLMotionProps } from 'framer-motion';
-import type { ReactNode } from 'react';
+import { motion, type HTMLMotionProps } from "framer-motion";
+import type { ReactNode } from "react";
 
 interface Props extends HTMLMotionProps<"div"> {
   children: ReactNode;
   delay?: number;
 }
 
-export const FadeIn = ({ children, delay = 0, className = "", ...props }: Props) => (
+export const FadeIn = ({
+  children,
+  delay = 0,
+  className = "",
+  ...props
+}: Props) => (
   <motion.div
     initial={{ opacity: 0, y: 10 }}
     animate={{ opacity: 1, y: 0 }}
     exit={{ opacity: 0, y: -10 }}
-    transition={{ duration: 0.3, delay, ease: 'easeOut' }}
+    transition={{ duration: 0.3, delay, ease: "easeOut" }}
     className={className}
     {...props}
   >

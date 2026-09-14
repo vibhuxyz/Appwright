@@ -208,8 +208,9 @@ Intent records carry the ids of entries that do not exist yet:
 /** An entry payload with its id pre-allocated. parentId, seq, and timestamp
     are assigned by storage when the entry is appended: it chains to the
     lane's then-current leaf. */
-type ProvisionedEntry<T extends Entry = Entry> =
-  T extends Entry ? Omit<T, "parentId" | "seq" | "timestamp"> : never;
+type ProvisionedEntry<T extends Entry = Entry> = T extends Entry
+  ? Omit<T, "parentId" | "seq" | "timestamp">
+  : never;
 ```
 
 ### Record catalog
@@ -219,9 +220,9 @@ Every record belongs to one lane's record sequence. Records that belong to an op
 ```ts
 interface RecordBase {
   id: string;
-  seq: number;            // shared sequence, section 2
+  seq: number; // shared sequence, section 2
   lane: string;
-  timestamp: number;      // Unix ms
+  timestamp: number; // Unix ms
 }
 
 interface ModelReference {
@@ -251,7 +252,7 @@ interface LaneConfigRecord extends RecordBase {
 // records of the operation carry.
 interface OperationStartedRecord extends RecordBase {
   type: "operation_started";
-  sourceLeafId: string | null;        // the lane's leaf at acceptance
+  sourceLeafId: string | null; // the lane's leaf at acceptance
   intent:
     | {
         kind: "run";
@@ -273,18 +274,19 @@ interface OperationStartedRecord extends RecordBase {
     | {
         kind: "compaction";
         customInstructions?: string;
-        resultEntryId: string;          // provisioned compaction entry
+        resultEntryId: string; // provisioned compaction entry
       }
     | ({
         kind: "navigation";
         customInstructions?: string;
       } & (
-        | { targetId: null; label?: never }       // root has no label fact
-        | { targetId: string; label?: string }    // written at completion
-      ) & (
-        | { summarize: false; summaryEntryId?: never }
-        | { summarize: true; summaryEntryId: string }  // provisioned branch-summary entry
-      ));
+        | { targetId: null; label?: never } // root has no label fact
+        | { targetId: string; label?: string } // written at completion
+      ) &
+        (
+          | { summarize: false; summaryEntryId?: never }
+          | { summarize: true; summaryEntryId: string } // provisioned branch-summary entry
+        ));
 }
 
 // Operation acceptance does not copy lane configuration. A generation
@@ -308,9 +310,9 @@ type OperationFinishedRecord = RecordBase & {
   type: "operation_finished";
   runId: string;
 } & (
-  | { outcome: "failed"; error: { code: string; message: string } }
-  | { outcome: "completed" | "aborted" | "declined"; error?: never }
-);
+    | { outcome: "failed"; error: { code: string; message: string } }
+    | { outcome: "completed" | "aborted" | "declined"; error?: never }
+  );
 
 // Starts one durable logical step. This record's own id IS the stepId.
 // Generation sources copy configuration arrays and persist the normalized
@@ -320,45 +322,64 @@ type OperationFinishedRecord = RecordBase & {
 // present exactly when that result reports usage, so recovery can write the
 // exact accounting record before the result entry without rerunning the hook.
 type StructuralStepSource<T extends CompactionEntry | BranchSummaryEntry> =
-  | { source: "generated";
+  | {
+      source: "generated";
       configuration: LaneConfiguration;
       retryPolicy: RetryPolicy;
       hookResult?: never;
-      hookUsageRecordId?: never }
-  | { source: "hook";
+      hookUsageRecordId?: never;
+    }
+  | {
+      source: "hook";
       configuration?: never;
       retryPolicy?: never;
       hookResult: ProvisionedEntry<T>;
-      hookUsageRecordId?: string };
+      hookUsageRecordId?: string;
+    };
 
-type StepStartedRecord = RecordBase & { type: "step_started"; runId: string } & (
-  | { step: "assistant";
-      configuration: LaneConfiguration;
-      retryPolicy: RetryPolicy;        // normalized total value
-      triggerMessageId: string }
-  | { step: "deferred_fetch";
-      /** Exact copies from the assistant generation step that persisted the
+type StepStartedRecord = RecordBase & {
+  type: "step_started";
+  runId: string;
+} & (
+    | {
+        step: "assistant";
+        configuration: LaneConfiguration;
+        retryPolicy: RetryPolicy; // normalized total value
+        triggerMessageId: string;
+      }
+    | {
+        step: "deferred_fetch";
+        /** Exact copies from the assistant generation step that persisted the
           original deferred response. Copied active tools govern a ready
           response's tool calls; the source handle supplies fetch identity. */
-      configuration: LaneConfiguration;
-      /** Normalized copy. maxAttempts applies to attempts naming one source;
+        configuration: LaneConfiguration;
+        /** Normalized copy. maxAttempts applies to attempts naming one source;
           a successful pending response creates a new source. */
-      retryPolicy: RetryPolicy }
-  | ({ step: "compaction";
-       resultEntryId: string;           // always a CompactionEntry
-     } & StructuralStepSource<CompactionEntry> & (
-       | { compactionReason: "manual" | "threshold";
-           supersededResponseEntryId?: never; triggerMessageId?: never }
-       | { compactionReason: "overflow";
-           /** Exact durable assistant response omitted by this recovery. */
-           supersededResponseEntryId: string;
-           /** Copied from the assistant step that produced that response. */
-           triggerMessageId: string }
-     ))
-  | ({ step: "branch_summary";
-       resultEntryId: string }          // always a BranchSummaryEntry
-     & StructuralStepSource<BranchSummaryEntry>)
-);
+        retryPolicy: RetryPolicy;
+      }
+    | ({
+        step: "compaction";
+        resultEntryId: string; // always a CompactionEntry
+      } & StructuralStepSource<CompactionEntry> &
+        (
+          | {
+              compactionReason: "manual" | "threshold";
+              supersededResponseEntryId?: never;
+              triggerMessageId?: never;
+            }
+          | {
+              compactionReason: "overflow";
+              /** Exact durable assistant response omitted by this recovery. */
+              supersededResponseEntryId: string;
+              /** Copied from the assistant step that produced that response. */
+              triggerMessageId: string;
+            }
+        ))
+    | ({
+        step: "branch_summary";
+        resultEntryId: string;
+      } & StructuralStepSource<BranchSummaryEntry>) // always a BranchSummaryEntry
+  );
 
 // Written immediately before one attempt's provider work. attempt is 1-based
 // and consecutive within stepId. Assistant and deferred-fetch attempts each
@@ -374,22 +395,26 @@ type StepAttemptRecord = RecordBase & {
   stepId: string;
   attempt: number;
 } & (
-  | { step: "assistant";
-      responseEntryId: string;
-      usageRecordId: string;
-      /** Request-specific intended limit before context clamping. */
-      intendedOutputLimit: number;
-      /** Context-window size used by this request. */
-      contextWindow: number }
-  | { step: "deferred_fetch";
-      /** Exact deferred response entry whose complete handle this poll
+    | {
+        step: "assistant";
+        responseEntryId: string;
+        usageRecordId: string;
+        /** Request-specific intended limit before context clamping. */
+        intendedOutputLimit: number;
+        /** Context-window size used by this request. */
+        contextWindow: number;
+      }
+    | {
+        step: "deferred_fetch";
+        /** Exact deferred response entry whose complete handle this poll
           redeems. Pending responses advance this lineage even when the
           complete handle is unchanged; interrupted responses do not. */
-      sourceEntryId: string;
-      responseEntryId: string;
-      usageRecordId: string }
-  | { step: "compaction" | "branch_summary" }
-);
+        sourceEntryId: string;
+        responseEntryId: string;
+        usageRecordId: string;
+      }
+    | { step: "compaction" | "branch_summary" }
+  );
 
 // A generated branch summary must be durable before navigation moves. This
 // record stores the complete payload produced by one successful attempt. The
@@ -428,7 +453,7 @@ interface ToolBatchStartedRecord extends RecordBase {
   type: "tool_batch_started";
   runId: string;
   assistantEntryId: string;
-  calls: { toolIndex: number; resultEntryId: string }[];  // 0..tool-call count - 1
+  calls: { toolIndex: number; resultEntryId: string }[]; // 0..tool-call count - 1
 }
 
 // Written after before_tool and validation pass, immediately before this
@@ -440,7 +465,7 @@ interface ToolStartedRecord extends RecordBase {
   toolIndex: number;
   toolCallId: string;
   toolName: string;
-  effectiveArgs: Record<string, unknown>;   // after before_tool
+  effectiveArgs: Record<string, unknown>; // after before_tool
   /** The tool's declared replay safety, snapshotted at execution time.
       Recovery re-executes an unfinished call only when this field AND the
       current tool declaration both say "safe"; otherwise it writes a
@@ -454,17 +479,17 @@ type QueueEnqueuedRecord = RecordBase & {
   type: "queue_enqueued";
   target: ProvisionedEntry<MessageEntry>;
 } & (
-  | { queue: "steer" | "followUp"; runId: string }
-  | { queue: "nextRun"; runId?: never }
-);
+    | { queue: "steer" | "followUp"; runId: string }
+    | { queue: "nextRun"; runId?: never }
+  );
 
 // Durable retraction of a pending queue item, before consumption. Without
 // this record a crash would resurrect the item: recovery treats a
 // queue_enqueued without its entry as pending.
 interface QueueCancelledRecord extends RecordBase {
   type: "queue_cancelled";
-  runId?: string;                      // matches the queue_enqueued it kills
-  entryId: string;                     // the enqueued target's provisioned id
+  runId?: string; // matches the queue_enqueued it kills
+  entryId: string; // the enqueued target's provisioned id
 }
 
 // Deferred-write acceptance: a tree entry requested while a step was in
@@ -482,31 +507,53 @@ interface WriteDeferredRecord extends RecordBase {
 // recovery checks that one presence bit and reconstructs a missing record from
 // the immutable response usage before classification. Other usage remains pure
 // accounting. A transport death mid-stream can still bill unreported tokens.
-type UsageRecord = RecordBase & { type: "usage"; usage: Usage } & (
+type UsageRecord = RecordBase & { type: "usage"; usage: Usage } &
   // A provider request settled. Split-turn compaction writes two records
   // sharing one structural attempt and result entry id.
-  | { cause: "assistant" | "compaction" | "branch_summary" | "deferred_fetch";
-      runId: string; stepId: string; entryId: string; attempt: number;
-      stopReason: TerminalStopReason }
-  // A finalized tool result reported nested LLM work; skipped when it
-  // reports none. A safe replay writes a second record for the second
-  // execution: both were billed.
-  | { cause: "tool"; runId: string; entryId: string; toolCallId: string }
-  // A hook-supplied summary carried usage the hook measured itself.
-  | { cause: "hook"; runId: string; entryId: string }
-  // Application-supplied, anytime (lane.recordUsage): reconciliation,
-  // estimates, corrections. Negative values are legal.
-  | { cause: "adjustment"; runId?: string; entryId?: string; details?: JsonValue }
-);
+  (
+    | {
+        cause: "assistant" | "compaction" | "branch_summary" | "deferred_fetch";
+        runId: string;
+        stepId: string;
+        entryId: string;
+        attempt: number;
+        stopReason: TerminalStopReason;
+      }
+    // A finalized tool result reported nested LLM work; skipped when it
+    // reports none. A safe replay writes a second record for the second
+    // execution: both were billed.
+    | { cause: "tool"; runId: string; entryId: string; toolCallId: string }
+    // A hook-supplied summary carried usage the hook measured itself.
+    | { cause: "hook"; runId: string; entryId: string }
+    // Application-supplied, anytime (lane.recordUsage): reconciliation,
+    // estimates, corrections. Negative values are legal.
+    | {
+        cause: "adjustment";
+        runId?: string;
+        entryId?: string;
+        details?: JsonValue;
+      }
+  );
 
-type LaneRecord = LaneConfigRecord | OperationStartedRecord | AbortRequestedRecord
-  | OperationFinishedRecord | StepStartedRecord | StepAttemptRecord
-  | BranchSummaryPreparedRecord | StepFailedRecord | ToolBatchStartedRecord
-  | ToolStartedRecord | QueueEnqueuedRecord | QueueCancelledRecord
-  | WriteDeferredRecord | UsageRecord;
+type LaneRecord =
+  | LaneConfigRecord
+  | OperationStartedRecord
+  | AbortRequestedRecord
+  | OperationFinishedRecord
+  | StepStartedRecord
+  | StepAttemptRecord
+  | BranchSummaryPreparedRecord
+  | StepFailedRecord
+  | ToolBatchStartedRecord
+  | ToolStartedRecord
+  | QueueEnqueuedRecord
+  | QueueCancelledRecord
+  | WriteDeferredRecord
+  | UsageRecord;
 
-type NewRecord<T extends LaneRecord = LaneRecord> =
-  T extends LaneRecord ? Omit<T, "seq" | "timestamp"> : never;
+type NewRecord<T extends LaneRecord = LaneRecord> = T extends LaneRecord
+  ? Omit<T, "seq" | "timestamp">
+  : never;
 ```
 
 The batch plan covers every call outcome, even without execution. Blocked and invalid calls write no `tool_started`; they append an `isError: true` result under their source index's planned id. A crash before that entry reruns clearance, including `before_tool`, against the same id. Genuine output-limit `length`, abort before start, and unsafe started-call recovery likewise append explanatory, aborted, or interrupted synthetic results under planned ids.
@@ -658,14 +705,14 @@ A linked later record means that an ordinary transition already won: a newer att
 
 Every prefix around settlement and transition has one interpretation:
 
-| durable prefix | recovery before ordinary orchestration |
-|---|---|
-| `step_started`, no attempt | append attempt 1 before the provider effect |
-| `step_attempt`, response absent, no abort | effect unknown; start a fresh numbered attempt below the cap, or append the synthetic interruption response under the provisioned id at the cap |
-| `step_attempt`, response absent, abort present | append synthetic `aborted` under the provisioned response id and its preplanned usage; never retry |
-| response present, usage absent | reconstruct the exact preplanned usage record from the response; then abort wins if its marker exists |
-| usage present, response absent | corruption; live settlement cannot write in this order |
-| response and usage present, no linked transition | run the pure classifier on that same response; an abort marker selects reconciliation |
+| durable prefix                                        | recovery before ordinary orchestration                                                                                                                      |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `step_started`, no attempt                            | append attempt 1 before the provider effect                                                                                                                 |
+| `step_attempt`, response absent, no abort             | effect unknown; start a fresh numbered attempt below the cap, or append the synthetic interruption response under the provisioned id at the cap             |
+| `step_attempt`, response absent, abort present        | append synthetic `aborted` under the provisioned response id and its preplanned usage; never retry                                                          |
+| response present, usage absent                        | reconstruct the exact preplanned usage record from the response; then abort wins if its marker exists                                                       |
+| usage present, response absent                        | corruption; live settlement cannot write in this order                                                                                                      |
+| response and usage present, no linked transition      | run the pure classifier on that same response; an abort marker selects reconciliation                                                                       |
 | response and usage present, linked transition present | absent abort, resume the represented retry, overflow compaction, tool batch, suspension, or finish; with abort, preserve the response and reconcile instead |
 
 An abort marker takes priority over ordinary transitions, regardless of a response's preserved stop reason. Otherwise classification checks overflow before interruption or retryable error, so an oversized request compacts rather than retries unchanged. `deferred` suspends. Unmarked `aborted` retries below the captured cap and fails at it. Retryable `error` retries below the cap; other errors fail. `stop`, `toolUse`, and genuine output-limit `length` are accepted. Live and reopened execution use this order.
@@ -679,10 +726,15 @@ Overflow classification has three explicit inputs, all durable on the response a
 3. **A recoverable `length`.** The response either matches the existing Xiaomi MiMo-compatible context-pressure signal — zero output and reported input plus cache-read tokens at least 99% of the captured non-zero window — or ended below the request's persisted intended output limit:
 
 ```ts
-function isRecoverableLength(message: AssistantMessage, intendedOutputLimit: number): boolean {
-  return message.stopReason === "length"
-    && intendedOutputLimit > 0
-    && message.usage.output < intendedOutputLimit;
+function isRecoverableLength(
+  message: AssistantMessage,
+  intendedOutputLimit: number,
+): boolean {
+  return (
+    message.stopReason === "length" &&
+    intendedOutputLimit > 0 &&
+    message.usage.output < intendedOutputLimit
+  );
 }
 ```
 
@@ -709,15 +761,15 @@ R   usage
 
 Per crash site:
 
-| crash after | durable state | recovery |
-|---|---|---|
-| assistant `step_started` | no attempt | commit attempt 1 before the provider effect |
-| assistant `step_attempt` | response absent; provider effect unknown | start the next numbered attempt below the cap; at the cap append the synthetic interruption response under the attempt's id |
-| assistant response entry | preplanned usage may be absent | append missing usage, then classify the durable response |
-| assistant usage | response settled and accounted; no linked compaction yet | classify that response; if recoverable, run the omission-aware compaction decision before any new request or tool plan |
-| overflow compaction `step_started` | exact response and trigger linked; stable typed result absent | continue that same compaction with preparation and retained tail omitting the linked response |
-| compaction `step_attempt` | structural effect unknown | start the next numbered attempt below the cap; otherwise append `step_failed` |
-| compaction entry | structural step closed by its typed result | checkpoint path; a fresh assistant step with the same trigger follows |
+| crash after                        | durable state                                                 | recovery                                                                                                                    |
+| ---------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| assistant `step_started`           | no attempt                                                    | commit attempt 1 before the provider effect                                                                                 |
+| assistant `step_attempt`           | response absent; provider effect unknown                      | start the next numbered attempt below the cap; at the cap append the synthetic interruption response under the attempt's id |
+| assistant response entry           | preplanned usage may be absent                                | append missing usage, then classify the durable response                                                                    |
+| assistant usage                    | response settled and accounted; no linked compaction yet      | classify that response; if recoverable, run the omission-aware compaction decision before any new request or tool plan      |
+| overflow compaction `step_started` | exact response and trigger linked; stable typed result absent | continue that same compaction with preparation and retained tail omitting the linked response                               |
+| compaction `step_attempt`          | structural effect unknown                                     | start the next numbered attempt below the cap; otherwise append `step_failed`                                               |
+| compaction entry                   | structural step closed by its typed result                    | checkpoint path; a fresh assistant step with the same trigger follows                                                       |
 
 A genuine output-limit `length` response is accepted and remains in transcript **and provider context**. Without tool calls it reaches the normal checkpoint. With calls, the harness plans the batch, executes none, and appends one planned `isError: true` result per call in source order, explaining that truncation may have left arguments incomplete. The errors do not terminate, so another assistant turn sees the response and results. A crash before planning reclassifies and plans; a crash after planning fills missing results without execution.
 
@@ -853,13 +905,13 @@ E   tool result c1                    c1's planned id
 X7  result durable                    c1 complete
 ```
 
-| crash site | durable state | recovery |
-|---|---|---|
-| X1 | accepted, accounted assistant response; no plan | append one complete `tool_batch_started` with fresh ids, then continue; no clearance or effect can have occurred |
-| X2, X3 | plan exists; this call has no `tool_started` and no result | ordinary call: rerun lookup, validation, and `before_tool`; blocked or invalid outcome uses the planned id. Genuine `length` skips clearance and writes its planned explanatory result. Aborting reconciliation writes the planned `aborted` result for a call that never started |
-| X4, X5 | `tool_started`, no result | the effect is unknown. Without an abort marker, re-execute persisted args only when the record and current declaration both say `safe`, then run `after_tool`; otherwise append a planned synthetic `interrupted` result with no hooks. With an abort marker, never replay; append the interrupted result |
-| X6 | `tool_started` and one or more tool-usage records, no result | keep all billed usage in the ledger, then take the same replay-or-interrupt action as X4. Without abort, a replay is another effect and may add another usage record; its real result snapshots only that replay's usage. An interrupted synthetic has no usage snapshot |
-| X7 | planned result entry exists | skip the call; if its message reports usage, the matching usage record must already exist |
+| crash site | durable state                                                | recovery                                                                                                                                                                                                                                                                                                  |
+| ---------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| X1         | accepted, accounted assistant response; no plan              | append one complete `tool_batch_started` with fresh ids, then continue; no clearance or effect can have occurred                                                                                                                                                                                          |
+| X2, X3     | plan exists; this call has no `tool_started` and no result   | ordinary call: rerun lookup, validation, and `before_tool`; blocked or invalid outcome uses the planned id. Genuine `length` skips clearance and writes its planned explanatory result. Aborting reconciliation writes the planned `aborted` result for a call that never started                         |
+| X4, X5     | `tool_started`, no result                                    | the effect is unknown. Without an abort marker, re-execute persisted args only when the record and current declaration both say `safe`, then run `after_tool`; otherwise append a planned synthetic `interrupted` result with no hooks. With an abort marker, never replay; append the interrupted result |
+| X6         | `tool_started` and one or more tool-usage records, no result | keep all billed usage in the ledger, then take the same replay-or-interrupt action as X4. Without abort, a replay is another effect and may add another usage record; its real result snapshots only that replay's usage. An interrupted synthetic has no usage snapshot                                  |
+| X7         | planned result entry exists                                  | skip the call; if its message reports usage, the matching usage record must already exist                                                                                                                                                                                                                 |
 
 Blocked and invalid calls go directly from X2/X3 to their planned error result and never write `tool_started`. Genuine output-limit `length` does the same for every source call without running clearance. During live abort, a started effect that settles keeps its real/error result; after a crash, any unresolved started call gets an `interrupted` result without replay. A planned call that never started gets an `aborted` result. Every synthetic result has `isError: true` and `terminate: false`.
 
@@ -915,15 +967,15 @@ For a hook summary, `step_started` stores the complete provisioned `BranchSummar
 
 Acceptance returns `InvalidNavigation` before writing `operation_started` when `target === sourceLeafId` or when `target === null` and a label is present. Root is not an entry and has no label fact. With `summarize: true`, the durable states and actions are exhaustive:
 
-| current leaf and durable result state | action |
-|---|---|
-| source leaf, no structural step | run `before_navigation` again; decline, persist its complete result in `step_started`, or select generated work with `step_started` |
-| source leaf, hook-source `step_started` | repair its preplanned usage when needed, then move using its stored payload |
-| source leaf, generated step without `branch_summary_prepared` or `step_failed` | start or retry numbered attempts; on success write usage then the complete prepared record |
-| source leaf, generated `step_failed` | finish failed; never move |
-| source leaf, durable hook or generated payload | move to the target unless abort already won |
-| target leaf, durable payload, summary entry absent | append that exact payload; never call the hook or provider |
-| summary-entry leaf, exact summary entry present | atomically append the accepted label and completed finish when labeled; otherwise append only the finish |
+| current leaf and durable result state                                          | action                                                                                                                              |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| source leaf, no structural step                                                | run `before_navigation` again; decline, persist its complete result in `step_started`, or select generated work with `step_started` |
+| source leaf, hook-source `step_started`                                        | repair its preplanned usage when needed, then move using its stored payload                                                         |
+| source leaf, generated step without `branch_summary_prepared` or `step_failed` | start or retry numbered attempts; on success write usage then the complete prepared record                                          |
+| source leaf, generated `step_failed`                                           | finish failed; never move                                                                                                           |
+| source leaf, durable hook or generated payload                                 | move to the target unless abort already won                                                                                         |
+| target leaf, durable payload, summary entry absent                             | append that exact payload; never call the hook or provider                                                                          |
+| summary-entry leaf, exact summary entry present                                | atomically append the accepted label and completed finish when labeled; otherwise append only the finish                            |
 
 A target leaf without a durable payload, a summary entry whose id is not the leaf, or any other leaf is corruption. With `summarize: false`, only source-before-move and target-after-move are valid; no structural step or summary entry exists. A pre-move abort finishes aborted and leaves any prepared payload only in records. Once the move commits, abort cannot undo it: recovery appends the durable summary when required, writes the label, and finishes completed without model or hook lookup.
 
@@ -1030,28 +1082,28 @@ Live commits apply the same transitions in memory. Fresh reduction must match li
 
 `resume()` persists no program counter and dispatches no recovery-only continuation. It invokes the live run, compaction, or navigation procedure, which reads reduced state and reaches its first unfinished transition:
 
-| reduced prefix | ordinary re-entry |
-|---|---|
-| missing accepted initial messages | append the missing planned entries before other operation work, including while aborting |
-| assistant `step_started`, no attempt | `assistantStep` commits attempt 1, then makes the provider request |
-| assistant attempt, response absent | `assistantStep` treats the effect as unknown: start the next numbered attempt below the captured cap, or settle the missing planned response as synthetic interruption at the cap |
-| assistant/fetch response present, usage absent | `persistMissingResponseUsage` reconstructs the preplanned usage record before classification or abort completion |
-| accounted assistant response, no linked transition | `assistantStep` runs the ordinary pure classifier; retry, linked overflow, suspension, terminal failure, tool planning, or checkpoint follows normally |
-| accepted tool-call response, no batch plan | `runToolBatch` commits the complete plan before clearance |
-| tool plan with missing results | `reconcileToolBatch` proceeds in source order: rerun clearance for no-start calls, replay only safe started calls, or append the required interrupted, genuine-length, or abort synthetic under the planned id |
-| original or pending deferred source, no fetch attempt awaiting settlement | `redeemDeferred` creates the fetch step once if needed, commits one attempt for the exact source, and performs at most one check-once fetch for this `resume()` |
-| fetch attempt, response absent | `redeemDeferred` treats the poll as unknown: use a later numbered attempt below the copied per-source cap, or settle the missing id as terminal interruption at the cap |
-| accounted fetch response | ordinary deferred classification advances an equal-handle pending source, retains an interrupted source below cap, accepts a ready response, or enters terminal-failure drain |
-| compaction operation or auto-compaction before a durable step | the ordinary compaction procedure runs its decision hook and persists either the complete hook result or a generated source before continuing |
-| hook structural source, result absent | repair its preplanned hook usage when present, then commit the stored result if abort has not won |
-| generated compaction with no attempt, unknown final attempt, result, or `step_failed` | `summaryStep` respectively starts attempt 1, starts a later numbered attempt below cap, commits its typed result directly, or enters the ordinary structural failure path; no prepared-result record exists |
-| generated branch summary without prepared result or `step_failed` | `summaryStep` starts or retries attempts; success writes reported usage and `branch_summary_prepared` before navigation can move |
-| navigation at source with a durable hook/prepared payload | `navigationProcedure` conditionally commits the move without another hook or provider effect |
-| navigation at target with summary absent | append the exact durable payload; never regenerate it |
-| navigation at its summary-entry leaf, or unsummarized navigation at target | atomically append the label and finish when labeled; otherwise append the finish |
-| pending writes or conversational queues | the ordinary checkpoint applies writes, consumes eligible input, and re-evaluates assistant need |
-| terminal assistant/fetch failure | the ordinary failure-drain checkpoint applies writes and consumes eligible input; absent new work it finishes failed |
-| no unfinished transition | the ordinary checkpoint or structural finish boundary conditionally appends `operation_finished` |
+| reduced prefix                                                                        | ordinary re-entry                                                                                                                                                                                              |
+| ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| missing accepted initial messages                                                     | append the missing planned entries before other operation work, including while aborting                                                                                                                       |
+| assistant `step_started`, no attempt                                                  | `assistantStep` commits attempt 1, then makes the provider request                                                                                                                                             |
+| assistant attempt, response absent                                                    | `assistantStep` treats the effect as unknown: start the next numbered attempt below the captured cap, or settle the missing planned response as synthetic interruption at the cap                              |
+| assistant/fetch response present, usage absent                                        | `persistMissingResponseUsage` reconstructs the preplanned usage record before classification or abort completion                                                                                               |
+| accounted assistant response, no linked transition                                    | `assistantStep` runs the ordinary pure classifier; retry, linked overflow, suspension, terminal failure, tool planning, or checkpoint follows normally                                                         |
+| accepted tool-call response, no batch plan                                            | `runToolBatch` commits the complete plan before clearance                                                                                                                                                      |
+| tool plan with missing results                                                        | `reconcileToolBatch` proceeds in source order: rerun clearance for no-start calls, replay only safe started calls, or append the required interrupted, genuine-length, or abort synthetic under the planned id |
+| original or pending deferred source, no fetch attempt awaiting settlement             | `redeemDeferred` creates the fetch step once if needed, commits one attempt for the exact source, and performs at most one check-once fetch for this `resume()`                                                |
+| fetch attempt, response absent                                                        | `redeemDeferred` treats the poll as unknown: use a later numbered attempt below the copied per-source cap, or settle the missing id as terminal interruption at the cap                                        |
+| accounted fetch response                                                              | ordinary deferred classification advances an equal-handle pending source, retains an interrupted source below cap, accepts a ready response, or enters terminal-failure drain                                  |
+| compaction operation or auto-compaction before a durable step                         | the ordinary compaction procedure runs its decision hook and persists either the complete hook result or a generated source before continuing                                                                  |
+| hook structural source, result absent                                                 | repair its preplanned hook usage when present, then commit the stored result if abort has not won                                                                                                              |
+| generated compaction with no attempt, unknown final attempt, result, or `step_failed` | `summaryStep` respectively starts attempt 1, starts a later numbered attempt below cap, commits its typed result directly, or enters the ordinary structural failure path; no prepared-result record exists    |
+| generated branch summary without prepared result or `step_failed`                     | `summaryStep` starts or retries attempts; success writes reported usage and `branch_summary_prepared` before navigation can move                                                                               |
+| navigation at source with a durable hook/prepared payload                             | `navigationProcedure` conditionally commits the move without another hook or provider effect                                                                                                                   |
+| navigation at target with summary absent                                              | append the exact durable payload; never regenerate it                                                                                                                                                          |
+| navigation at its summary-entry leaf, or unsummarized navigation at target            | atomically append the label and finish when labeled; otherwise append the finish                                                                                                                               |
+| pending writes or conversational queues                                               | the ordinary checkpoint applies writes, consumes eligible input, and re-evaluates assistant need                                                                                                               |
+| terminal assistant/fetch failure                                                      | the ordinary failure-drain checkpoint applies writes and consumes eligible input; absent new work it finishes failed                                                                                           |
+| no unfinished transition                                                              | the ordinary checkpoint or structural finish boundary conditionally appends `operation_finished`                                                                                                               |
 
 An abort marker takes priority after missing initial messages and response accounting are repaired. If a compaction result or navigation move already committed, the ordinary structural procedure completes that committed structure. Otherwise `abortPath` settles a missing active assistant/fetch response under its planned id, completes planned tool results without replay, best-effort cancels a deferred handle, applies pending writes, and finishes aborted. No unrelated assistant entry is appended.
 
@@ -1071,7 +1123,7 @@ Interrupted hook handlers follow the section 11 replay table. Old v3 sessions co
 
 ```ts
 interface AgentLane {
-  readonly name: string;                 // "main" on the harness itself
+  readonly name: string; // "main" on the harness itself
   getLeafId(): Promise<string | null>;
 
   // Operations. Never throw; every call resolves with a result (see below).
@@ -1081,10 +1133,13 @@ interface AgentLane {
   skill(name: string, additionalInstructions?: string): Promise<RunResult>;
   promptFromTemplate(name: string, args?: string[]): Promise<RunResult>;
   compact(options?: { customInstructions?: string }): Promise<CompactionResult>;
-  navigateTree(targetId: string | null, options?: NavigateOptions): Promise<NavigationResult>;
-  resume(): Promise<ResumeResult>;       // continue this lane's open operation
-  abort(): Promise<AbortResult>;         // first call is durable on resolve; reconciliation runs in background
-                                         // repeated calls while aborting return the same drained input
+  navigateTree(
+    targetId: string | null,
+    options?: NavigateOptions,
+  ): Promise<NavigationResult>;
+  resume(): Promise<ResumeResult>; // continue this lane's open operation
+  abort(): Promise<AbortResult>; // first call is durable on resolve; reconciliation runs in background
+  // repeated calls while aborting return the same drained input
 
   // Queues. Durable on resolve (queue_enqueued record); the returned
   // entryId identifies the item until consumption. steer/followUp require
@@ -1100,11 +1155,13 @@ interface AgentLane {
   cancelQueued(entryId: string): Promise<CancelQueuedResult>;
   /** Append an adjustment usage record (section 5): reconciliation,
       estimates, corrections. Allowed anytime; records are not context. */
-  recordUsage(usage: Usage, options?: { entryId?: string; details?: JsonValue }):
-    Promise<RecordUsageResult>;
+  recordUsage(
+    usage: Usage,
+    options?: { entryId?: string; details?: JsonValue },
+  ): Promise<RecordUsageResult>;
 
   waitForIdle(): Promise<void>;
-  runWhenIdle(callback: () => void | Promise<void>): Promise<void>;   // runtime-only
+  runWhenIdle(callback: () => void | Promise<void>): Promise<void>; // runtime-only
 
   // Manual drive controls. Section 15 defines their exact behavior; they
   // are usable only with AgentHarnessOptions.drive === "manual".
@@ -1116,9 +1173,12 @@ interface AgentLane {
   // getModel resolves its durable reference through Models. Each setter
   // commits an immediate total replacement on this lane's mutation line,
   // including while an operation is open.
-  getModel(): Promise<Model>;                 setModel(model: Model): Promise<void>;
-  getThinkingLevel(): Promise<ThinkingLevel>; setThinkingLevel(level: ThinkingLevel): Promise<void>;
-  getActiveTools(): Promise<string[]>;        setActiveTools(names: string[]): Promise<void>;
+  getModel(): Promise<Model>;
+  setModel(model: Model): Promise<void>;
+  getThinkingLevel(): Promise<ThinkingLevel>;
+  setThinkingLevel(level: ThinkingLevel): Promise<void>;
+  getActiveTools(): Promise<string[]>;
+  setActiveTools(names: string[]): Promise<void>;
 
   /** This lane's view of the tree: reads default to this lane's leaf;
       appends defer while a run is open and otherwise chain to the leaf
@@ -1126,7 +1186,11 @@ interface AgentLane {
   session: SessionTree;
 
   /** Scoped: this lane's transcript, state, queues, and events (section 9). */
-  watch(): Promise<{ snapshot: LaneSnapshot; start: (listener) => void; unsubscribe: () => void }>;
+  watch(): Promise<{
+    snapshot: LaneSnapshot;
+    start: (listener) => void;
+    unsubscribe: () => void;
+  }>;
 }
 ```
 
@@ -1148,7 +1212,7 @@ class AgentHarness implements AgentLane {
   // ("slack:1719432.0021"). Handles are stateless facades bound to the
   // name: any number may exist, all equivalent; identity is the name,
   // never the object. Lanes are not deleted or renamed.
-  lane(name: string): Promise<AgentLane | undefined>;    // lookup, never creates
+  lane(name: string): Promise<AgentLane | undefined>; // lookup, never creates
   createLane(name: string, at: string | null): Promise<CreateLaneResult>;
   /** Inventory. Always includes "main". */
   lanes(): Promise<LaneInfo[]>;
@@ -1157,13 +1221,20 @@ class AgentHarness implements AgentLane {
   // Tool implementations are code and cannot persist; active names live
   // only in each lane's total configuration. setTools replaces only the
   // global registry; use a lane's setActiveTools to change activation.
-  getTools(): Promise<AgentTool[]>;      setTools(tools: AgentTool[]): Promise<void>;
-  getResources(): Promise<Resources>;    setResources(r: Resources): Promise<void>;
-  getStreamOptions(): Promise<StreamOptions>;  setStreamOptions(o: StreamOptions): Promise<void>;
-  getRetryPolicy(): Promise<RetryPolicy>;      setRetryPolicy(p: RetryPolicy): Promise<void>;
-  getCompactionSettings(): Promise<CompactionSettings>; setCompactionSettings(s): Promise<void>;
-  getSteeringMode(): Promise<QueueMode>;       setSteeringMode(m: QueueMode): Promise<void>;
-  getFollowUpMode(): Promise<QueueMode>;       setFollowUpMode(m: QueueMode): Promise<void>;
+  getTools(): Promise<AgentTool[]>;
+  setTools(tools: AgentTool[]): Promise<void>;
+  getResources(): Promise<Resources>;
+  setResources(r: Resources): Promise<void>;
+  getStreamOptions(): Promise<StreamOptions>;
+  setStreamOptions(o: StreamOptions): Promise<void>;
+  getRetryPolicy(): Promise<RetryPolicy>;
+  setRetryPolicy(p: RetryPolicy): Promise<void>;
+  getCompactionSettings(): Promise<CompactionSettings>;
+  setCompactionSettings(s): Promise<void>;
+  getSteeringMode(): Promise<QueueMode>;
+  setSteeringMode(m: QueueMode): Promise<void>;
+  getFollowUpMode(): Promise<QueueMode>;
+  setFollowUpMode(m: QueueMode): Promise<void>;
 
   /** Session-wide observer: lane inventory snapshot plus the unfiltered
       event stream. No transcripts; compose with lane.watch(). */
@@ -1184,10 +1255,12 @@ class AgentHarness implements AgentLane {
 interface LaneInfo {
   name: string;
   leafId: string | null;
-  operation: null | { id: string; kind: "run" | "compaction" | "navigation";
-                      status: "running" | "suspended" | "aborting" };
+  operation: null | {
+    id: string;
+    kind: "run" | "compaction" | "navigation";
+    status: "running" | "suspended" | "aborting";
+  };
 }
-
 ```
 
 ### Options
@@ -1196,41 +1269,43 @@ interface LaneInfo {
 interface AgentHarnessOptions {
   // Identity and providers
   session: Session;
-  models: Models;                        // provider collection for all requests
+  models: Models; // provider collection for all requests
 
   // Immutable lane seed captured at create(). It initializes main when the
   // session is first attached and every lane later created by this harness;
   // it is never a fallback for a configured lane.
   model: Model;
-  thinkingLevel?: ThinkingLevel;              // seed default: "off"
-  activeToolNames?: string[];                  // seed default: initial tool names
+  thinkingLevel?: ThinkingLevel; // seed default: "off"
+  activeToolNames?: string[]; // seed default: initial tool names
 
   // Runtime capabilities — harness-global, reconstructed at create()
   tools?: AgentTool[];
   toolContext?: TContext | (() => TContext | Promise<TContext>);
-  systemPrompt?: string | ((ctx) => string | Promise<string>);   // evaluated per request
-  resources?: Resources;                 // skills, prompt templates
+  systemPrompt?: string | ((ctx) => string | Promise<string>); // evaluated per request
+  resources?: Resources; // skills, prompt templates
 
   // Execution policy
-  streamOptions?: StreamOptions;         // transport, headers, timeouts, deferred
-  retry?: RetryPolicy;                   // step attempt cap; the durable count
+  streamOptions?: StreamOptions; // transport, headers, timeouts, deferred
+  retry?: RetryPolicy; // step attempt cap; the durable count
   compaction?: CompactionSettings;
   steeringMode?: QueueMode;
   followUpMode?: QueueMode;
   /** Batch default; a called tool declaring executionMode "sequential"
       forces sequential regardless (section 14). */
-  toolExecution?: "sequential" | "parallel";   // default parallel
+  toolExecution?: "sequential" | "parallel"; // default parallel
   /** automatic: operation methods drive their procedures to completion.
       manual: the operation's effects park at the gate; peekAction() /
       executeAction() / runToCompletion() drive them. Deterministic tests
       and debuggers. Section 15. */
-  drive?: "automatic" | "manual";       // default automatic
+  drive?: "automatic" | "manual"; // default automatic
 
   // Projection
   /** AgentMessage → provider messages, before each request. Default handles
       bash executions, custom messages, summaries; validates at acceptance
       that queued/prompted messages convert to user messages. */
-  toProviderMessages?: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
+  toProviderMessages?: (
+    messages: AgentMessage[],
+  ) => Message[] | Promise<Message[]>;
   /** Custom entry → context messages, at context build. Entries without a
       projector never enter provider context. */
   entryProjectors?: Record<string, EntryProjector>;
@@ -1256,9 +1331,7 @@ The subset contains only:
 - exhaustive `matchError()`.
 
 ```ts
-export type Result<T, E> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
+export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
 export const Result = {
   ok<T>(value: T): Result<T, never> {
@@ -1287,7 +1360,9 @@ export interface TaggedErrorFactory<Tag extends string> {
   is(value: unknown): value is TaggedErrorValue<Tag>;
 }
 
-export declare function TaggedError<Tag extends string>(tag: Tag): TaggedErrorFactory<Tag>;
+export declare function TaggedError<Tag extends string>(
+  tag: Tag,
+): TaggedErrorFactory<Tag>;
 
 export type ErrorMatchers<E extends TaggedErrorValue<string>, R> = {
   [Tag in E["_tag"]]: (error: Extract<E, { _tag: Tag }>) => R;
@@ -1321,21 +1396,21 @@ class MissingIdentities extends TaggedError("MissingIdentities")<{
 
 The remaining classes use the same base:
 
-| class | payload besides `message` |
-|---|---|
-| `NoActiveRun` | `lane` |
-| `NoActiveOperation` | `lane` |
-| `NothingToResume` | `lane` |
-| `InvalidMessage` | `lane`, `reason` |
-| `InvalidNavigation` | `lane`, `reason` |
-| `UnknownSkill` | `name` |
-| `UnknownTemplate` | `name` |
-| `UnknownTarget` | `targetId` |
-| `UnknownQueueItem` | `lane`, `entryId` |
-| `LaneExists` | `lane` |
-| `InvalidLane` | `lane`, `reason` |
-| `NothingToCompact` | `lane` |
-| `Closed` | none |
+| class               | payload besides `message` |
+| ------------------- | ------------------------- |
+| `NoActiveRun`       | `lane`                    |
+| `NoActiveOperation` | `lane`                    |
+| `NothingToResume`   | `lane`                    |
+| `InvalidMessage`    | `lane`, `reason`          |
+| `InvalidNavigation` | `lane`, `reason`          |
+| `UnknownSkill`      | `name`                    |
+| `UnknownTemplate`   | `name`                    |
+| `UnknownTarget`     | `targetId`                |
+| `UnknownQueueItem`  | `lane`, `entryId`         |
+| `LaneExists`        | `lane`                    |
+| `InvalidLane`       | `lane`, `reason`          |
+| `NothingToCompact`  | `lane`                    |
+| `Closed`            | none                      |
 
 Transports serialize `{ _tag, message, ...payload }` and reconstruct the class at the proxy. Adding a rejection class changes its error union, forcing exhaustive `matchError` callers to handle the tag.
 
@@ -1352,24 +1427,43 @@ type OptionalFinalAssistant =
   | { finalEntryId?: never; finalMessage?: never };
 
 type RunOutcome =
-  | { kind: "completed"; leafId: string; finalEntryId: string; finalMessage: AssistantMessage }
+  | {
+      kind: "completed";
+      leafId: string;
+      finalEntryId: string;
+      finalMessage: AssistantMessage;
+    }
   | ({ kind: "aborted"; leafId: string } & OptionalFinalAssistant)
-  | ({ kind: "failed"; leafId: string; error: OperationError } & OptionalFinalAssistant)
-  | { kind: "suspended"; leafId: string; finalEntryId: string; deferred: DeferredHandle };
+  | ({
+      kind: "failed";
+      leafId: string;
+      error: OperationError;
+    } & OptionalFinalAssistant)
+  | {
+      kind: "suspended";
+      leafId: string;
+      finalEntryId: string;
+      deferred: DeferredHandle;
+    };
 
 type CompactionOutcome =
   | { kind: "completed"; leafId: string; entry: CompactionEntry }
-  | { kind: "declined";  leafId: string }
-  | { kind: "aborted";   leafId: string }
-  | { kind: "failed";    leafId: string; error: OperationError };
+  | { kind: "declined"; leafId: string }
+  | { kind: "aborted"; leafId: string }
+  | { kind: "failed"; leafId: string; error: OperationError };
 
 type NavigationOutcome =
-  | { kind: "completed"; newLeafId: string | null; summaryEntry?: BranchSummaryEntry }
-  | { kind: "declined";  leafId: string | null }
-  | { kind: "aborted";   leafId: string | null }
-  | { kind: "failed";    leafId: string | null; error: OperationError };
+  | {
+      kind: "completed";
+      newLeafId: string | null;
+      summaryEntry?: BranchSummaryEntry;
+    }
+  | { kind: "declined"; leafId: string | null }
+  | { kind: "aborted"; leafId: string | null }
+  | { kind: "failed"; leafId: string | null; error: OperationError };
 
-type RunRejected = LaneBusy | InvalidMessage | UnknownSkill | UnknownTemplate | Closed;
+type RunRejected =
+  LaneBusy | InvalidMessage | UnknownSkill | UnknownTemplate | Closed;
 type CompactionRejected = LaneBusy | NothingToCompact | Closed;
 type NavigationRejected = LaneBusy | InvalidNavigation | UnknownTarget | Closed;
 type ResumeRejected = LaneBusy | NothingToResume | MissingIdentities | Closed;
@@ -1379,19 +1473,31 @@ type CancelQueuedRejected = UnknownQueueItem | Closed;
 type AbortRejected = NoActiveOperation | Closed;
 
 type RunResult = Result<{ runId: string } & RunOutcome, RunRejected>;
-type CompactionResult = Result<{ runId: string } & CompactionOutcome, CompactionRejected>;
-type NavigationResult = Result<{ runId: string } & NavigationOutcome, NavigationRejected>;
+type CompactionResult = Result<
+  { runId: string } & CompactionOutcome,
+  CompactionRejected
+>;
+type NavigationResult = Result<
+  { runId: string } & NavigationOutcome,
+  NavigationRejected
+>;
 type QueueResult = Result<{ entryId: string }, QueueRejected>;
 type NextRunResult = Result<{ entryId: string }, NextRunRejected>;
-type CancelQueuedResult = Result<{
-  outcome: "cancelled" | "already_consumed" | "already_cleared";
-}, CancelQueuedRejected>;
+type CancelQueuedResult = Result<
+  {
+    outcome: "cancelled" | "already_consumed" | "already_cleared";
+  },
+  CancelQueuedRejected
+>;
 type RecordUsageResult = Result<void, Closed>;
-type AbortResult = Result<{
-  runId: string;
-  steer: AgentMessage[];
-  followUp: AgentMessage[];
-}, AbortRejected>;
+type AbortResult = Result<
+  {
+    runId: string;
+    steer: AgentMessage[];
+    followUp: AgentMessage[];
+  },
+  AbortRejected
+>;
 
 type ResumeOutcome =
   | ({ operation: "run"; runId: string } & RunOutcome)
@@ -1400,7 +1506,10 @@ type ResumeOutcome =
 
 type ResumeResult = Result<ResumeOutcome, ResumeRejected>;
 
-type CreateLaneResult = Result<AgentLane, LaneExists | InvalidLane | UnknownTarget | Closed>;
+type CreateLaneResult = Result<
+  AgentLane,
+  LaneExists | InvalidLane | UnknownTarget | Closed
+>;
 ```
 
 `steer`/`followUp` use the active-run `QueueResult`; only it includes `NoActiveRun`. `NextRunResult` accepts valid input while open and idle or during any operation. It appends only an operation-independent queue record; later run acceptance captures it.
@@ -1443,14 +1552,14 @@ interface SuspendedOperation {
   lane: string;
   kind: "run" | "compaction" | "navigation";
   id: string;
-  startedAt: number;                             // Unix ms, from the operation_started record
+  startedAt: number; // Unix ms, from the operation_started record
   reason: "crash" | "deferred";
-  prompt?: AgentMessage[];                       // runs: normalized original prompt
-  deferred?: DeferredHandle;                     // reason "deferred": pending response or
-                                                 // below-cap unmarked fetch interruption
-  aborting?: { steer: AgentMessage[]; followUp: AgentMessage[] };  // abort accepted pre-crash;
-                                                 // stable cleared payloads returned by repeated abort,
-                                                 // offered for requeue
+  prompt?: AgentMessage[]; // runs: normalized original prompt
+  deferred?: DeferredHandle; // reason "deferred": pending response or
+  // below-cap unmarked fetch interruption
+  aborting?: { steer: AgentMessage[]; followUp: AgentMessage[] }; // abort accepted pre-crash;
+  // stable cleared payloads returned by repeated abort,
+  // offered for requeue
   /** Identities required by the next ordinary effect, not every name in the
       lane configuration. Recomputed as reduction advances; abort-only
       reconciliation never reports or blocks on these. */
@@ -1471,8 +1580,8 @@ const { harness, suspended } = await AgentHarness.create({
   tools,
 });
 for (const s of suspended) await (await harness.lane(s.lane))!.resume();
-await harness.nextRun("focus on the tests");  // legal while idle; queues input but starts no run
-await harness.prompt("fix the bug");           // captures the queued item, then starts the run
+await harness.nextRun("focus on the tests"); // legal while idle; queues input but starts no run
+await harness.prompt("fix the bug"); // captures the queued item, then starts the run
 await harness.setModel(opus);
 
 // Slack bot. Channel = session + main; thread = lane, keyed by thread id.
@@ -1485,9 +1594,9 @@ if (!thread) {
 }
 // The new lane has the immutable options seed, not configuration from
 // pingedEntryId, main, or another lane.
-await thread.prompt("summarize this thread");   // parallel to main and other threads
-await thread.setModel(haiku);                   // immediate total replacement; this thread only
-await thread.session.appendMessage(msg);        // this thread's branch
+await thread.prompt("summarize this thread"); // parallel to main and other threads
+await thread.setModel(haiku); // immediate total replacement; this thread only
+await thread.session.appendMessage(msg); // this thread's branch
 
 // Thread renderer: this lane only.
 const { snapshot, start } = await thread.watch();
@@ -1502,7 +1611,8 @@ if (result.ok && result.value.kind === "suspended") schedulePoll(thread);
 // Dashboard: inventory + firehose, no transcripts.
 const s = await harness.watchSession();
 for (const lane of s.snapshot.lanes) {
-  if (lane.operation?.status === "suspended") await (await harness.lane(lane.name))!.resume();
+  if (lane.operation?.status === "suspended")
+    await (await harness.lane(lane.name))!.resume();
 }
 ```
 
@@ -1511,10 +1621,10 @@ for (const lane of s.snapshot.lanes) {
 A UI needs current state and every later change without a gap. A proxy must put the snapshot on the wire before events, so `watch()` buffers until armed:
 
 ```ts
-const { snapshot, start, unsubscribe } = await lane.watch();   // harness.watch() = main's
+const { snapshot, start, unsubscribe } = await lane.watch(); // harness.watch() = main's
 
-await send(client, { kind: "snapshot", snapshot });   // snapshot is on the wire
-start((event) => send(client, event));                // flush buffer in order, then live
+await send(client, { kind: "snapshot", snapshot }); // snapshot is on the wire
+start((event) => send(client, event)); // flush buffer in order, then live
 ```
 
 `watch()` atomically snapshots and begins buffering. `start(listener)` flushes in order, then delivers live; each event arrives once and in order, without sequence numbers or registration races. `unsubscribe()` drops the watcher and buffer. A never-started watcher buffers without bound.
@@ -1523,7 +1633,7 @@ start((event) => send(client, event));                // flush buffer in order, 
 
 ```ts
 interface QueuedItem {
-  entryId: string;                     // QueueResult/NextRunResult and cancelQueued correlation
+  entryId: string; // QueueResult/NextRunResult and cancelQueued correlation
   message: AgentMessage;
 }
 
@@ -1538,7 +1648,7 @@ interface LaneSnapshot {
     id: string;
     kind: "run" | "compaction" | "navigation";
     status: "running" | "suspended" | "aborting";
-    startedAt: number;                   // Unix ms
+    startedAt: number; // Unix ms
     /** status "suspended": everything a client needs to offer resume/abort.
         The same data create() returned; a remote UI only sees snapshots. */
     suspended?: SuspendedOperation;
@@ -1555,10 +1665,17 @@ interface LaneSnapshot {
     retry?: { attempt: number; maxAttempts: number; nextAttemptAt: number };
   };
 
-  queues: { steer: QueuedItem[]; followUp: QueuedItem[]; nextRun: QueuedItem[] };
-  pendingWrites: { id: string; entry: ProvisionedEntry<MessageEntry | CustomEntry> }[];
+  queues: {
+    steer: QueuedItem[];
+    followUp: QueuedItem[];
+    nextRun: QueuedItem[];
+  };
+  pendingWrites: {
+    id: string;
+    entry: ProvisionedEntry<MessageEntry | CustomEntry>;
+  }[];
 
-  faulted: boolean;                      // harness-wide, mirrored into every snapshot
+  faulted: boolean; // harness-wide, mirrored into every snapshot
 }
 
 interface SessionSnapshot {
@@ -1703,9 +1820,13 @@ const off = harness.hooks.on("before_tool", async (event) => {
   if (event.toolName === "bash") return { block: { reason: "not allowed" } };
 });
 
-harness.hooks.on("before_run", async () => ({
-  resumeData: { version: 1 },
-}), { id: "extension.example" });
+harness.hooks.on(
+  "before_run",
+  async () => ({
+    resumeData: { version: 1 },
+  }),
+  { id: "extension.example" },
+);
 ```
 
 Semantics, uniform across all hooks:
@@ -1832,16 +1953,16 @@ before_navigation: {
 
 Hooks re-run only where the work itself re-runs. Persisted outputs are never recomputed.
 
-| hook | fresh | retry | resume |
-|---|---|---|---|
-| `before_run` | once | no | no (persisted) |
-| `before_resume` | no | no | yes, idempotent |
-| `transform_context`, `before_request`, `before_payload` | per request | yes | yes |
-| `after_response` | per response | per response | per response |
-| `before_tool` | per call | — | not when `tool_started` exists |
-| `after_tool` | per executed result | — | on safe replay only |
-| `before_compaction`, `before_navigation` | once until a structural source commits | no | not when any structural `step_started` for this work exists; hook output is persisted there |
-| `before_run_end` | per normal finish boundary | — | at the boundary resume reaches (may repeat); never for abort, terminal failure, or exhausted auto-compaction |
+| hook                                                    | fresh                                  | retry        | resume                                                                                                       |
+| ------------------------------------------------------- | -------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------ |
+| `before_run`                                            | once                                   | no           | no (persisted)                                                                                               |
+| `before_resume`                                         | no                                     | no           | yes, idempotent                                                                                              |
+| `transform_context`, `before_request`, `before_payload` | per request                            | yes          | yes                                                                                                          |
+| `after_response`                                        | per response                           | per response | per response                                                                                                 |
+| `before_tool`                                           | per call                               | —            | not when `tool_started` exists                                                                               |
+| `after_tool`                                            | per executed result                    | —            | on safe replay only                                                                                          |
+| `before_compaction`, `before_navigation`                | once until a structural source commits | no           | not when any structural `step_started` for this work exists; hook output is persisted there                  |
+| `before_run_end`                                        | per normal finish boundary             | —            | at the boundary resume reaches (may repeat); never for abort, terminal failure, or exhausted auto-compaction |
 
 ## 12. Session and SessionTree
 
@@ -1853,19 +1974,38 @@ The tree content. No other entry types exist; pointers and global facts are not 
 interface EntryBase {
   type: string;
   id: string;
-  seq: number;                 // shared sequence; read-side, storage-assigned
-  parentId: string | null;     // storage-assigned: the appending lane's leaf
-  timestamp: number;           // Unix ms, storage-assigned
+  seq: number; // shared sequence; read-side, storage-assigned
+  parentId: string | null; // storage-assigned: the appending lane's leaf
+  timestamp: number; // Unix ms, storage-assigned
 }
 
-interface MessageEntry           extends EntryBase { type: "message"; message: AgentMessage;
-                                                     terminate?: true }
-interface CompactionEntry        extends EntryBase { type: "compaction"; summary: string;
-                                                     retainedTail: AgentMessage[];
-                                                     tokensBefore: number; details?; usage?; fromHook: boolean }
-interface BranchSummaryEntry     extends EntryBase { type: "branch_summary"; fromId: string; summary: string;
-                                                     details?; usage?; fromHook: boolean }
-interface CustomEntry            extends EntryBase { type: "custom"; customType: string; data? }
+interface MessageEntry extends EntryBase {
+  type: "message";
+  message: AgentMessage;
+  terminate?: true;
+}
+interface CompactionEntry extends EntryBase {
+  type: "compaction";
+  summary: string;
+  retainedTail: AgentMessage[];
+  tokensBefore: number;
+  details?;
+  usage?;
+  fromHook: boolean;
+}
+interface BranchSummaryEntry extends EntryBase {
+  type: "branch_summary";
+  fromId: string;
+  summary: string;
+  details?;
+  usage?;
+  fromHook: boolean;
+}
+interface CustomEntry extends EntryBase {
+  type: "custom";
+  customType: string;
+  data?;
+}
 
 type Entry = MessageEntry | CompactionEntry | BranchSummaryEntry | CustomEntry;
 ```
@@ -1896,16 +2036,16 @@ Each lane exposes this tree view as `lane.session`; `Session` implements it for 
 ```ts
 interface EntryQuery {
   type?: Entry["type"];
-  customType?: string;                     // for type "custom"
-  order?: "newestFirst" | "oldestFirst";   // default newestFirst
+  customType?: string; // for type "custom"
+  order?: "newestFirst" | "oldestFirst"; // default newestFirst
   limit?: number;
   cursor?: EntryCursor;
 }
 
 /** Bounds of a branch scan. Default: the whole path, leaf to root. */
 interface BranchBounds {
-  start?: string;              // default: the view's lane leaf
-  stopAtType?: Entry["type"];  // scan ends after the first match, inclusive
+  start?: string; // default: the view's lane leaf
+  stopAtType?: Entry["type"]; // scan ends after the first match, inclusive
   stopAtId?: string;
 }
 
@@ -1932,7 +2072,9 @@ interface SessionTree {
 
   /** Branch-scoped: the path from start toward root. */
   findEntriesOnBranch(query?: EntryQuery & BranchBounds): Promise<Entry[]>;
-  findEntryOnBranch(query?: EntryQuery & BranchBounds): Promise<Entry | undefined>;
+  findEntryOnBranch(
+    query?: EntryQuery & BranchBounds,
+  ): Promise<Entry | undefined>;
 
   // Writes. Resolve on durable acceptance; the returned id is the entry's
   // id (provisioned when the write defers).
@@ -1965,10 +2107,17 @@ type SessionMutation =
   | { kind: "entry"; lane: string; entry: ProvisionedEntry }
   | { kind: "record"; record: NewRecord }
   | { kind: "fact"; fact: FactWrite }
-  | { kind: "lane"; action: "create" | "move"; lane: string; leafId: string | null };
+  | {
+      kind: "lane";
+      action: "create" | "move";
+      lane: string;
+      leafId: string | null;
+    };
 
-type NonEmptySessionMutations =
-  readonly [SessionMutation, ...SessionMutation[]];
+type NonEmptySessionMutations = readonly [
+  SessionMutation,
+  ...SessionMutation[],
+];
 
 /** One committed logical mutation. Entry LogItems are lane-free: routing
     belongs only to the corresponding input SessionMutation. Facts and lane
@@ -1977,10 +2126,16 @@ type LogItem =
   | { kind: "entry"; entry: Entry }
   | { kind: "record"; record: LaneRecord }
   | { kind: "fact"; seq: number; fact: FactWrite }
-  | { kind: "lane"; seq: number; action: "create" | "move";
-      lane: string; leafId: string | null };
+  | {
+      kind: "lane";
+      seq: number;
+      action: "create" | "move";
+      lane: string;
+      leafId: string | null;
+    };
 
-class Session implements SessionTree {          // bound to "main"
+class Session implements SessionTree {
+  // bound to "main"
   constructor(storage: SessionStorage, options?: { idGenerator?: IdGenerator });
   /** Process-local id provisioning used by Session and harness. Default
       UUIDv7; tests inject a deterministic generator. Sync by design. */
@@ -2009,8 +2164,11 @@ class Session implements SessionTree {          // bound to "main"
   /** Atomically creates the pointer and first total configuration with
       [lane create, lane_config]. Session provisions the record id and returns
       the committed LaneConfigRecord. */
-  createLane(lane: string, at: string | null,
-             configuration: LaneConfiguration): Promise<LaneConfigRecord>;   // rejects existing names
+  createLane(
+    lane: string,
+    at: string | null,
+    configuration: LaneConfiguration,
+  ): Promise<LaneConfigRecord>; // rejects existing names
   moveLane(lane: string, to: string | null): Promise<void>;
 
   /** Low-level atomic append for the harness, recovery, and test fixtures.
@@ -2028,13 +2186,18 @@ class Session implements SessionTree {          // bound to "main"
   findRecords(query?: RecordQuery): Promise<LaneRecord[]>;
   /** Unfinished operation starts, newest first. limit: 2 distinguishes the
       valid zero/one states from multiple-open-operation corruption. */
-  findOpenOperations(lane: string, options?: { limit?: number }): Promise<OperationStartedRecord[]>;
+  findOpenOperations(
+    lane: string,
+    options?: { limit?: number },
+  ): Promise<OperationStartedRecord[]>;
   /** Full chronological view: entries, records, facts, lane moves,
       merged by seq. Debugging and tests. */
   getLog(options?: { afterSeq?: number; limit?: number }): Promise<LogItem[]>;
 }
 
-interface IdGenerator { next(): string; }
+interface IdGenerator {
+  next(): string;
+}
 
 interface RecordQuery {
   /** Exact lane match. Omit to query every lane. */
@@ -2092,12 +2255,17 @@ interface SessionStorage {
   getEntries(ids: readonly string[]): Promise<ReadonlyMap<string, Entry>>;
   findEntries(query?: EntryQuery): Promise<Entry[]>;
   /** start is mandatory here; defaulting to a lane's leaf is view sugar. */
-  findEntriesOnBranch(query: EntryQuery & BranchBounds & { start: string }): Promise<Entry[]>;
+  findEntriesOnBranch(
+    query: EntryQuery & BranchBounds & { start: string },
+  ): Promise<Entry[]>;
   findRecords<K extends LaneRecord["type"]>(
     query: RecordQuery & { type: K },
   ): Promise<Extract<LaneRecord, { type: K }>[]>;
   findRecords(query?: RecordQuery): Promise<LaneRecord[]>;
-  findOpenOperations(lane: string, options?: { limit?: number }): Promise<OperationStartedRecord[]>;
+  findOpenOperations(
+    lane: string,
+    options?: { limit?: number },
+  ): Promise<OperationStartedRecord[]>;
   getLog(options?): Promise<LogItem[]>;
 
   // Global-fact reads. Writes use append({ kind: "fact", ... }).
@@ -2143,7 +2311,7 @@ The concrete repository is `JsonlSessionRepo`. Its metadata and options extend t
 interface JsonlSessionMetadata extends SessionMetadata {
   cwd: string;
   path: string;
-  modifiedAt: number;                 // filesystem mtime used for listing order
+  modifiedAt: number; // filesystem mtime used for listing order
   sourceFormat: 3 | 4;
   /** Present only when a v3 parent path could not yet be resolved to an id. */
   legacyParentSessionPath?: string;
@@ -2152,7 +2320,9 @@ interface JsonlSessionCreateOptions extends SessionCreateOptions {
   cwd: string;
   metadata?: Record<string, JsonValue>;
 }
-interface JsonlSessionListOptions { cwd?: string; }
+interface JsonlSessionListOptions {
+  cwd?: string;
+}
 ```
 
 A v3 `parentSession` path resolves to the available parent header id; otherwise metadata and first-write conversion retain `legacyParentSessionPath`. Format 4 uses `parentSessionId`. Filesystem `modifiedAt` is not sequenced.
@@ -2293,9 +2463,14 @@ export interface StreamAssistantConfig {
   systemPrompt?: string;
   tools?: AgentTool[];
   /** AgentMessage[] → AgentMessage[]. Pruning, injection. */
-  transformContext?: (messages: AgentMessage[], signal?: AbortSignal) => Promise<AgentMessage[]>;
+  transformContext?: (
+    messages: AgentMessage[],
+    signal?: AbortSignal,
+  ) => Promise<AgentMessage[]>;
   /** AgentMessage[] → provider messages. */
-  toProviderMessages: (messages: AgentMessage[]) => Message[] | Promise<Message[]>;
+  toProviderMessages: (
+    messages: AgentMessage[],
+  ) => Message[] | Promise<Message[]>;
   /** Dispatch. models.streamSimple resolves auth per request (credential
       store, expiring tokens, header merge, env, baseUrl) — no auth surface
       on this config. streamFn overrides dispatch for tests. */
@@ -2338,44 +2513,80 @@ interface AgentTool {
 Calls expose three phases so `tool_started` fits between clearance and effect, and recovery can run effect/finalization without clearance. The batch driver owns no durable ids; the harness plans all calls first. Callbacks receive the original `AgentToolCall`, allowing private source-index lookup without exposing that index:
 
 ```ts
-type PreparedToolCall  = { kind: "prepared"; toolCall: AgentToolCall; tool: AgentTool; args: unknown };
-type ImmediateOutcome  = { kind: "immediate"; result: AgentToolResult; isError: true };
-                         // unknown tool, invalid args, blocked, aborted
-type FinalizedToolCall = { toolCall: AgentToolCall; result: AgentToolResult; isError: boolean };
+type PreparedToolCall = {
+  kind: "prepared";
+  toolCall: AgentToolCall;
+  tool: AgentTool;
+  args: unknown;
+};
+type ImmediateOutcome = {
+  kind: "immediate";
+  result: AgentToolResult;
+  isError: true;
+};
+// unknown tool, invalid args, blocked, aborted
+type FinalizedToolCall = {
+  toolCall: AgentToolCall;
+  result: AgentToolResult;
+  isError: boolean;
+};
 
 /** Phase 1 — clearance. Tool lookup, prepareArguments, schema validation,
     beforeToolCall (may replace args or block), validation of replacement
     args, abort checks. No effect starts here. */
 export function prepareToolCall(
-  toolCall: AgentToolCall, tools: AgentTool[], callbacks: ToolCallbacks,
-  telemetryContext: TelemetryContext, signal?: AbortSignal,
+  toolCall: AgentToolCall,
+  tools: AgentTool[],
+  callbacks: ToolCallbacks,
+  telemetryContext: TelemetryContext,
+  signal?: AbortSignal,
 ): Promise<PreparedToolCall | ImmediateOutcome>;
 
 /** Phase 2 — the effect. Streams tool_execution_update via the sink and
     drains pending update events before resolving. Never throws; failures
     become error results. */
 export function executeToolCall(
-  prepared: PreparedToolCall, emit: AgentEventSink,
-  telemetryContext: TelemetryContext, signal?: AbortSignal,
+  prepared: PreparedToolCall,
+  emit: AgentEventSink,
+  telemetryContext: TelemetryContext,
+  signal?: AbortSignal,
 ): Promise<{ result: AgentToolResult; isError: boolean }>;
 
 /** Phase 3 — afterToolCall patch, field by field; a throwing callback
     becomes an error result. */
 export function finalizeToolCall(
-  prepared: PreparedToolCall, executed: { result; isError }, callbacks: ToolCallbacks,
-  telemetryContext: TelemetryContext, signal?: AbortSignal,
+  prepared: PreparedToolCall,
+  executed: { result; isError },
+  callbacks: ToolCallbacks,
+  telemetryContext: TelemetryContext,
+  signal?: AbortSignal,
 ): Promise<FinalizedToolCall>;
 
 /** content ?? [] normalization, addedToolNames passthrough, timestamp. */
-export function createToolResultMessage(finalized: FinalizedToolCall): ToolResultMessage;
+export function createToolResultMessage(
+  finalized: FinalizedToolCall,
+): ToolResultMessage;
 export function createErrorToolResult(text: string): AgentToolResult;
 
 export interface ToolCallbacks {
-  beforeToolCall?(call, args, signal): Promise<{
-    args?: Record<string, unknown>;
-    block?: { reason: string };
-  } | undefined>;
-  afterToolCall?(call, args, result, isError, signal): Promise<ToolResultPatch | undefined>;
+  beforeToolCall?(
+    call,
+    args,
+    signal,
+  ): Promise<
+    | {
+        args?: Record<string, unknown>;
+        block?: { reason: string };
+      }
+    | undefined
+  >;
+  afterToolCall?(
+    call,
+    args,
+    result,
+    isError,
+    signal,
+  ): Promise<ToolResultPatch | undefined>;
   /** Phase-two dispatch. Omission calls executeToolCall() directly. The
       harness supplies a function that delegates each invocation to
       fx.executeTool; this callback is internal orchestration, not tool context. */
@@ -2386,13 +2597,19 @@ export interface ToolCallbacks {
   /** Between phases 1 and 2: the durability point. The batch plan already
       exists; the harness writes tool_started without another result id.
       Called in source order in both modes. */
-  onToolStart?(call: AgentToolCall, effectiveArgs: Record<string, unknown>): Promise<void>;
+  onToolStart?(
+    call: AgentToolCall,
+    effectiveArgs: Record<string, unknown>,
+  ): Promise<void>;
   /** After phase 3 and the result message's start/end lifecycle; source
       order. The original call identifies its existing planned id. The
       harness writes usage first when present, then appends the result with
       terminate; entry_added follows that commit. */
-  onToolResult?(call: AgentToolCall, message: ToolResultMessage,
-                terminate: boolean): Promise<void>;
+  onToolResult?(
+    call: AgentToolCall,
+    message: ToolResultMessage,
+    terminate: boolean,
+  ): Promise<void>;
 }
 
 /** Batch-driver rules:
@@ -2421,9 +2638,13 @@ export interface ToolCallbacks {
       still-missing planned result.
     - terminate is true only when every finalized result sets terminate. */
 export function executeToolBatch(
-  assistant: AssistantMessage, tools: AgentTool[], callbacks: ToolCallbacks,
-  options: { toolExecution?: "sequential" | "parallel" }, emit: AgentEventSink,
-  telemetryContext: TelemetryContext, signal?: AbortSignal,
+  assistant: AssistantMessage,
+  tools: AgentTool[],
+  callbacks: ToolCallbacks,
+  options: { toolExecution?: "sequential" | "parallel" },
+  emit: AgentEventSink,
+  telemetryContext: TelemetryContext,
+  signal?: AbortSignal,
 ): Promise<{ messages: ToolResultMessage[]; terminate: boolean }>;
 ```
 
@@ -2448,19 +2669,35 @@ Read-only `ProcedureRuntime` supplies reduced state/planned entries, branch/cont
 ```ts
 type StructuralStepStartIntent<T extends CompactionEntry | BranchSummaryEntry> =
   | { source: "generated" }
-  | { source: "hook"; hookResult: ProvisionedEntry<T>; hookUsageRecordId?: string };
+  | {
+      source: "hook";
+      hookResult: ProvisionedEntry<T>;
+      hookUsageRecordId?: string;
+    };
 
 type StepStartIntent = { id: string; runId: string } & (
   | { step: "assistant"; triggerMessageId: string }
-  | { step: "deferred_fetch"; configuration: LaneConfiguration; retryPolicy: RetryPolicy }
-  | ({ step: "compaction"; resultEntryId: string } &
-      StructuralStepStartIntent<CompactionEntry> & (
+  | {
+      step: "deferred_fetch";
+      configuration: LaneConfiguration;
+      retryPolicy: RetryPolicy;
+    }
+  | ({
+      step: "compaction";
+      resultEntryId: string;
+    } & StructuralStepStartIntent<CompactionEntry> &
+      (
         | { compactionReason: "manual" | "threshold" }
-        | { compactionReason: "overflow";
-            supersededResponseEntryId: string; triggerMessageId: string }
+        | {
+            compactionReason: "overflow";
+            supersededResponseEntryId: string;
+            triggerMessageId: string;
+          }
       ))
-  | ({ step: "branch_summary"; resultEntryId: string } &
-      StructuralStepStartIntent<BranchSummaryEntry>)
+  | ({
+      step: "branch_summary";
+      resultEntryId: string;
+    } & StructuralStepStartIntent<BranchSummaryEntry>)
 );
 
 interface Effects {
@@ -2469,87 +2706,145 @@ interface Effects {
   // behavior. Each commits at the head of the lane mutation line, then updates
   // LaneState. Every successful entry commit emits entry_added after the
   // complete storage append and state update agree.
-  appendEntry(entry: ProvisionedEntry, telemetryContext: TelemetryContext): Promise<Entry>;
-  appendRecord<T extends LaneRecord>(record: NewRecord<T>, telemetryContext: TelemetryContext): Promise<T>;
+  appendEntry(
+    entry: ProvisionedEntry,
+    telemetryContext: TelemetryContext,
+  ): Promise<Entry>;
+  appendRecord<T extends LaneRecord>(
+    record: NewRecord<T>,
+    telemetryContext: TelemetryContext,
+  ): Promise<T>;
   /** After the response's message_end, appends it under its attempt's
       provisioned id and emits entry_added. In the same mutation-line job, an
       earlier abort marker normalizes the settled message to stopReason
       "aborted" and clears deferred-only fields; an already-committed response
       is never changed. */
   settleAttemptResponse(
-    attempt: Extract<StepAttemptRecord, { step: "assistant" | "deferred_fetch" }>,
+    attempt: Extract<
+      StepAttemptRecord,
+      { step: "assistant" | "deferred_fetch" }
+    >,
     message: SettledAssistantMessage,
     telemetryContext: TelemetryContext,
   ): Promise<MessageEntry>;
   /** Effect-intent races. These append only when abort has not already won. */
-  startAttempt(attempt: NewRecord<StepAttemptRecord>,
-               telemetryContext: TelemetryContext): Promise<StepAttemptRecord | "aborted">;
-  startToolBatch(plan: NewRecord<ToolBatchStartedRecord>,
-                 telemetryContext: TelemetryContext): Promise<ToolBatchStartedRecord | "aborted">;
-  startTool(start: NewRecord<ToolStartedRecord>,
-            telemetryContext: TelemetryContext): Promise<ToolStartedRecord | "aborted">;
+  startAttempt(
+    attempt: NewRecord<StepAttemptRecord>,
+    telemetryContext: TelemetryContext,
+  ): Promise<StepAttemptRecord | "aborted">;
+  startToolBatch(
+    plan: NewRecord<ToolBatchStartedRecord>,
+    telemetryContext: TelemetryContext,
+  ): Promise<ToolBatchStartedRecord | "aborted">;
+  startTool(
+    start: NewRecord<ToolStartedRecord>,
+    telemetryContext: TelemetryContext,
+  ): Promise<ToolStartedRecord | "aborted">;
   /** Structural commit races. These write only when abort has not already
       won; an existing result/move remains committed when abort arrives later. */
-  commitStructuralEntry(entry: ProvisionedEntry<CompactionEntry>,
-                        telemetryContext: TelemetryContext): Promise<"committed" | "aborted">;
+  commitStructuralEntry(
+    entry: ProvisionedEntry<CompactionEntry>,
+    telemetryContext: TelemetryContext,
+  ): Promise<"committed" | "aborted">;
   /** A generated structural step can fail only while abort has not won. */
-  failStructuralStep(record: NewRecord<StepFailedRecord>,
-                     telemetryContext: TelemetryContext): Promise<StepFailedRecord | "aborted">;
+  failStructuralStep(
+    record: NewRecord<StepFailedRecord>,
+    telemetryContext: TelemetryContext,
+  ): Promise<StepFailedRecord | "aborted">;
   /** Persists one complete generated branch-summary payload before the move.
       Returns aborted instead of writing when the marker won. */
-  prepareBranchSummary(record: NewRecord<BranchSummaryPreparedRecord>,
-                       telemetryContext: TelemetryContext):
-    Promise<BranchSummaryPreparedRecord | "aborted">;
+  prepareBranchSummary(
+    record: NewRecord<BranchSummaryPreparedRecord>,
+    telemetryContext: TelemetryContext,
+  ): Promise<BranchSummaryPreparedRecord | "aborted">;
   /** A summarized move additionally verifies that a complete hook or
       generated payload is already durable. */
-  commitNavigationMove(to: string | null,
-                       telemetryContext: TelemetryContext): Promise<"committed" | "aborted">;
+  commitNavigationMove(
+    to: string | null,
+    telemetryContext: TelemetryContext,
+  ): Promise<"committed" | "aborted">;
   /** Commits step_started while atomically capturing the lane's current
       total configuration and normalized retry policy for generated sources.
       Hook sources instead persist the supplied complete result and usage id.
       Deferred-fetch configuration and policy are copied from its original
       generation step and supplied by its owning procedure. */
-  startStep(start: StepStartIntent,
-            telemetryContext: TelemetryContext): Promise<StepStartedRecord | "aborted">;
-  moveLane(to: string | null, telemetryContext: TelemetryContext): Promise<void>;
+  startStep(
+    start: StepStartIntent,
+    telemetryContext: TelemetryContext,
+  ): Promise<StepStartedRecord | "aborted">;
+  moveLane(
+    to: string | null,
+    telemetryContext: TelemetryContext,
+  ): Promise<void>;
   setFact(fact: FactWrite, telemetryContext: TelemetryContext): Promise<void>;
 
   // Conditional commits. Decision and write in one mutation-line job.
-  tryFinishRun(runId: string, outcome: "completed" | "failed",
-               telemetryContext: TelemetryContext,
-               error?: OperationError): Promise<"finished" | "continue">;
+  tryFinishRun(
+    runId: string,
+    outcome: "completed" | "failed",
+    telemetryContext: TelemetryContext,
+    error?: OperationError,
+  ): Promise<"finished" | "continue">;
   /** For completed navigation with an accepted label, the conditional
       commit uses one Session.append([label fact, operation_finished]). */
-  finishOperation(runId: string, outcome: "completed" | "declined" | "failed" | "aborted",
-                  telemetryContext: TelemetryContext,
-                  error?: OperationError): Promise<"finished" | "continue">;
-  commitRunEndFollowUp(runId: string, item: ProvisionedEntry<MessageEntry>,
-                       telemetryContext: TelemetryContext): Promise<"committed" | "dropped">;
-  consumeQueueItem(runId: string, queue: "steer" | "followUp", entryId: string,
-                   telemetryContext: TelemetryContext): Promise<"consumed" | "skipped">;
-  applyPendingWrite(runId: string, entryId: string,
-                    telemetryContext: TelemetryContext): Promise<"applied" | "skipped">;
+  finishOperation(
+    runId: string,
+    outcome: "completed" | "declined" | "failed" | "aborted",
+    telemetryContext: TelemetryContext,
+    error?: OperationError,
+  ): Promise<"finished" | "continue">;
+  commitRunEndFollowUp(
+    runId: string,
+    item: ProvisionedEntry<MessageEntry>,
+    telemetryContext: TelemetryContext,
+  ): Promise<"committed" | "dropped">;
+  consumeQueueItem(
+    runId: string,
+    queue: "steer" | "followUp",
+    entryId: string,
+    telemetryContext: TelemetryContext,
+  ): Promise<"consumed" | "skipped">;
+  applyPendingWrite(
+    runId: string,
+    entryId: string,
+    telemetryContext: TelemetryContext,
+  ): Promise<"applied" | "skipped">;
 
   // External effects.
   /** Exactly one provider generation request. Assistant/fetch public message
       lifecycle is emitted by the owning request adapter; structural callers
       supply a private sink. Nested request hooks call this same `fx` facade. */
-  streamAssistant(request: AssistantRequest,
-                  telemetryContext: TelemetryContext): Promise<SettledAssistantMessage>;
-  executeTool(prepared: PreparedToolCall,
-              telemetryContext: TelemetryContext): Promise<{ result: AgentToolResult; isError: boolean }>;
+  streamAssistant(
+    request: AssistantRequest,
+    telemetryContext: TelemetryContext,
+  ): Promise<SettledAssistantMessage>;
+  executeTool(
+    prepared: PreparedToolCall,
+    telemetryContext: TelemetryContext,
+  ): Promise<{ result: AgentToolResult; isError: boolean }>;
   /** The source entry supplies the exact provider/model and complete handle.
       Returned and rejection-converted responses complete their public
       message lifecycle before this method resolves. */
-  fetchDeferred(source: MessageEntry, options: DeferredFetchOptions,
-                telemetryContext: TelemetryContext): Promise<SettledAssistantMessage>;
-  cancelDeferred(source: MessageEntry,
-                 telemetryContext: TelemetryContext): Promise<void>;
+  fetchDeferred(
+    source: MessageEntry,
+    options: DeferredFetchOptions,
+    telemetryContext: TelemetryContext,
+  ): Promise<SettledAssistantMessage>;
+  cancelDeferred(
+    source: MessageEntry,
+    telemetryContext: TelemetryContext,
+  ): Promise<void>;
 
   // Interception and time.
-  runHook<K extends HookName>(name: K, event: HookEvent<K>,
-                              telemetryContext: TelemetryContext): Promise<HookResult<K>>;
-  sleep(delayMs: number, telemetryContext: TelemetryContext): Promise<"elapsed" | "aborted">;
+  runHook<K extends HookName>(
+    name: K,
+    event: HookEvent<K>,
+    telemetryContext: TelemetryContext,
+  ): Promise<HookResult<K>>;
+  sleep(
+    delayMs: number,
+    telemetryContext: TelemetryContext,
+  ): Promise<"elapsed" | "aborted">;
 }
 ```
 
@@ -2569,7 +2864,10 @@ let tail: Promise<unknown> = Promise.resolve();
 
 function mutateLane<T>(job: () => Promise<T>): Promise<T> {
   const result = tail.then(job);
-  tail = result.then(() => undefined, () => undefined);
+  tail = result.then(
+    () => undefined,
+    () => undefined,
+  );
   return result;
 }
 ```
@@ -2579,14 +2877,14 @@ A job validates live `LaneState`, makes at most one `Session.append()`, installs
 The jobs, by caller:
 
 - **Lane surface** (ungated, enqueue directly):
-  - *Operation acceptance* — after pre-acceptance `fx.runHook("before_run", ...)` returns, validate idle, capture the pending `nextRun` items into `initialMessages`, write `operation_started`, set `state.operation`. The second of two concurrent acceptances sees the first and rejects `busy` with no write; its already-completed hook output is discarded. The hook ran outside the line on the prompt only, but still crossed `Effects` and is a manual action.
-  - *Configured lane creation* — validate the name and anchor, then call `Session.createLane()`, which appends `[lane create, seed lane_config]`; publish the lane and `lane_created` only after both logical mutations commit.
-  - *Queue acceptance* (`steer`, `followUp`) — validate an active, non-aborting run; write `queue_enqueued`. While the harness is open, `nextRun` validates its message but performs no active-operation check, writes its operation-independent enqueue, and starts no run.
-  - *Queue cancellation* (`cancelQueued`) — no `queue_enqueued` for the id: `Err(UnknownQueueItem)`; target entry exists: `already_consumed`; not pending (abort-drained or already cancelled): `already_cleared`; else write `queue_cancelled` and remove the item from its pending set.
-  - *Deferred-write acceptance* (lane-view tree writes) — run open: write `write_deferred`; structural operation open: wait for it to end, then re-enter; idle: append the entry directly.
-  - *Configuration setter* — derive one total replacement from the lane's current value, append `lane_config`, then update the current value. This runs immediately during any operation and survives abort.
-  - *Abort* — on the first call, write `abort_requested` and store the exact drained `pendingSteer`/`pendingFollowUp` payloads. After that job commits and leaves the line, emit `run_abort`, signal the active effect's `AbortController`, and cancel this lane's unreleased manual provider/tool/fetch/sleep actions without executing them. A call that finds the marker returns copies of those stored/derived payloads with the same run id and performs no write, event, signal, or gate cancellation. A call that finds the terminal record returns `NoActiveOperation`.
-  - *Resume admission* — reserve the lane's single execution slot; no write.
+  - _Operation acceptance_ — after pre-acceptance `fx.runHook("before_run", ...)` returns, validate idle, capture the pending `nextRun` items into `initialMessages`, write `operation_started`, set `state.operation`. The second of two concurrent acceptances sees the first and rejects `busy` with no write; its already-completed hook output is discarded. The hook ran outside the line on the prompt only, but still crossed `Effects` and is a manual action.
+  - _Configured lane creation_ — validate the name and anchor, then call `Session.createLane()`, which appends `[lane create, seed lane_config]`; publish the lane and `lane_created` only after both logical mutations commit.
+  - _Queue acceptance_ (`steer`, `followUp`) — validate an active, non-aborting run; write `queue_enqueued`. While the harness is open, `nextRun` validates its message but performs no active-operation check, writes its operation-independent enqueue, and starts no run.
+  - _Queue cancellation_ (`cancelQueued`) — no `queue_enqueued` for the id: `Err(UnknownQueueItem)`; target entry exists: `already_consumed`; not pending (abort-drained or already cancelled): `already_cleared`; else write `queue_cancelled` and remove the item from its pending set.
+  - _Deferred-write acceptance_ (lane-view tree writes) — run open: write `write_deferred`; structural operation open: wait for it to end, then re-enter; idle: append the entry directly.
+  - _Configuration setter_ — derive one total replacement from the lane's current value, append `lane_config`, then update the current value. This runs immediately during any operation and survives abort.
+  - _Abort_ — on the first call, write `abort_requested` and store the exact drained `pendingSteer`/`pendingFollowUp` payloads. After that job commits and leaves the line, emit `run_abort`, signal the active effect's `AbortController`, and cancel this lane's unreleased manual provider/tool/fetch/sleep actions without executing them. A call that finds the marker returns copies of those stored/derived payloads with the same run id and performs no write, event, signal, or gate cancellation. A call that finds the terminal record returns `NoActiveOperation`.
+  - _Resume admission_ — reserve the lane's single execution slot; no write.
 - **Procedure via `fx`** (gated in manual mode):
   - `tryFinishRun` — if aborting or anything pending, write nothing and return `"continue"`; else write `operation_finished` and idle the lane.
   - `consumeQueueItem` — if the item is still pending and the run is not aborting, emit its immediate message start/end, append its entry, and remove it; else `"skipped"` with no events.
@@ -2618,20 +2916,20 @@ steer vs finish                          abort vs before_run_end follow-up
 
 The complete list. Each row names the two legal histories and the jobs that force them. Tier C (section 19) tests both orders of every row.
 
-| # | race | histories | mechanism |
-|---|---|---|---|
-| 1 | `prompt()` vs `prompt()` | one accepted; other `busy`, no write | acceptance job |
-| 2 | `steer`/`followUp` vs run finish | consumed at a checkpoint · `NoActiveRun` | queue acceptance + `tryFinishRun` |
-| 3 | deferred write vs run finish | applied before close · idle direct append | write acceptance + `tryFinishRun` |
-| 4 | abort vs run finish | reconciliation, outcome `aborted` · `NoActiveOperation` | abort job + `tryFinishRun` |
-| 5 | abort vs queue consumption | entry appended, not in abort payload · returned by abort, skipped | `consumeQueueItem` + abort drain |
-| 6 | abort vs `before_run_end` follow-up | committed then drained by abort · dropped, nothing behind the marker | `commitRunEndFollowUp` |
-| 7 | `nextRun` vs acceptance | captured by this run · belongs to the next | capture inside acceptance |
-| 8 | deferred write vs abort finish | applied during reconciliation · applied before it | `finishOperation("aborted")` loops |
-| 9 | config setter vs generation-step start | replacement captured by the new step · already-started step keeps its prior snapshot | config-setter job + generation-step start commit |
-| 10 | abort vs in-flight provider/tool effect | response/result commits first and is preserved · marker commits first and settlement is normalized or synthetic | irreducible external race; marker precedes signal, response append revalidates, tool reconciliation owns missing planned results |
-| 11 | cross-lane writes | any interleaving | storage `seq` linearization (section 13); lanes share no state |
-| 12 | `cancelQueued` vs consumption | consumed first: `already_consumed` · cancelled first: consumption skips, the model never sees it | cancel job + `consumeQueueItem` |
+| #   | race                                    | histories                                                                                                       | mechanism                                                                                                                        |
+| --- | --------------------------------------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `prompt()` vs `prompt()`                | one accepted; other `busy`, no write                                                                            | acceptance job                                                                                                                   |
+| 2   | `steer`/`followUp` vs run finish        | consumed at a checkpoint · `NoActiveRun`                                                                        | queue acceptance + `tryFinishRun`                                                                                                |
+| 3   | deferred write vs run finish            | applied before close · idle direct append                                                                       | write acceptance + `tryFinishRun`                                                                                                |
+| 4   | abort vs run finish                     | reconciliation, outcome `aborted` · `NoActiveOperation`                                                         | abort job + `tryFinishRun`                                                                                                       |
+| 5   | abort vs queue consumption              | entry appended, not in abort payload · returned by abort, skipped                                               | `consumeQueueItem` + abort drain                                                                                                 |
+| 6   | abort vs `before_run_end` follow-up     | committed then drained by abort · dropped, nothing behind the marker                                            | `commitRunEndFollowUp`                                                                                                           |
+| 7   | `nextRun` vs acceptance                 | captured by this run · belongs to the next                                                                      | capture inside acceptance                                                                                                        |
+| 8   | deferred write vs abort finish          | applied during reconciliation · applied before it                                                               | `finishOperation("aborted")` loops                                                                                               |
+| 9   | config setter vs generation-step start  | replacement captured by the new step · already-started step keeps its prior snapshot                            | config-setter job + generation-step start commit                                                                                 |
+| 10  | abort vs in-flight provider/tool effect | response/result commits first and is preserved · marker commits first and settlement is normalized or synthetic | irreducible external race; marker precedes signal, response append revalidates, tool reconciliation owns missing planned results |
+| 11  | cross-lane writes                       | any interleaving                                                                                                | storage `seq` linearization (section 13); lanes share no state                                                                   |
+| 12  | `cancelQueued` vs consumption           | consumed first: `already_consumed` · cancelled first: consumption skips, the model never sees it                | cancel job + `consumeQueueItem`                                                                                                  |
 
 Row 10 is irreducible: an external effect may occur without a returned result. Section 5 intent plus replay policy handles it like a crash.
 
@@ -2641,16 +2939,23 @@ Row 10 is irreducible: an external effect may occur without a returned result. S
 
 ```ts
 type ActionInfo =
-  | { kind: "append_entry";  entryType: Entry["type"]; entryId: string }
+  | { kind: "append_entry"; entryType: Entry["type"]; entryId: string }
   | { kind: "append_record"; recordType: LaneRecord["type"] }
   | { kind: "move_lane"; to: string | null }
   | { kind: "set_fact"; fact: "name" | "label" | "custom" }
   | { kind: "try_finish_run"; outcome: "completed" | "failed" }
-  | { kind: "finish_operation"; outcome: "completed" | "declined" | "failed" | "aborted" }
+  | {
+      kind: "finish_operation";
+      outcome: "completed" | "declined" | "failed" | "aborted";
+    }
   | { kind: "commit_follow_up" }
   | { kind: "consume_queue_item"; queue: "steer" | "followUp"; entryId: string }
   | { kind: "apply_pending_write"; entryId: string }
-  | { kind: "stream_assistant"; step: "assistant" | "compaction" | "branch_summary"; attempt: number }
+  | {
+      kind: "stream_assistant";
+      step: "assistant" | "compaction" | "branch_summary";
+      attempt: number;
+    }
   | { kind: "execute_tool"; toolCallId: string; toolName: string }
   | { kind: "fetch_deferred" | "cancel_deferred"; provider: string; id: string }
   | { kind: "hook"; name: HookName }
@@ -2676,37 +2981,54 @@ class GatedEffects implements Effects {
   private gate<T>(
     info: ActionInfo,
     run: () => Promise<T>,
-    abortBeforeStart?: (resolve: (value: T) => void, reject: (error: unknown) => void) => void,
+    abortBeforeStart?: (
+      resolve: (value: T) => void,
+      reject: (error: unknown) => void,
+    ) => void,
   ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       let started = false;
       let settle!: () => void;
-      const settled = new Promise<void>((done) => { settle = done; });
+      const settled = new Promise<void>((done) => {
+        settle = done;
+      });
       this.queue.push({
         info,
         start: () => {
           if (started) throw new Error("action released twice");
           started = true;
-          void Promise.resolve().then(run).then(resolve, reject).finally(settle);
+          void Promise.resolve()
+            .then(run)
+            .then(resolve, reject)
+            .finally(settle);
         },
-        abortBeforeStart: abortBeforeStart ? () => {
-          if (started) return;
-          started = true;
-          try { abortBeforeStart(resolve, reject); } finally { settle(); }
-        } : undefined,
+        abortBeforeStart: abortBeforeStart
+          ? () => {
+              if (started) return;
+              started = true;
+              try {
+                abortBeforeStart(resolve, reject);
+              } finally {
+                settle();
+              }
+            }
+          : undefined,
         settled,
       });
-      this.arrived();          // wakes a pending driver, including a released parent
+      this.arrived(); // wakes a pending driver, including a released parent
     });
   }
 
   appendRecord(record: NewRecord, telemetryContext: TelemetryContext) {
-    return this.gate({ kind: "append_record", recordType: record.type },
-                     () => this.inner.appendRecord(record, telemetryContext));
+    return this.gate({ kind: "append_record", recordType: record.type }, () =>
+      this.inner.appendRecord(record, telemetryContext),
+    );
   }
   startStep(start: StepStartIntent, telemetryContext: TelemetryContext) {
-    return this.gate({ kind: "append_record", recordType: "step_started" },
-                     () => this.inner.startStep(start, telemetryContext));
+    return this.gate(
+      { kind: "append_record", recordType: "step_started" },
+      () => this.inner.startStep(start, telemetryContext),
+    );
   }
   // ... one wrapper per effect method. Conditional writes retain their
   // specific ActionInfo kind; start/settle/prepare/fail record methods are
@@ -2741,18 +3063,18 @@ interface TerminalFailureState {
 
 interface StepState {
   started: StepStartedRecord;
-  attempts: StepAttemptRecord[];              // this stepId, source order
+  attempts: StepAttemptRecord[]; // this stepId, source order
   newestAttempt?: {
     record: StepAttemptRecord;
-    response?: MessageEntry;                  // assistant/fetch only
-    usage?: UsageRecord;                      // exact preplanned id
+    response?: MessageEntry; // assistant/fetch only
+    usage?: UsageRecord; // exact preplanned id
   };
   /** Generated branch summary only; complete payload before navigation move. */
   preparedBranchSummary?: BranchSummaryPreparedRecord;
   /** Hook payload comes from started; this bit covers its preplanned usage. */
   hookUsageExists: boolean;
-  resultExists: boolean;                      // structural typed result
-  failure?: StepFailedRecord;                 // generated structural terminal failure
+  resultExists: boolean; // structural typed result
+  failure?: StepFailedRecord; // generated structural terminal failure
 }
 
 /** In-memory orchestration state per lane. Restore obtains it from the pure
@@ -2783,12 +3105,16 @@ interface LaneState {
     pendingSteer: ProvisionedEntry<MessageEntry>[];
     pendingFollowUp: ProvisionedEntry<MessageEntry>[];
     pendingWrites: ProvisionedEntry<MessageEntry | CustomEntry>[];
-    deferred: DeferredHandle | null;        // unredeemed handle
-    overflowRecoveryUsed: boolean;          // overflow step exists for current trigger
+    deferred: DeferredHandle | null; // unredeemed handle
+    overflowRecoveryUsed: boolean; // overflow step exists for current trigger
     /** Newest entry this operation appended; pure predicates read it. */
-    newestOwn: null | { entryId: string; type: Entry["type"];
-                        role?: AgentMessage["role"]; stopReason?: TerminalStopReason };
-    targets: { result?: boolean; summary?: boolean };   // structural ops
+    newestOwn: null | {
+      entryId: string;
+      type: Entry["type"];
+      role?: AgentMessage["role"];
+      stopReason?: TerminalStopReason;
+    };
+    targets: { result?: boolean; summary?: boolean }; // structural ops
   };
   pendingNextRun: ProvisionedEntry<MessageEntry>[];
 }
@@ -2796,16 +3122,17 @@ interface LaneState {
 interface ToolBatchState {
   plan: ToolBatchStartedRecord;
   assistantEntryId: string;
-  calls: {                                  // original source order
-    toolIndex: number;                       // source ordering and planned-result lookup only
+  calls: {
+    // original source order
+    toolIndex: number; // source ordering and planned-result lookup only
     toolCall: AgentToolCall;
-    resultEntryId: string;                   // from plan, never tool_started
+    resultEntryId: string; // from plan, never tool_started
     started?: ToolStartedRecord;
     result?: MessageEntry;
-    terminate?: boolean;                    // persisted on the result entry
+    terminate?: boolean; // persisted on the result entry
   }[];
-  genuineLength: boolean;                   // accepted output-limit length; no tool executes
-  unresolved: boolean;                      // at least one planned result is absent
+  genuineLength: boolean; // accepted output-limit length; no tool executes
+  unresolved: boolean; // at least one planned result is absent
 }
 
 type NextRunRecord =
@@ -2863,11 +3190,18 @@ function reduceLaneState(input: LaneReductionInput): LaneReductionResult;
 Four control-flow signals travel by exception inside a procedure; none escapes to a caller. `RunFailed` carries a terminal failure into the drain-and-finish path. `Park` unwinds when a deferred handle remains unredeemed after a pending or interrupted poll; the lane suspends. `Aborted` unwinds only after the durable abort marker wins. `Overflow` routes a durable, fully accounted recoverable response (section 6) into the compact-and-retry path. Any other rejection faults the harness.
 
 ```ts
-class RunFailed { constructor(readonly error: OperationError) {} }
-class Park      { constructor(readonly handle: DeferredHandle) {} }
-class Aborted   {}
-class Overflow  {
-  constructor(readonly responseEntryId: string, readonly triggerMessageId: string) {}
+class RunFailed {
+  constructor(readonly error: OperationError) {}
+}
+class Park {
+  constructor(readonly handle: DeferredHandle) {}
+}
+class Aborted {}
+class Overflow {
+  constructor(
+    readonly responseEntryId: string,
+    readonly triggerMessageId: string,
+  ) {}
 }
 
 const newId = (): string => runtime.idGenerator.next();
@@ -2883,7 +3217,9 @@ async function appendIfMissing(target: ProvisionedEntry): Promise<void> {
   await fx.appendEntry(target);
 }
 
-async function appendMessageIfMissing(target: ProvisionedEntry<MessageEntry>): Promise<void> {
+async function appendMessageIfMissing(
+  target: ProvisionedEntry<MessageEntry>,
+): Promise<void> {
   if (plannedEntries.has(target.id)) return appendIfMissing(target);
   emitImmediateMessageLifecycle(target.message, target.id);
   await appendIfMissing(target);
@@ -2908,16 +3244,19 @@ async function settleSyntheticResponse(
 
 ```ts
 async function resume(): Promise<ResumeResult> {
-  await fx.runHook("before_resume", beforeResumeEvent(state));  // per registration id (section 11)
+  await fx.runHook("before_resume", beforeResumeEvent(state)); // per registration id (section 11)
   emit({ type: "run_resume", runId: op.id, recovery: true });
   try {
     // tagResume re-tags an operation Result as a ResumeResult: Ok gains
     // { operation }, Err passes through unchanged. Provider/fetch/tool helpers
     // call requireIdentity immediately before only the effect they will run.
     switch (op.kind) {
-      case "run":        return tagResume("run",        await runProcedure());
-      case "compaction": return tagResume("compaction", await compactionProcedure());
-      case "navigation": return tagResume("navigation", await navigationProcedure());
+      case "run":
+        return tagResume("run", await runProcedure());
+      case "compaction":
+        return tagResume("compaction", await compactionProcedure());
+      case "navigation":
+        return tagResume("navigation", await navigationProcedure());
     }
   } catch (error) {
     if (MissingIdentities.is(error)) return Result.err(error);
@@ -2927,21 +3266,26 @@ async function resume(): Promise<ResumeResult> {
 
 async function runProcedure(): Promise<RunResult> {
   try {
-    for (const m of [...op.missingInitialMessages]) await appendMessageIfMissing(m); // never dropped
-    await persistMissingResponseUsage(op.step);              // entry-before-usage crash prefix
+    for (const m of [...op.missingInitialMessages])
+      await appendMessageIfMissing(m); // never dropped
+    await persistMissingResponseUsage(op.step); // entry-before-usage crash prefix
     if (op.abort) return await abortPath();
 
-    if (op.step?.started.step === "deferred_fetch" &&
-        stepNeedsClassification(op.step, state)) {
+    if (
+      op.step?.started.step === "deferred_fetch" &&
+      stepNeedsClassification(op.step, state)
+    ) {
       const source = sourceNamedByNewestFetchAttempt(op.step, state);
       const redeemed = routeDeferredClassification(
-        classifyDurableDeferredResponse(op.step, state), source);
+        classifyDurableDeferredResponse(op.step, state),
+        source,
+      );
       // No fetch occurs before this already-persisted response is accounted
       // and classified. Response-step lookup below uses this deferred step's
       // copied active tool names.
       if (hasToolCalls(redeemed)) await runToolBatch(redeemed);
     } else if (op.deferred) {
-      const redeemed = await redeemDeferred();               // may throw Park, RunFailed, Aborted
+      const redeemed = await redeemDeferred(); // may throw Park, RunFailed, Aborted
       if (hasToolCalls(redeemed)) await runToolBatch(redeemed); // copied fetch-step active names
     }
     if (op.toolBatch?.unresolved) await reconcileToolBatch(op.toolBatch);
@@ -2949,17 +3293,29 @@ async function runProcedure(): Promise<RunResult> {
     // A crash mid-step resumes that exact step before new checkpoint input
     // is consumed (section 7). Live retry and recovery consume identically.
     if (op.step?.failure) throw new RunFailed(op.step.failure.error);
-    if (op.step?.started.step === "assistant" && stepNeedsClassification(op.step, state)) {
+    if (
+      op.step?.started.step === "assistant" &&
+      stepNeedsClassification(op.step, state)
+    ) {
       const outcome = await runTurn();
       if (outcome) return outcome;
-    } else if (op.step?.started.step === "compaction" && !op.step.resultExists) {
-      await autoCompact(op.step.started.compactionReason,
-                        overflowLinkFrom(op.step.started));  // exact link is recorded at step scope
-    } else if (op.step?.started.step === "branch_summary" && !op.step.resultExists) {
-      throw new Error("Run has a branch-summary step");      // corruption
+    } else if (
+      op.step?.started.step === "compaction" &&
+      !op.step.resultExists
+    ) {
+      await autoCompact(
+        op.step.started.compactionReason,
+        overflowLinkFrom(op.step.started),
+      ); // exact link is recorded at step scope
+    } else if (
+      op.step?.started.step === "branch_summary" &&
+      !op.step.resultExists
+    ) {
+      throw new Error("Run has a branch-summary step"); // corruption
     }
 
-    if (newestOwnMessageIsTerminalFailure(state)) {          // error or capped interruption (section 7)
+    if (newestOwnMessageIsTerminalFailure(state)) {
+      // error or capped interruption (section 7)
       return await handleRunFailed(existingFailure(state));
     }
     return await driverLoop();
@@ -2971,14 +3327,13 @@ async function runProcedure(): Promise<RunResult> {
 async function handleRunSignal(e: unknown): Promise<RunResult> {
   if (e instanceof Park) {
     emit({ type: "run_suspend", runId: op.id, deferred: e.handle }); // exactly once per park
-    return suspended(e.handle);                              // unwind invocation; lane parked
+    return suspended(e.handle); // unwind invocation; lane parked
   }
-  if (e instanceof Aborted)   return await abortPath();
+  if (e instanceof Aborted) return await abortPath();
   if (e instanceof RunFailed) return await handleRunFailed(e.error);
-  throw e;                                                   // storage/defect → faulted harness
+  throw e; // storage/defect → faulted harness
 }
 ```
-
 
 **Fixed-point test invariant.** After each durable boundary, suspension, and finish, focused/manual tests run section 7 reads and reduction and compare with live `LaneState`. Production updates state directly without rereading.
 
@@ -2988,12 +3343,14 @@ async function handleRunSignal(e: unknown): Promise<RunResult> {
 async function driverLoop(): Promise<RunResult> {
   while (true) {
     // checkpoint — each consumption is a conditional mutation-line job
-    for (const w of [...op.pendingWrites])            await fx.applyPendingWrite(op.id, w.id);
-    for (const m of steeringForThisCheckpoint(op))    await fx.consumeQueueItem(op.id, "steer", m.id);
+    for (const w of [...op.pendingWrites])
+      await fx.applyPendingWrite(op.id, w.id);
+    for (const m of steeringForThisCheckpoint(op))
+      await fx.consumeQueueItem(op.id, "steer", m.id);
     if (op.abort) return await abortPath();
     if (await contextOverLimit()) {
-      const compacted = await autoCompact("threshold");     // may throw RunFailed
-      if (compacted) continue;                              // fresh checkpoint after a committed compaction
+      const compacted = await autoCompact("threshold"); // may throw RunFailed
+      if (compacted) continue; // fresh checkpoint after a committed compaction
       // A threshold hook declined, or there was nothing useful to compact.
       // Threshold is proactive, so continue this checkpoint without looping.
     }
@@ -3001,16 +3358,23 @@ async function driverLoop(): Promise<RunResult> {
     if (needsAssistant()) {
       const outcome = await runTurn();
       if (outcome) return outcome;
-      continue;                                              // fresh checkpoint
+      continue; // fresh checkpoint
     }
 
-    for (const m of followUpsForThisCheckpoint(op))   await fx.consumeQueueItem(op.id, "followUp", m.id);
+    for (const m of followUpsForThisCheckpoint(op))
+      await fx.consumeQueueItem(op.id, "followUp", m.id);
     if (needsAssistant() || hasPendingWork()) continue;
 
     // finish boundary
-    const r = await fx.runHook("before_run_end", { runId: op.id, messages: runMessages() });
+    const r = await fx.runHook("before_run_end", {
+      runId: op.id,
+      messages: runMessages(),
+    });
     if (r?.followUp) {
-      await fx.commitRunEndFollowUp(op.id, provisionUserMessage(newId(), r.followUp));
+      await fx.commitRunEndFollowUp(
+        op.id,
+        provisionUserMessage(newId(), r.followUp),
+      );
     }
     if (hasPendingWork()) continue;
 
@@ -3023,27 +3387,30 @@ async function driverLoop(): Promise<RunResult> {
 async function runTurn(): Promise<RunResult | undefined> {
   let assistant: AssistantMessage;
   try {
-    assistant = await assistantStep();          // may throw Park, RunFailed, Aborted, Overflow
+    assistant = await assistantStep(); // may throw Park, RunFailed, Aborted, Overflow
   } catch (e) {
     if (e instanceof Overflow) return await recoverOverflow(e);
     throw e;
   }
   if (op.abort) return await abortPath();
-  if (hasToolCalls(assistant)) await runToolBatch(assistant);  // uses this generation step's captured active names
+  if (hasToolCalls(assistant)) await runToolBatch(assistant); // uses this generation step's captured active names
   return undefined;
 }
 
-async function recoverOverflow(overflow: Overflow): Promise<RunResult | undefined> {
+async function recoverOverflow(
+  overflow: Overflow,
+): Promise<RunResult | undefined> {
   if (op.abort) return await abortPath();
-  if (op.overflowRecoveryUsed) {                // a linked compaction already used this trigger
+  if (op.overflowRecoveryUsed) {
+    // a linked compaction already used this trigger
     // The second recoverable response is already durable and accounted.
     return await handleRunFailed(truncationError());
   }
   await autoCompact("overflow", {
     supersededResponseEntryId: overflow.responseEntryId,
     triggerMessageId: overflow.triggerMessageId,
-  });                                           // decline or empty preparation → RunFailed
-  return undefined;                             // driverLoop loops; needsAssistant is still true
+  }); // decline or empty preparation → RunFailed
+  return undefined; // driverLoop loops; needsAssistant is still true
 }
 
 async function handleRunFailed(error: OperationError): Promise<RunResult> {
@@ -3051,18 +3418,23 @@ async function handleRunFailed(error: OperationError): Promise<RunResult> {
     // Drain accepted input. No before_run_end, no further model work
     // unless consumed conversational input restarts the loop.
     while (true) {
-      for (const w of [...op.pendingWrites]) await fx.applyPendingWrite(op.id, w.id);
+      for (const w of [...op.pendingWrites])
+        await fx.applyPendingWrite(op.id, w.id);
       let consumed = 0;
       for (const m of steeringForThisCheckpoint(op)) {
-        if (await fx.consumeQueueItem(op.id, "steer", m.id) === "consumed") consumed++;
+        if ((await fx.consumeQueueItem(op.id, "steer", m.id)) === "consumed")
+          consumed++;
       }
       if (consumed === 0) {
         for (const m of followUpsForThisCheckpoint(op)) {
-          if (await fx.consumeQueueItem(op.id, "followUp", m.id) === "consumed") consumed++;
+          if (
+            (await fx.consumeQueueItem(op.id, "followUp", m.id)) === "consumed"
+          )
+            consumed++;
         }
       }
       if (op.abort) return await abortPath();
-      if (consumed > 0) return await driverLoop();           // input clears the failure
+      if (consumed > 0) return await driverLoop(); // input clears the failure
       const done = await fx.tryFinishRun(op.id, "failed", error);
       if (done === "finished") return finished("failed", error);
     }
@@ -3079,7 +3451,9 @@ async function handleRunFailed(error: OperationError): Promise<RunResult> {
 Every settled assistant attempt appends exactly one complete response, including retryable errors, overflow responses, deferred handles, terminal errors, and aborted responses. The attempt's second provisioned object is its usage record. No general attempt-outcome or classification record exists.
 
 ```ts
-async function persistMissingResponseUsage(step: StepState | null): Promise<void> {
+async function persistMissingResponseUsage(
+  step: StepState | null,
+): Promise<void> {
   const a = step?.newestAttempt;
   if (a?.response && !a.usage) {
     await fx.appendRecord(preplannedUsageRecord(a.record, a.response.message));
@@ -3090,7 +3464,9 @@ async function assistantStep(): Promise<SettledAssistantMessage> {
   let step = continuableAssistantStep(op.step, state);
   if (!step) {
     const started = await fx.startStep({
-      id: newId(), runId: op.id, step: "assistant",
+      id: newId(),
+      runId: op.id,
+      step: "assistant",
       triggerMessageId: newestConsumedUserContextId(state),
     });
     if (started === "aborted") throw new Aborted();
@@ -3110,7 +3486,10 @@ async function assistantStep(): Promise<SettledAssistantMessage> {
         step: step.started,
         attempt: current.record,
         abortRequested: op.abort !== null,
-        laterTransitions: transitionsLinkedTo(current.record.responseEntryId, state),
+        laterTransitions: transitionsLinkedTo(
+          current.record.responseEntryId,
+          state,
+        ),
       });
       if (retryStartingHere === current.record.attempt) {
         emitRetryEnd(current.record, classification); // existing success/finalError contract
@@ -3120,27 +3499,35 @@ async function assistantStep(): Promise<SettledAssistantMessage> {
         throw new Error("assistantStep entered after its response transition"); // dispatch defect
       }
       if (classification.kind === "abort") {
-        if (!op.abort) throw new Error("abort classification without abort_requested");
+        if (!op.abort)
+          throw new Error("abort classification without abort_requested");
         throw new Aborted();
       }
       if (classification.kind === "overflow") {
-        throw new Overflow(current.record.responseEntryId, step.started.triggerMessageId);
+        throw new Overflow(
+          current.record.responseEntryId,
+          step.started.triggerMessageId,
+        );
       }
       if (classification.kind === "suspend") {
         throw new Park(final.deferred);
       }
       if (classification.kind === "failure") {
-        throw new RunFailed(final.stopReason === "aborted"
-          ? providerInterruptionError(final)
-          : messageError(final));
+        throw new RunFailed(
+          final.stopReason === "aborted"
+            ? providerInterruptionError(final)
+            : messageError(final),
+        );
       }
       if (classification.kind !== "retry") {
-        return final;                          // accepted stop, toolUse, or genuine length
+        return final; // accepted stop, toolUse, or genuine length
       }
 
       const nextAttempt = current.record.attempt + 1;
       emitRetryScheduled(step.started, nextAttempt, retryErrorMessage(final));
-      const slept = await fx.sleep(retryDelay(step.started.retryPolicy, current.record.attempt));
+      const slept = await fx.sleep(
+        retryDelay(step.started.retryPolicy, current.record.attempt),
+      );
       if (slept === "aborted" || op.abort) throw new Aborted();
       retryStartingHere = nextAttempt;
       current = undefined;
@@ -3149,13 +3536,21 @@ async function assistantStep(): Promise<SettledAssistantMessage> {
       // or repeat it under the same attempt number.
       if (current.record.attempt >= step.started.retryPolicy.maxAttempts) {
         const response = await settleSyntheticResponse(
-          current.record, interruptedAssistantMessage());
+          current.record,
+          interruptedAssistantMessage(),
+        );
         if (op.abort) throw new Aborted();
         throw new RunFailed(messageError(response.message));
       }
       const nextAttempt = current.record.attempt + 1;
-      emitRetryScheduled(step.started, nextAttempt, "provider outcome unknown after interruption");
-      const slept = await fx.sleep(retryDelay(step.started.retryPolicy, current.record.attempt));
+      emitRetryScheduled(
+        step.started,
+        nextAttempt,
+        "provider outcome unknown after interruption",
+      );
+      const slept = await fx.sleep(
+        retryDelay(step.started.retryPolicy, current.record.attempt),
+      );
       if (slept === "aborted" || op.abort) throw new Aborted();
       retryStartingHere = nextAttempt;
       current = undefined;
@@ -3163,13 +3558,24 @@ async function assistantStep(): Promise<SettledAssistantMessage> {
 
     if (!current) {
       const attempt = step.attempts.length + 1;
-      const model = runtime.identities.requireModel(step.started.configuration.model);
-      const options = await fx.runHook("before_request",
-        { model, step: "assistant", attempt, streamOptions });
+      const model = runtime.identities.requireModel(
+        step.started.configuration.model,
+      );
+      const options = await fx.runHook("before_request", {
+        model,
+        step: "assistant",
+        attempt,
+        streamOptions,
+      });
       const limits = assistantRequestLimits(step.started, model, options);
       const record = stepAttempt({
-        id: newId(), runId: op.id, stepId: step.started.id, step: "assistant", attempt,
-        responseEntryId: newId(), usageRecordId: newId(),
+        id: newId(),
+        runId: op.id,
+        stepId: step.started.id,
+        step: "assistant",
+        attempt,
+        responseEntryId: newId(),
+        usageRecordId: newId(),
         intendedOutputLimit: limits.intendedOutputLimit,
         contextWindow: limits.contextWindow,
       });
@@ -3180,9 +3586,12 @@ async function assistantStep(): Promise<SettledAssistantMessage> {
       // fx.streamAssistant emits message_start/update*, runs after_response,
       // and emits message_end. Only then may the response entry commit.
       const streamed = await fx.streamAssistant(
-        assistantRequest(step.started, startedAttempt, model, options));
+        assistantRequest(step.started, startedAttempt, model, options),
+      );
       const response = await fx.settleAttemptResponse(startedAttempt, streamed); // entry_added after commit
-      await fx.appendRecord(preplannedUsageRecord(startedAttempt, response.message));
+      await fx.appendRecord(
+        preplannedUsageRecord(startedAttempt, response.message),
+      );
       installedAttempt(startedAttempt, response.message);
       // The next iteration performs the pure durable classifier. No hook,
       // tool plan, retry, overflow step, suspension, or finish can precede it.
@@ -3206,8 +3615,13 @@ async function summaryStep(
   resultEntryId: string,
   overflowLink?: OverflowCompactionLink,
 ): Promise<GeneratedSummary> {
-  const step = requireGeneratedStructuralStep(op.step, kind, reason,
-    resultEntryId, overflowLink);
+  const step = requireGeneratedStructuralStep(
+    op.step,
+    kind,
+    reason,
+    resultEntryId,
+    overflowLink,
+  );
   let retryPrepared = false;
 
   while (true) {
@@ -3217,21 +3631,33 @@ async function summaryStep(
       // The caller invokes summaryStep only while its result/prepared payload
       // is absent. Re-entry with an attempt therefore means unknown work.
       if (previous.record.attempt >= step.started.retryPolicy.maxAttempts) {
-        const failed = await fx.failStructuralStep(stepFailedFromUnknown(previous.record));
+        const failed = await fx.failStructuralStep(
+          stepFailedFromUnknown(previous.record),
+        );
         if (failed === "aborted") throw new Aborted();
         throw new RunFailed(failed.error);
       }
       const next = previous.record.attempt + 1;
-      emitRetryScheduled(step.started, next, "structural provider outcome unknown after interruption");
-      const slept = await fx.sleep(retryDelay(step.started.retryPolicy, previous.record.attempt));
+      emitRetryScheduled(
+        step.started,
+        next,
+        "structural provider outcome unknown after interruption",
+      );
+      const slept = await fx.sleep(
+        retryDelay(step.started.retryPolicy, previous.record.attempt),
+      );
       if (slept === "aborted" || op.abort) throw new Aborted();
     }
     retryPrepared = false;
 
     const attempt = step.attempts.length + 1;
     const record = stepAttempt({
-      id: newId(), type: "step_attempt", runId: op.id,
-      stepId: step.started.id, step: kind, attempt,
+      id: newId(),
+      type: "step_attempt",
+      runId: op.id,
+      stepId: step.started.id,
+      step: kind,
+      attempt,
     });
     const started = await fx.startAttempt(record);
     if (started === "aborted" || op.abort) throw new Aborted();
@@ -3240,36 +3666,69 @@ async function summaryStep(
     // Split-turn compaction may invoke request() twice. Each invocation runs
     // before_request through fx, crosses one fx.streamAssistant action with a
     // private sink, and writes reported usage before request() resolves.
-    const outcome = await runGeneratedSummaryAttempt(kind, preparationFor(step), {
-      request: async (messages) => {
-        const model = runtime.identities.requireModel(step.started.configuration.model);
-        const options = await fx.runHook("before_request",
-          { model, step: kind, attempt, streamOptions: structuralStreamOptions() });
-        const response = await fx.streamAssistant(structuralRequest(
-          messages, step.started, started, model, options, privateEventSink));
-        if (hasReportedUsage(response)) {
-          await fx.appendRecord(structuralUsageRecord(
-            op.id, step.started.id, resultEntryId, attempt, kind, response));
-        }
-        return response;
+    const outcome = await runGeneratedSummaryAttempt(
+      kind,
+      preparationFor(step),
+      {
+        request: async (messages) => {
+          const model = runtime.identities.requireModel(
+            step.started.configuration.model,
+          );
+          const options = await fx.runHook("before_request", {
+            model,
+            step: kind,
+            attempt,
+            streamOptions: structuralStreamOptions(),
+          });
+          const response = await fx.streamAssistant(
+            structuralRequest(
+              messages,
+              step.started,
+              started,
+              model,
+              options,
+              privateEventSink,
+            ),
+          );
+          if (hasReportedUsage(response)) {
+            await fx.appendRecord(
+              structuralUsageRecord(
+                op.id,
+                step.started.id,
+                resultEntryId,
+                attempt,
+                kind,
+                response,
+              ),
+            );
+          }
+          return response;
+        },
       },
-    });
-    if (attempt > 1) emitRetryEnd(started,
-      op.abort ? { kind: "abort" } : outcome);
-    if (op.abort) throw new Aborted();                         // usage above remains billed
+    );
+    if (attempt > 1)
+      emitRetryEnd(started, op.abort ? { kind: "abort" } : outcome);
+    if (op.abort) throw new Aborted(); // usage above remains billed
 
     if (outcome.kind === "success") {
-      return outcome.result;                                  // durable commit is the caller's next action
+      return outcome.result; // durable commit is the caller's next action
     }
-    if (outcome.kind === "retry" && attempt < step.started.retryPolicy.maxAttempts) {
+    if (
+      outcome.kind === "retry" &&
+      attempt < step.started.retryPolicy.maxAttempts
+    ) {
       emitRetryScheduled(step.started, attempt + 1, outcome.error.message);
-      const slept = await fx.sleep(retryDelay(step.started.retryPolicy, attempt));
+      const slept = await fx.sleep(
+        retryDelay(step.started.retryPolicy, attempt),
+      );
       if (slept === "aborted" || op.abort) throw new Aborted();
       retryPrepared = true;
       continue;
     }
 
-    const failed = await fx.failStructuralStep(stepFailedFromOutcome(started, outcome));
+    const failed = await fx.failStructuralStep(
+      stepFailedFromOutcome(started, outcome),
+    );
     if (failed === "aborted") throw new Aborted();
     throw new RunFailed(failed.error);
   }
@@ -3292,13 +3751,14 @@ function routeDeferredClassification(
   if (classification.kind === "abort") throw new Aborted();
   if (classification.kind === "pending") throw new Park(classification.handle);
   if (classification.kind === "interrupted") {
-    throw new Park(source.message.deferred!);                  // exact source remains unredeemed
+    throw new Park(source.message.deferred!); // exact source remains unredeemed
   }
-  if (classification.kind === "failure") throw new RunFailed(classification.error);
+  if (classification.kind === "failure")
+    throw new RunFailed(classification.error);
   if (classification.kind === "advanced") {
     throw new Error("deferred response already has a later transition");
   }
-  return classification.message;                              // ready
+  return classification.message; // ready
 }
 
 async function redeemDeferred(): Promise<SettledAssistantMessage> {
@@ -3308,7 +3768,9 @@ async function redeemDeferred(): Promise<SettledAssistantMessage> {
     // step_started commits, every later process reads F's copies.
     const original = generationStepForInitialDeferredResponse(state);
     const started = await fx.startStep({
-      id: newId(), runId: op.id, step: "deferred_fetch",
+      id: newId(),
+      runId: op.id,
+      step: "deferred_fetch",
       configuration: copyLaneConfiguration(original.configuration),
       retryPolicy: copyRetryPolicy(original.retryPolicy),
     });
@@ -3320,23 +3782,39 @@ async function redeemDeferred(): Promise<SettledAssistantMessage> {
   const source = newestDeferredSourceEntry(state);
   const sourceAttempts = attemptsForDeferredSource(step, source.id);
   const prior = sourceAttempts.at(-1);
-  if (prior && !prior.response && sourceAttempts.length >= step.started.retryPolicy.maxAttempts) {
+  if (
+    prior &&
+    !prior.response &&
+    sourceAttempts.length >= step.started.retryPolicy.maxAttempts
+  ) {
     const response = await settleSyntheticResponse(
-      prior.record, interruptedDeferredMessage(source));
+      prior.record,
+      interruptedDeferredMessage(source),
+    );
     if (op.abort) throw new Aborted();
     throw new RunFailed(providerInterruptionError(response.message));
   }
-  if (prior && (!prior.response ||
-                (prior.response.message.stopReason === "aborted" && !op.abort))) {
-    const slept = await fx.sleep(retryDelay(step.started.retryPolicy, sourceAttempts.length));
+  if (
+    prior &&
+    (!prior.response ||
+      (prior.response.message.stopReason === "aborted" && !op.abort))
+  ) {
+    const slept = await fx.sleep(
+      retryDelay(step.started.retryPolicy, sourceAttempts.length),
+    );
     if (slept === "aborted" || op.abort) throw new Aborted();
   }
 
-  const attempt = step.attempts.length + 1;                    // never reuse an unknown poll
+  const attempt = step.attempts.length + 1; // never reuse an unknown poll
   const record = stepAttempt({
-    id: newId(), runId: op.id, stepId: step.started.id,
-    step: "deferred_fetch", attempt, sourceEntryId: source.id,
-    responseEntryId: newId(), usageRecordId: newId(),
+    id: newId(),
+    runId: op.id,
+    stepId: step.started.id,
+    step: "deferred_fetch",
+    attempt,
+    sourceEntryId: source.id,
+    responseEntryId: newId(),
+    usageRecordId: newId(),
   });
   const startedAttempt = await fx.startAttempt(record);
   if (startedAttempt === "aborted" || op.abort) throw new Aborted();
@@ -3345,10 +3823,14 @@ async function redeemDeferred(): Promise<SettledAssistantMessage> {
   // check, runs response hooks, and emits message_end before returning.
   const fetched = await fx.fetchDeferred(source, { wait: 0 });
   const response = await fx.settleAttemptResponse(startedAttempt, fetched);
-  await fx.appendRecord(preplannedUsageRecord(startedAttempt, response.message));
+  await fx.appendRecord(
+    preplannedUsageRecord(startedAttempt, response.message),
+  );
   const settledStep = installedAttempt(startedAttempt, response.message);
   return routeDeferredClassification(
-    classifyDurableDeferredResponse(settledStep, state), source);
+    classifyDurableDeferredResponse(settledStep, state),
+    source,
+  );
 }
 ```
 
@@ -3361,109 +3843,188 @@ One `resume()` makes at most one `wait: 0` fetch. Pending appends response/usage
 Live execution commits the full plan before `executeToolBatch`; the batch is never one gated action. Provider `toolCallId` values are response-unique. Callbacks retain the source call object so private lookup finds its planned result without exposing an index. Ordinary batches resolve only active names captured by the response's assistant step or copied fetch step. Genuine `length` resolves no tools. Every callback, hook, and phase-two call crosses `fx`:
 
 ```ts
-async function runToolBatch(assistant: AssistantMessage, telemetryContext: TelemetryContext): Promise<void> {
+async function runToolBatch(
+  assistant: AssistantMessage,
+  telemetryContext: TelemetryContext,
+): Promise<void> {
   const assistantEntryId = newestAssistantEntryId(state);
-  let batch = op.toolBatch?.assistantEntryId === assistantEntryId ? op.toolBatch : undefined;
+  let batch =
+    op.toolBatch?.assistantEntryId === assistantEntryId
+      ? op.toolBatch
+      : undefined;
   if (!batch) {
     const sourceCalls = toolCallsWithSourceIndexes(assistant);
-    const plan = await fx.startToolBatch({
-      id: newId(), type: "tool_batch_started", runId: op.id, assistantEntryId,
-      calls: sourceCalls.map(({ toolIndex }) => ({ toolIndex, resultEntryId: newId() })),
-    }, telemetryContext);
+    const plan = await fx.startToolBatch(
+      {
+        id: newId(),
+        type: "tool_batch_started",
+        runId: op.id,
+        assistantEntryId,
+        calls: sourceCalls.map(({ toolIndex }) => ({
+          toolIndex,
+          resultEntryId: newId(),
+        })),
+      },
+      telemetryContext,
+    );
     if (plan === "aborted") throw new Aborted();
-    batch = installedToolBatch(plan, assistant);              // exact source-index mapping
+    batch = installedToolBatch(plan, assistant); // exact source-index mapping
   }
 
   const plannedCallFor = (call: AgentToolCall) =>
     batch!.calls.find((item) => item.toolCall === call)!;
 
-  const tools = assistant.stopReason === "length"
-    ? []
-    : runtime.identities.requireToolsForResponseStep(assistant, state);
-  await executeToolBatch(assistant, tools, {
-    beforeToolCall: async (call, args) => {
-      return await fx.runHook("before_tool",
-        { toolCallId: call.id, toolName: call.name, args }, telemetryContext);
+  const tools =
+    assistant.stopReason === "length"
+      ? []
+      : runtime.identities.requireToolsForResponseStep(assistant, state);
+  await executeToolBatch(
+    assistant,
+    tools,
+    {
+      beforeToolCall: async (call, args) => {
+        return await fx.runHook(
+          "before_tool",
+          { toolCallId: call.id, toolName: call.name, args },
+          telemetryContext,
+        );
+      },
+      onToolStart: async (call, effectiveArgs) => {
+        const planned = plannedCallFor(call); // id stays on the plan
+        const started = await fx.startTool(
+          toolStarted(op.id, {
+            assistantEntryId,
+            toolIndex: planned.toolIndex,
+            toolCallId: call.id,
+            toolName: call.name,
+            effectiveArgs,
+            replay: declaredReplay(call),
+          }),
+          telemetryContext,
+        );
+        if (started === "aborted") throw new Aborted();
+      },
+      executeTool: (prepared) => {
+        if (op.abort) throw new Aborted();
+        return fx.executeTool(prepared, telemetryContext);
+      },
+      afterToolCall: (call, args, result, isError) =>
+        fx.runHook(
+          "after_tool",
+          {
+            toolCallId: call.id,
+            toolName: call.name,
+            args,
+            ...result,
+            isError,
+          },
+          telemetryContext,
+        ),
+      onToolResult: async (call, message, terminate) => {
+        const planned = plannedCallFor(call); // blocked/invalid use this too
+        if (message.usage) {
+          await fx.appendRecord(
+            toolUsageRecord(
+              op.id,
+              planned.resultEntryId,
+              call.id,
+              message.usage,
+            ),
+            telemetryContext,
+          );
+        }
+        await appendIfMissing(
+          resultEntry(planned.resultEntryId, message, terminate),
+        );
+      },
     },
-    onToolStart: async (call, effectiveArgs) => {
-      const planned = plannedCallFor(call);                    // id stays on the plan
-      const started = await fx.startTool(toolStarted(op.id, {
-        assistantEntryId, toolIndex: planned.toolIndex,
-        toolCallId: call.id, toolName: call.name,
-        effectiveArgs, replay: declaredReplay(call),
-      }), telemetryContext);
-      if (started === "aborted") throw new Aborted();
-    },
-    executeTool: (prepared) => {
-      if (op.abort) throw new Aborted();
-      return fx.executeTool(prepared, telemetryContext);
-    },
-    afterToolCall: (call, args, result, isError) =>
-      fx.runHook("after_tool",
-        { toolCallId: call.id, toolName: call.name, args, ...result, isError },
-        telemetryContext),
-    onToolResult: async (call, message, terminate) => {
-      const planned = plannedCallFor(call);                    // blocked/invalid use this too
-      if (message.usage) {
-        await fx.appendRecord(toolUsageRecord(op.id, planned.resultEntryId,
-          call.id, message.usage), telemetryContext);
-      }
-      await appendIfMissing(resultEntry(planned.resultEntryId, message, terminate));
-    },
-  }, { toolExecution: config.toolExecution }, emitLaneEvents, telemetryContext, abortSignal);
+    { toolExecution: config.toolExecution },
+    emitLaneEvents,
+    telemetryContext,
+    abortSignal,
+  );
 }
 ```
 
 Ordinary re-entry invokes `reconcileToolBatch` for missing results; no recovery dispatcher exists. In source order, `runPlannedToolCall` composes clearance, start record, effect, finalization, optional usage, immediate message lifecycle, and planned append without allocating ids. Real results show only that execution's usage; synthetics show none and prior usage stays ledger-only. Unstarted calls rerun clearance; started calls never do:
 
 ```ts
-async function appendReconciledToolResult(target: ProvisionedEntry<MessageEntry>): Promise<void> {
+async function appendReconciledToolResult(
+  target: ProvisionedEntry<MessageEntry>,
+): Promise<void> {
   if (plannedEntries.has(target.id)) return appendIfMissing(target);
   emitImmediateMessageLifecycle(target.message, target.id);
   await appendIfMissing(target);
 }
 
-async function reconcileToolBatch(batch: ToolBatchState,
-                                  telemetryContext: TelemetryContext): Promise<void> {
-  if (op.abort) throw new Aborted();                           // abortPath owns this state
-  if (batch.genuineLength) {                                  // accepted length: never execute
+async function reconcileToolBatch(
+  batch: ToolBatchState,
+  telemetryContext: TelemetryContext,
+): Promise<void> {
+  if (op.abort) throw new Aborted(); // abortPath owns this state
+  if (batch.genuineLength) {
+    // accepted length: never execute
     for (const call of batch.calls) {
       if (!call.result) {
-        await appendReconciledToolResult(incompleteArgumentsToolResult(
-          call.resultEntryId, call.toolCall));
+        await appendReconciledToolResult(
+          incompleteArgumentsToolResult(call.resultEntryId, call.toolCall),
+        );
       }
     }
-    return;                                                   // planned errors force another turn
+    return; // planned errors force another turn
   }
 
   for (const call of batch.calls) {
     if (call.result) continue;
 
-    if (!call.started) {                                      // X2/X3: full clearance path
-      await runPlannedToolCall(call, telemetryContext);       // all hooks/effects/writes use fx
-      continue;                                               // same plan; no fresh result id
+    if (!call.started) {
+      // X2/X3: full clearance path
+      await runPlannedToolCall(call, telemetryContext); // all hooks/effects/writes use fx
+      continue; // same plan; no fresh result id
     }
 
     // Missing current implementation means no safe replay and needs no
     // identity error because the synthetic path performs no tool effect.
-    const currentReplay = runtime.identities.replayDeclaration(call.started.toolName);
+    const currentReplay = runtime.identities.replayDeclaration(
+      call.started.toolName,
+    );
     if (call.started.replay === "safe" && currentReplay === "safe") {
-      const prepared = { kind: "prepared", toolCall: call.toolCall,
-                         tool: runtime.identities.requireTool(call.started.toolName),
-                         args: call.started.effectiveArgs };   // persisted, not re-derived
+      const prepared = {
+        kind: "prepared",
+        toolCall: call.toolCall,
+        tool: runtime.identities.requireTool(call.started.toolName),
+        args: call.started.effectiveArgs,
+      }; // persisted, not re-derived
       const executed = await fx.executeTool(prepared, telemetryContext);
-      const finalized = await finalizeToolCall(prepared, executed,
+      const finalized = await finalizeToolCall(
+        prepared,
+        executed,
         { afterToolCall: fxWiredAfterTool(telemetryContext) },
-        telemetryContext, abortSignal);
+        telemetryContext,
+        abortSignal,
+      );
       if (finalized.result.usage) {
-        await fx.appendRecord(toolUsageRecord(op.id, call.resultEntryId,
-          call.toolCall.id, finalized.result.usage), telemetryContext); // replay's own cost
+        await fx.appendRecord(
+          toolUsageRecord(
+            op.id,
+            call.resultEntryId,
+            call.toolCall.id,
+            finalized.result.usage,
+          ),
+          telemetryContext,
+        ); // replay's own cost
       }
-      await appendReconciledToolResult(resultEntry(call.resultEntryId,
-        createToolResultMessage(finalized), finalized.result.terminate === true));
+      await appendReconciledToolResult(
+        resultEntry(
+          call.resultEntryId,
+          createToolResultMessage(finalized),
+          finalized.result.terminate === true,
+        ),
+      );
     } else {
       await appendReconciledToolResult(
-        syntheticResult(call.resultEntryId, "interrupted"));
+        syntheticResult(call.resultEntryId, "interrupted"),
+      );
     }
   }
 }
@@ -3477,20 +4038,26 @@ async function reconcileToolBatch(batch: ToolBatchState,
 async function settleAbortedProviderAttempt(): Promise<void> {
   const step = op.step;
   const current = step?.newestAttempt;
-  if (!current || (step.started.step !== "assistant" &&
-                   step.started.step !== "deferred_fetch")) return;
+  if (
+    !current ||
+    (step.started.step !== "assistant" &&
+      step.started.step !== "deferred_fetch")
+  )
+    return;
 
   if (current.response) {
     if (!current.usage) {
-      await fx.appendRecord(preplannedUsageRecord(current.record, current.response.message));
+      await fx.appendRecord(
+        preplannedUsageRecord(current.record, current.response.message),
+      );
     }
     emitRetryEndIfActive(current.record, { kind: "abort" });
-    return;                                  // preserve its committed stop reason
+    return; // preserve its committed stop reason
   }
 
   // The prior provider effect is unknown. Abort forbids a later attempt.
   const synthetic = syntheticAbortedMessage(step.started, current.record); // zero usage;
-                                                               // identity comes from durable data
+  // identity comes from durable data
   await settleSyntheticResponse(current.record, synthetic);
   emitRetryEndIfActive(current.record, { kind: "abort" });
 }
@@ -3499,8 +4066,8 @@ async function abortPath(): Promise<RunResult> {
   await settleAbortedProviderAttempt();
   if (op.deferred) {
     const source = newestDeferredSourceEntry(state);
-    await bestEffortCancelDeferred(source);            // internally calls fx.cancelDeferred when resolvable;
-                                                       // failures are telemetry only
+    await bestEffortCancelDeferred(source); // internally calls fx.cancelDeferred when resolvable;
+    // failures are telemetry only
   }
 
   while (true) {
@@ -3508,10 +4075,15 @@ async function abortPath(): Promise<RunResult> {
     // therefore an unknown crashed effect and is never replayed after abort.
     for (const call of op.toolBatch?.calls ?? []) {
       if (call.result) continue;
-      await appendReconciledToolResult(syntheticResult(
-        call.resultEntryId, call.started ? "interrupted" : "aborted"));
+      await appendReconciledToolResult(
+        syntheticResult(
+          call.resultEntryId,
+          call.started ? "interrupted" : "aborted",
+        ),
+      );
     }
-    for (const w of [...op.pendingWrites]) await fx.applyPendingWrite(op.id, w.id);
+    for (const w of [...op.pendingWrites])
+      await fx.applyPendingWrite(op.id, w.id);
 
     const done = await fx.finishOperation(op.id, "aborted");
     if (done === "finished") return finished("aborted"); // optional final assistant fields
@@ -3528,15 +4100,15 @@ Close is process lifecycle, not abort: it writes no marker/finish and never runs
 
 ```ts
 async function closeHarness(): Promise<void> {
-  closeAdmission();                              // all new public calls now observe Closed
-  signalRunningProviderAndToolEffects();         // process-local signal only; no durable marker
-  gatedEffects.rejectAllParked(HarnessClosed);   // includes nested and pre-acceptance actions
+  closeAdmission(); // all new public calls now observe Closed
+  signalRunningProviderAndToolEffects(); // process-local signal only; no durable marker
+  gatedEffects.rejectAllParked(HarnessClosed); // includes nested and pre-acceptance actions
   rejectLocalOperationPromises(HarnessClosed);
 
-  await laneMutationLines.settleAdmittedJobs();  // an append already entered may finish;
-                                                 // no procedure may enqueue its next effect
-  await ownedSession.close();                    // drains Session/storage queues, stops renewal,
-                                                 // releases only this owner/fence claim
+  await laneMutationLines.settleAdmittedJobs(); // an append already entered may finish;
+  // no procedure may enqueue its next effect
+  await ownedSession.close(); // drains Session/storage queues, stops renewal,
+  // releases only this owner/fence claim
 }
 ```
 
@@ -3545,14 +4117,27 @@ A close-signalled provider/tool cannot append after admission closes; prior inte
 ### Structural operations
 
 ```ts
-async function persistHookStructuralUsage(step: StepState | null): Promise<void> {
-  if (!step || step.started.step === "assistant" ||
-      step.started.step === "deferred_fetch" ||
-      step.started.source !== "hook" || step.hookUsageExists) return;
+async function persistHookStructuralUsage(
+  step: StepState | null,
+): Promise<void> {
+  if (
+    !step ||
+    step.started.step === "assistant" ||
+    step.started.step === "deferred_fetch" ||
+    step.started.source !== "hook" ||
+    step.hookUsageExists
+  )
+    return;
   const { hookResult, hookUsageRecordId } = step.started;
   if (hookResult.usage) {
-    await fx.appendRecord(hookUsageRecord(
-      hookUsageRecordId!, op.id, hookResult.id, hookResult.usage));
+    await fx.appendRecord(
+      hookUsageRecord(
+        hookUsageRecordId!,
+        op.id,
+        hookResult.id,
+        hookResult.usage,
+      ),
+    );
   }
 }
 
@@ -3566,17 +4151,25 @@ async function compactionProcedure(): Promise<CompactionResult> {
     if (!step && !op.targets.result) {
       const prep = preparation(state);
       const hook = await fx.runHook("before_compaction", {
-        reason: "manual", preparation: prep,
+        reason: "manual",
+        preparation: prep,
         customInstructions: op.intent.customInstructions,
       });
       if (hook?.decline) return await finishStructural("declined");
       const start = hook?.compaction
-        ? hookStructuralStart("compaction", op.intent.resultEntryId,
-            compactionEntry(op.intent.resultEntryId, hook.compaction, true,
-              { preparation: prep }))
+        ? hookStructuralStart(
+            "compaction",
+            op.intent.resultEntryId,
+            compactionEntry(op.intent.resultEntryId, hook.compaction, true, {
+              preparation: prep,
+            }),
+          )
         : generatedStructuralStart("compaction", op.intent.resultEntryId);
       const started = await fx.startStep({
-        id: newId(), runId: op.id, compactionReason: "manual", ...start,
+        id: newId(),
+        runId: op.id,
+        compactionReason: "manual",
+        ...start,
       });
       if (started === "aborted") return await abortStructural();
       step = installedStep(started);
@@ -3584,15 +4177,25 @@ async function compactionProcedure(): Promise<CompactionResult> {
     }
 
     if (!op.targets.result) {
-      const entry = step!.started.source === "hook"
-        ? step!.started.hookResult
-        : compactionEntry(op.intent.resultEntryId,
-            await summaryStep("compaction", "manual", op.intent.resultEntryId), false);
+      const entry =
+        step!.started.source === "hook"
+          ? step!.started.hookResult
+          : compactionEntry(
+              op.intent.resultEntryId,
+              await summaryStep(
+                "compaction",
+                "manual",
+                op.intent.resultEntryId,
+              ),
+              false,
+            );
       const commit = await fx.commitStructuralEntry(entry);
       if (commit === "aborted") return await abortStructural();
     }
     return await finishStructural("completed");
-  } catch (e) { return await handleStructuralSignal(e); }
+  } catch (e) {
+    return await handleStructuralSignal(e);
+  }
 }
 
 interface OverflowCompactionLink {
@@ -3615,23 +4218,37 @@ async function autoCompact(
   requireLinkExactlyForOverflow(reason, link);
 
   if (!step) {
-    const prep = preparation(state,
-      link ? { omitEntryId: link.supersededResponseEntryId } : undefined);
+    const prep = preparation(
+      state,
+      link ? { omitEntryId: link.supersededResponseEntryId } : undefined,
+    );
     if (nothingToCompact(prep)) {
       if (reason === "overflow") throw new RunFailed(truncationError());
       return false;
     }
-    const hook = await fx.runHook("before_compaction", { reason, preparation: prep });
+    const hook = await fx.runHook("before_compaction", {
+      reason,
+      preparation: prep,
+    });
     if (hook?.decline) {
       if (reason === "overflow") throw new RunFailed(truncationError());
       return false;
     }
     const start = hook?.compaction
-      ? hookStructuralStart("compaction", resultEntryId,
-          compactionEntry(resultEntryId, hook.compaction, true, { preparation: prep }))
+      ? hookStructuralStart(
+          "compaction",
+          resultEntryId,
+          compactionEntry(resultEntryId, hook.compaction, true, {
+            preparation: prep,
+          }),
+        )
       : generatedStructuralStart("compaction", resultEntryId);
     const started = await fx.startStep({
-      id: newId(), runId: op.id, compactionReason: reason, ...link, ...start,
+      id: newId(),
+      runId: op.id,
+      compactionReason: reason,
+      ...link,
+      ...start,
     });
     if (started === "aborted") throw new Aborted();
     step = installedStep(started);
@@ -3639,10 +4256,14 @@ async function autoCompact(
 
   await persistHookStructuralUsage(step);
   if (op.abort) throw new Aborted();
-  const entry = step.started.source === "hook"
-    ? step.started.hookResult
-    : compactionEntry(resultEntryId,
-        await summaryStep("compaction", reason, resultEntryId, link), false);
+  const entry =
+    step.started.source === "hook"
+      ? step.started.hookResult
+      : compactionEntry(
+          resultEntryId,
+          await summaryStep("compaction", reason, resultEntryId, link),
+          false,
+        );
   const commit = await fx.commitStructuralEntry(entry);
   if (commit === "aborted") throw new Aborted();
   return true;
@@ -3650,14 +4271,15 @@ async function autoCompact(
 
 async function navigationProcedure(): Promise<NavigationResult> {
   try {
-    let moved = navigationMoveCommitted(state);  // target or summary-entry leaf
+    let moved = navigationMoveCommitted(state); // target or summary-entry leaf
     await persistHookStructuralUsage(op.step);
     if (op.abort && !moved) return await abortStructural();
     if (op.step?.failure) throw new RunFailed(op.step.failure.error);
 
     let step = op.step;
     if (op.intent.summarize && !step) {
-      if (moved) throw new Error("Navigation moved without a durable summary payload");
+      if (moved)
+        throw new Error("Navigation moved without a durable summary payload");
       const prep = navigationPreparation(op.sourceLeafId, op.intent.targetId);
       const hook = await fx.runHook("before_navigation", {
         targetId: op.intent.targetId,
@@ -3666,11 +4288,21 @@ async function navigationProcedure(): Promise<NavigationResult> {
       });
       if (hook?.decline) return await finishStructural("declined");
       const start = hook?.summary
-        ? hookStructuralStart("branch_summary", op.intent.summaryEntryId!,
-            branchSummaryEntry(op.intent.summaryEntryId!, hook.summary, true, prep))
+        ? hookStructuralStart(
+            "branch_summary",
+            op.intent.summaryEntryId!,
+            branchSummaryEntry(
+              op.intent.summaryEntryId!,
+              hook.summary,
+              true,
+              prep,
+            ),
+          )
         : generatedStructuralStart("branch_summary", op.intent.summaryEntryId!);
       const started = await fx.startStep({
-        id: newId(), runId: op.id, ...start,
+        id: newId(),
+        runId: op.id,
+        ...start,
       });
       if (started === "aborted") return await abortStructural();
       step = installedStep(started);
@@ -3679,14 +4311,24 @@ async function navigationProcedure(): Promise<NavigationResult> {
 
     if (op.intent.summarize && !structuralPayload(step!)) {
       const generated = await summaryStep(
-        "branch_summary", undefined, op.intent.summaryEntryId!);
-      const prepared = await fx.prepareBranchSummary(branchSummaryPrepared({
-        id: newId(), runId: op.id, stepId: step!.started.id,
-        attempt: step!.attempts.at(-1)!.attempt,
-        result: branchSummaryEntry(
-          op.intent.summaryEntryId!, generated, false,
-          navigationPreparation(op.sourceLeafId, op.intent.targetId)),
-      }));
+        "branch_summary",
+        undefined,
+        op.intent.summaryEntryId!,
+      );
+      const prepared = await fx.prepareBranchSummary(
+        branchSummaryPrepared({
+          id: newId(),
+          runId: op.id,
+          stepId: step!.started.id,
+          attempt: step!.attempts.at(-1)!.attempt,
+          result: branchSummaryEntry(
+            op.intent.summaryEntryId!,
+            generated,
+            false,
+            navigationPreparation(op.sourceLeafId, op.intent.targetId),
+          ),
+        }),
+      );
       if (prepared === "aborted") return await abortStructural();
     }
 
@@ -3701,13 +4343,15 @@ async function navigationProcedure(): Promise<NavigationResult> {
     // finishOperation atomically appends the accepted label fact with the
     // terminal record when this completed navigation is labeled.
     return await finishStructural("completed");
-  } catch (e) { return await handleStructuralSignal(e); }
+  } catch (e) {
+    return await handleStructuralSignal(e);
+  }
 }
 
 async function finishStructural(outcome: "completed" | "declined") {
   const done = await fx.finishOperation(op.id, outcome);
-  if (done === "continue") return await abortStructural();   // abort won before commit
-  return structuralOutcome(outcome);                         // committed structure wins later abort
+  if (done === "continue") return await abortStructural(); // abort won before commit
+  return structuralOutcome(outcome); // committed structure wins later abort
 }
 
 async function abortStructural() {
@@ -3716,7 +4360,8 @@ async function abortStructural() {
   await persistHookStructuralUsage(op.step);
   emitRetryEndIfActive(op.step?.newestAttempt?.record, { kind: "abort" });
   const done = await fx.finishOperation(op.id, "aborted");
-  if (done !== "finished") throw new Error("aborted structural operation did not finish");
+  if (done !== "finished")
+    throw new Error("aborted structural operation did not finish");
   return structuralOutcome("aborted");
 }
 
@@ -3724,7 +4369,9 @@ async function handleStructuralSignal(e: unknown) {
   if (e instanceof Aborted) return await abortStructural();
   if (e instanceof RunFailed) {
     const done = await fx.finishOperation(op.id, "failed", e.error);
-    return done === "continue" ? await abortStructural() : structuralOutcome("failed", e.error);
+    return done === "continue"
+      ? await abortStructural()
+      : structuralOutcome("failed", e.error);
   }
   throw e;
 }
@@ -3732,20 +4379,20 @@ async function handleStructuralSignal(e: unknown) {
 
 Hook wiring:
 
-| harness hook | insertion point |
-|---|---|
-| `before_run` | pre-acceptance lane call; output is consumed by the ungated acceptance job |
-| `before_resume` | `resume()` dispatch, before any other procedure effect |
-| `before_run_end` | `driverLoop` finish boundary; result committed via `fx.commitRunEndFollowUp` |
-| `transform_context` | nested inside `fx.streamAssistant` (`StreamAssistantConfig.transformContext`) |
-| `before_request` | before each `fx.streamAssistant`, patches stream options |
-| `before_payload` | nested inside the stream function, provider level |
-| `after_response` | nested on the stream result, before `message_end` and the later entry append |
-| `before_tool` | `ToolCallbacks.beforeToolCall` (phase 1) |
-| `after_tool` | `ToolCallbacks.afterToolCall` (phase 3) |
-| `before_compaction` | manual/threshold/overflow decision before conditional `step_started` |
-| `before_navigation` | summarized-navigation decision before conditional `step_started` |
-| — (record/entry writes) | `ToolCallbacks.onToolStart` / `onToolResult` via `fx` |
+| harness hook            | insertion point                                                               |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| `before_run`            | pre-acceptance lane call; output is consumed by the ungated acceptance job    |
+| `before_resume`         | `resume()` dispatch, before any other procedure effect                        |
+| `before_run_end`        | `driverLoop` finish boundary; result committed via `fx.commitRunEndFollowUp`  |
+| `transform_context`     | nested inside `fx.streamAssistant` (`StreamAssistantConfig.transformContext`) |
+| `before_request`        | before each `fx.streamAssistant`, patches stream options                      |
+| `before_payload`        | nested inside the stream function, provider level                             |
+| `after_response`        | nested on the stream result, before `message_end` and the later entry append  |
+| `before_tool`           | `ToolCallbacks.beforeToolCall` (phase 1)                                      |
+| `after_tool`            | `ToolCallbacks.afterToolCall` (phase 3)                                       |
+| `before_compaction`     | manual/threshold/overflow decision before conditional `step_started`          |
+| `before_navigation`     | summarized-navigation decision before conditional `step_started`              |
+| — (record/entry writes) | `ToolCallbacks.onToolStart` / `onToolResult` via `fx`                         |
 
 Notes:
 
@@ -3773,25 +4420,28 @@ interface SimpleStreamOptions extends StreamOptions {
 // Response. A deferred request resolves quickly with a handle instead of
 // content. The message is persisted like any assistant message; the handle
 // is the durable fact recovery needs.
-type StopReason = "pending" | "stop" | "length" | "toolUse" | "error" | "aborted" | "deferred";
+type StopReason =
+  "pending" | "stop" | "length" | "toolUse" | "error" | "aborted" | "deferred";
 // Agent-side settled-result narrowings.
 type TerminalStopReason = Exclude<StopReason, "pending">;
-type SettledAssistantMessage = AssistantMessage & { stopReason: TerminalStopReason };
+type SettledAssistantMessage = AssistantMessage & {
+  stopReason: TerminalStopReason;
+};
 
 interface DeferredHandle {
   provider: string;
   modelId: string;
   api: string;
-  id: string;                    // provider token: response id, batch id + row
-  expiresAt?: number;            // Unix ms
-  pollAfterMs?: number;          // provider hint
-  data?: JsonValue;              // provider conversion data
+  id: string; // provider token: response id, batch id + row
+  expiresAt?: number; // Unix ms
+  pollAfterMs?: number; // provider hint
+  data?: JsonValue; // provider conversion data
 }
 
 interface AssistantMessage {
   // ... other fields
   stopReason: StopReason;
-  deferred?: DeferredHandle;     // present iff stopReason === "deferred"
+  deferred?: DeferredHandle; // present iff stopReason === "deferred"
 }
 
 // Authenticated HTTP request plumbing shared by stream, image, and deferred
@@ -3805,9 +4455,14 @@ interface ProviderRequestOptions<TModel = Model<Api>> {
   apiKey?: string;
   fetch?: FetchFunction;
   env?: ProviderEnv;
-  onPayload?: (payload: unknown, model: TModel) =>
-    unknown | undefined | Promise<unknown | undefined>;
-  onResponse?: (response: ProviderResponse, model: TModel) => void | Promise<void>;
+  onPayload?: (
+    payload: unknown,
+    model: TModel,
+  ) => unknown | undefined | Promise<unknown | undefined>;
+  onResponse?: (
+    response: ProviderResponse,
+    model: TModel,
+  ) => void | Promise<void>;
   headers?: ProviderHeaders;
   timeoutMs?: number;
   maxRetries?: number;
@@ -3825,8 +4480,16 @@ type DeferredCancelOptions = ProviderRequestOptions<Model<Api>>;
 // presence is the capability signal. A provider without them never returns
 // stopReason "deferred" and ignores the deferred request option.
 export interface ProviderStreams {
-  stream(model: Model<Api>, context: Context, options?: StreamOptions): AssistantMessageEventStream;
-  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AssistantMessageEventStream;
+  stream(
+    model: Model<Api>,
+    context: Context,
+    options?: StreamOptions,
+  ): AssistantMessageEventStream;
+  streamSimple(
+    model: Model<Api>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ): AssistantMessageEventStream;
 
   /** Redeem a handle. Same return type as streamSimple; downstream code is
       identical. Polls or re-attaches until terminal, then emits the normal
@@ -3835,12 +4498,18 @@ export interface ProviderStreams {
       - still pending:  stopReason "deferred" with the same handle (after
                         `wait` expires; wait: 0 checks once)
       - terminal:       stopReason "error" (expired, unknown, consumed)     */
-  fetchDeferred?(model: Model<Api>, handle: DeferredHandle,
-                 options?: DeferredFetchOptions): AssistantMessageEventStream;
+  fetchDeferred?(
+    model: Model<Api>,
+    handle: DeferredHandle,
+    options?: DeferredFetchOptions,
+  ): AssistantMessageEventStream;
 
   /** Best effort; providers without cancellation omit it. */
-  cancelDeferred?(model: Model<Api>, handle: DeferredHandle,
-                  options?: DeferredCancelOptions): Promise<void>;
+  cancelDeferred?(
+    model: Model<Api>,
+    handle: DeferredHandle,
+    options?: DeferredCancelOptions,
+  ): Promise<void>;
 }
 ```
 
@@ -3851,15 +4520,23 @@ All stream, deferred, and image options inherit `ProviderRequestOptions.telemetr
 The harness uses the authenticated `Models` dispatch surface rather than talking to a provider object directly:
 
 ```ts
-type ModelsDeferredFetchOptions = DeferredFetchOptions & ModelsRequestTransforms;
-type ModelsDeferredCancelOptions = DeferredCancelOptions & ModelsRequestTransforms;
+type ModelsDeferredFetchOptions = DeferredFetchOptions &
+  ModelsRequestTransforms;
+type ModelsDeferredCancelOptions = DeferredCancelOptions &
+  ModelsRequestTransforms;
 
 interface Models {
   // other methods
-  fetchDeferred(model: Model<Api>, handle: DeferredHandle,
-                options?: ModelsDeferredFetchOptions): Promise<AssistantMessage>;
-  cancelDeferred(model: Model<Api>, handle: DeferredHandle,
-                 options?: ModelsDeferredCancelOptions): Promise<void>;
+  fetchDeferred(
+    model: Model<Api>,
+    handle: DeferredHandle,
+    options?: ModelsDeferredFetchOptions,
+  ): Promise<AssistantMessage>;
+  cancelDeferred(
+    model: Model<Api>,
+    handle: DeferredHandle,
+    options?: ModelsDeferredCancelOptions,
+  ): Promise<void>;
 }
 ```
 
@@ -3978,12 +4655,7 @@ The low-level adapter accepts the open `SpanAttributes` bag. Pi instrumentation 
 
 ```ts
 type TelemetryAttributeType =
-  | "string"
-  | "number"
-  | "boolean"
-  | "string[]"
-  | "number[]"
-  | "boolean[]";
+  "string" | "number" | "boolean" | "string[]" | "number[]" | "boolean[]";
 
 interface TelemetryAttributeMetadata {
   description: string;
@@ -3991,17 +4663,46 @@ interface TelemetryAttributeMetadata {
   cardinality?: "low" | "high";
 }
 
-type TelemetryAttributeDefinition = TelemetryAttributeMetadata & (
-  | { type: "string"; values?: readonly string[]; examples?: readonly string[] }
-  | { type: "number"; values?: readonly number[]; examples?: readonly number[] }
-  | { type: "boolean"; values?: readonly boolean[]; examples?: readonly boolean[] }
-  | { type: "string[]"; elementValues?: readonly string[]; examples?: readonly (readonly string[])[] }
-  | { type: "number[]"; elementValues?: readonly number[]; examples?: readonly (readonly number[])[] }
-  | { type: "boolean[]"; elementValues?: readonly boolean[]; examples?: readonly (readonly boolean[])[] }
-);
+type TelemetryAttributeDefinition = TelemetryAttributeMetadata &
+  (
+    | {
+        type: "string";
+        values?: readonly string[];
+        examples?: readonly string[];
+      }
+    | {
+        type: "number";
+        values?: readonly number[];
+        examples?: readonly number[];
+      }
+    | {
+        type: "boolean";
+        values?: readonly boolean[];
+        examples?: readonly boolean[];
+      }
+    | {
+        type: "string[]";
+        elementValues?: readonly string[];
+        examples?: readonly (readonly string[])[];
+      }
+    | {
+        type: "number[]";
+        elementValues?: readonly number[];
+        examples?: readonly (readonly number[])[];
+      }
+    | {
+        type: "boolean[]";
+        elementValues?: readonly boolean[];
+        examples?: readonly (readonly boolean[])[];
+      }
+  );
 
-type TelemetryStartAttributeDefinition = TelemetryAttributeDefinition & { required: boolean };
-type TelemetryEventAttributeDefinition = TelemetryAttributeDefinition & { required: boolean };
+type TelemetryStartAttributeDefinition = TelemetryAttributeDefinition & {
+  required: boolean;
+};
+type TelemetryEventAttributeDefinition = TelemetryAttributeDefinition & {
+  required: boolean;
+};
 
 interface TelemetryEventDefinition {
   description: string;
@@ -4031,7 +4732,9 @@ interface TelemetrySchemaDefinition {
   spans: Record<string, TelemetrySpanDefinition>;
 }
 
-declare function defineTelemetrySchema<const T extends TelemetrySchemaDefinition>(schema: T): T;
+declare function defineTelemetrySchema<
+  const T extends TelemetrySchemaDefinition,
+>(schema: T): T;
 ```
 
 `defineTelemetrySchema()` is a typed identity over serializable data, not runtime validation. Types infer names, attributes, requirements, and literals. The tables are normative; `telemetry-schema.md` is generated.
@@ -4051,12 +4754,20 @@ const startSpan = createTypedSpanStarter(
   AGENT_TELEMETRY_SCHEMAS,
 );
 
-await startSpan("pi.harness.step", stepAttributes, async (stepSpan, startChildSpan) => {
-  stepSpan.setAttributes({ "pi.step.outcome": "succeeded" });
-  return startChildSpan("pi.ai.request", requestAttributes, async (requestSpan) => {
-    requestSpan.setAttributes({ "pi.ai.response.stop_reason": "stop" });
-  });
-});
+await startSpan(
+  "pi.harness.step",
+  stepAttributes,
+  async (stepSpan, startChildSpan) => {
+    stepSpan.setAttributes({ "pi.step.outcome": "succeeded" });
+    return startChildSpan(
+      "pi.ai.request",
+      requestAttributes,
+      async (requestSpan) => {
+        requestSpan.setAttributes({ "pi.ai.response.stop_reason": "stop" });
+      },
+    );
+  },
+);
 ```
 
 The span retains generic `startSpan()` for intentionally crossing schema tuples. Starter creation adds no span, runtime validation, parent enforcement, or durability.
@@ -4067,35 +4778,35 @@ The following tables are normative input to the schema objects. `!` means a requ
 
 `AI_TELEMETRY_SCHEMA` declares no pi-written span events and one span. Its parent rule is `{ kind: "any" }`:
 
-| span | allowed parents | status |
-|---|---|---|
+| span            | allowed parents         | status                                                                                                            |
+| --------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `pi.ai.request` | root or any caller span | error on throw/reject or a returned result with stop reason `error`; `aborted` and `deferred` are normal outcomes |
 
-| `pi.ai.request` start attribute | type | requirement | values / meaning |
-|---|---|---|---|
-| `pi.ai.operation` | string | ! | `stream`, `fetch_deferred`, `cancel_deferred`, `generate_images` |
-| `pi.ai.provider` | string | ! | selected provider id |
-| `pi.ai.model` | string | ! | requested model id |
-| `pi.ai.api` | string | ! | provider API id |
-| `pi.ai.streaming` | boolean | ! | whether this operation returns a stream |
-| `pi.ai.deferred` | boolean | ? | whether the operation requests or participates in deferred execution |
+| `pi.ai.request` start attribute | type    | requirement | values / meaning                                                     |
+| ------------------------------- | ------- | ----------- | -------------------------------------------------------------------- |
+| `pi.ai.operation`               | string  | !           | `stream`, `fetch_deferred`, `cancel_deferred`, `generate_images`     |
+| `pi.ai.provider`                | string  | !           | selected provider id                                                 |
+| `pi.ai.model`                   | string  | !           | requested model id                                                   |
+| `pi.ai.api`                     | string  | !           | provider API id                                                      |
+| `pi.ai.streaming`               | boolean | !           | whether this operation returns a stream                              |
+| `pi.ai.deferred`                | boolean | ?           | whether the operation requests or participates in deferred execution |
 
-| `pi.ai.request` end attribute | type | values / meaning |
-|---|---|---|
-| `pi.ai.response.model` | string | concrete response model, when reported |
-| `pi.ai.response.id` | string | provider response id; high cardinality |
-| `pi.ai.response.stop_reason` | string | `stop`, `length`, `tool_use`, `error`, `aborted`, `deferred`; terminal `toolUse` normalizes to `tool_use`, and `pending` is never recorded |
-| `pi.ai.http.status_code` | number | final HTTP status when exposed by the provider path |
-| `pi.ai.usage.input_tokens` | number | reported input tokens |
-| `pi.ai.usage.output_tokens` | number | reported output tokens |
-| `pi.ai.usage.cache_read_tokens` | number | reported cache-read tokens |
-| `pi.ai.usage.cache_write_tokens` | number | reported cache-write tokens |
-| `pi.ai.usage.reasoning_tokens` | number | reported reasoning subset of output |
-| `pi.ai.usage.total_tokens` | number | reported total tokens |
-| `pi.ai.usage.cost` | number | reported total cost |
-| `pi.ai.stream.chunk_count` | number | number of streamed update chunks, without chunk content |
-| `pi.ai.stream.time_to_first_chunk_ms` | number | elapsed milliseconds to first update chunk |
-| `pi.ai.error.type` | string | low-cardinality provider or transport error class |
+| `pi.ai.request` end attribute         | type   | values / meaning                                                                                                                           |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pi.ai.response.model`                | string | concrete response model, when reported                                                                                                     |
+| `pi.ai.response.id`                   | string | provider response id; high cardinality                                                                                                     |
+| `pi.ai.response.stop_reason`          | string | `stop`, `length`, `tool_use`, `error`, `aborted`, `deferred`; terminal `toolUse` normalizes to `tool_use`, and `pending` is never recorded |
+| `pi.ai.http.status_code`              | number | final HTTP status when exposed by the provider path                                                                                        |
+| `pi.ai.usage.input_tokens`            | number | reported input tokens                                                                                                                      |
+| `pi.ai.usage.output_tokens`           | number | reported output tokens                                                                                                                     |
+| `pi.ai.usage.cache_read_tokens`       | number | reported cache-read tokens                                                                                                                 |
+| `pi.ai.usage.cache_write_tokens`      | number | reported cache-write tokens                                                                                                                |
+| `pi.ai.usage.reasoning_tokens`        | number | reported reasoning subset of output                                                                                                        |
+| `pi.ai.usage.total_tokens`            | number | reported total tokens                                                                                                                      |
+| `pi.ai.usage.cost`                    | number | reported total cost                                                                                                                        |
+| `pi.ai.stream.chunk_count`            | number | number of streamed update chunks, without chunk content                                                                                    |
+| `pi.ai.stream.time_to_first_chunk_ms` | number | elapsed milliseconds to first update chunk                                                                                                 |
+| `pi.ai.error.type`                    | string | low-cardinality provider or transport error class                                                                                          |
 
 The schema declares no per-chunk telemetry event. The assistant stream carries live deltas while telemetry records only aggregate chunk count and first-chunk latency. Default telemetry never contains request or response content.
 
@@ -4103,19 +4814,19 @@ The schema declares no per-chunk telemetry event. The assistant stream carries l
 
 The three operation spans share `pi.session.id` (string, required, high cardinality), `pi.lane.name` (string, required, high cardinality), `pi.operation.id` (string, required, high cardinality), and `pi.operation.recovery` (boolean, required). Each also requires `pi.operation.kind` with only the literal matching that span. Operation error status may add optional end attributes `pi.error.code` and `pi.error.type`, both low-cardinality strings; free-form error messages are status diagnostics, not schema attributes.
 
-| span | allowed parents | start attributes | optional end attributes | explicit error status |
-|---|---|---|---|---|
-| `pi.harness.run` | root or application span | common operation attributes plus `pi.operation.kind`: `run` | `pi.operation.outcome`: `completed`, `aborted`, `failed`, `suspended` | outcome `failed` |
-| `pi.harness.compaction` | root or application span | common operation attributes plus `pi.operation.kind`: `compaction` | `pi.operation.outcome`: `completed`, `declined`, `aborted`, `failed` | outcome `failed` |
-| `pi.harness.navigation` | root or application span | common operation attributes plus `pi.operation.kind`: `navigation` | `pi.operation.outcome`: `completed`, `declined`, `aborted`, `failed` | outcome `failed` |
-| `pi.harness.checkpoint` | `pi.harness.run` | `pi.lane.name`!, `pi.operation.id`!, `pi.checkpoint.kind`!: `normal`, `failure_drain`, `abort_reconcile` | none | only throw/reject |
-| `pi.harness.turn` | `pi.harness.run` | `pi.lane.name`!, `pi.operation.id`!, `pi.turn.id`! string, high cardinality | none | only throw/reject |
-| `pi.harness.step` | `pi.harness.run`, `pi.harness.turn`, `pi.harness.checkpoint`, `pi.harness.compaction`, or `pi.harness.navigation` | `pi.lane.name`!, `pi.operation.id`!, `pi.step.id`! string high-cardinality, `pi.step.kind`!: `assistant`, `deferred_fetch`, `compaction`, `branch_summary`; `pi.step.attempt`! number; `pi.compaction.reason`?: `manual`, `threshold`, `overflow` | `pi.step.outcome`: `succeeded`, `retry`, `failed`, `aborted`, `deferred`, `overflow` | outcome `retry` or `failed` |
-| `pi.harness.tool` | `pi.harness.turn` for live work or `pi.harness.run` for reconciliation | `pi.lane.name`!, `pi.operation.id`!, `pi.turn.id`? string high-cardinality, `pi.tool.name`! string, `pi.tool.call_id`! string high-cardinality, `pi.tool.replay`!: `never`, `safe`; `pi.tool.recovery`! boolean | `pi.tool.is_error` boolean for the raw phase-2 execution result | `pi.tool.is_error: true` |
-| `pi.harness.hook` | root or the current harness/AI scope | `pi.lane.name`!, `pi.operation.id`? string high-cardinality, `pi.hook.name`! string with values from `HookName`, `pi.hook.registration_id`? string | `pi.hook.outcome`: `completed`, `skipped`, `blocked`, `failed` | handler throw, including fail-closed `before_tool` |
-| `pi.harness.sleep` | `pi.harness.run`, `pi.harness.compaction`, or `pi.harness.navigation` | `pi.operation.id`!, `pi.sleep.delay_ms`! number | `pi.sleep.outcome`: `elapsed`, `aborted` | only throw/reject |
-| `pi.harness.event_handler` | root or the scope emitting the event | `pi.event.type`! low-cardinality string with the section 10 event discriminants, `pi.lane.name`? string high-cardinality | none | listener throw; the event system catches it after the span rejects |
-| `pi.session.write` | root or the current harness scope | `pi.lane.name`!, `pi.operation.id`? string high-cardinality, `pi.session.mutation`!: `entry`, `record`, `lane`, `fact`, `multi`; `pi.session.item_type`? string | `pi.session.seq` number for a single mutation or the first sequence in a multi-write append | storage rejection |
+| span                       | allowed parents                                                                                                   | start attributes                                                                                                                                                                                                                                  | optional end attributes                                                                     | explicit error status                                              |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `pi.harness.run`           | root or application span                                                                                          | common operation attributes plus `pi.operation.kind`: `run`                                                                                                                                                                                       | `pi.operation.outcome`: `completed`, `aborted`, `failed`, `suspended`                       | outcome `failed`                                                   |
+| `pi.harness.compaction`    | root or application span                                                                                          | common operation attributes plus `pi.operation.kind`: `compaction`                                                                                                                                                                                | `pi.operation.outcome`: `completed`, `declined`, `aborted`, `failed`                        | outcome `failed`                                                   |
+| `pi.harness.navigation`    | root or application span                                                                                          | common operation attributes plus `pi.operation.kind`: `navigation`                                                                                                                                                                                | `pi.operation.outcome`: `completed`, `declined`, `aborted`, `failed`                        | outcome `failed`                                                   |
+| `pi.harness.checkpoint`    | `pi.harness.run`                                                                                                  | `pi.lane.name`!, `pi.operation.id`!, `pi.checkpoint.kind`!: `normal`, `failure_drain`, `abort_reconcile`                                                                                                                                          | none                                                                                        | only throw/reject                                                  |
+| `pi.harness.turn`          | `pi.harness.run`                                                                                                  | `pi.lane.name`!, `pi.operation.id`!, `pi.turn.id`! string, high cardinality                                                                                                                                                                       | none                                                                                        | only throw/reject                                                  |
+| `pi.harness.step`          | `pi.harness.run`, `pi.harness.turn`, `pi.harness.checkpoint`, `pi.harness.compaction`, or `pi.harness.navigation` | `pi.lane.name`!, `pi.operation.id`!, `pi.step.id`! string high-cardinality, `pi.step.kind`!: `assistant`, `deferred_fetch`, `compaction`, `branch_summary`; `pi.step.attempt`! number; `pi.compaction.reason`?: `manual`, `threshold`, `overflow` | `pi.step.outcome`: `succeeded`, `retry`, `failed`, `aborted`, `deferred`, `overflow`        | outcome `retry` or `failed`                                        |
+| `pi.harness.tool`          | `pi.harness.turn` for live work or `pi.harness.run` for reconciliation                                            | `pi.lane.name`!, `pi.operation.id`!, `pi.turn.id`? string high-cardinality, `pi.tool.name`! string, `pi.tool.call_id`! string high-cardinality, `pi.tool.replay`!: `never`, `safe`; `pi.tool.recovery`! boolean                                   | `pi.tool.is_error` boolean for the raw phase-2 execution result                             | `pi.tool.is_error: true`                                           |
+| `pi.harness.hook`          | root or the current harness/AI scope                                                                              | `pi.lane.name`!, `pi.operation.id`? string high-cardinality, `pi.hook.name`! string with values from `HookName`, `pi.hook.registration_id`? string                                                                                                | `pi.hook.outcome`: `completed`, `skipped`, `blocked`, `failed`                              | handler throw, including fail-closed `before_tool`                 |
+| `pi.harness.sleep`         | `pi.harness.run`, `pi.harness.compaction`, or `pi.harness.navigation`                                             | `pi.operation.id`!, `pi.sleep.delay_ms`! number                                                                                                                                                                                                   | `pi.sleep.outcome`: `elapsed`, `aborted`                                                    | only throw/reject                                                  |
+| `pi.harness.event_handler` | root or the scope emitting the event                                                                              | `pi.event.type`! low-cardinality string with the section 10 event discriminants, `pi.lane.name`? string high-cardinality                                                                                                                          | none                                                                                        | listener throw; the event system catches it after the span rejects |
+| `pi.session.write`         | root or the current harness scope                                                                                 | `pi.lane.name`!, `pi.operation.id`? string high-cardinality, `pi.session.mutation`!: `entry`, `record`, `lane`, `fact`, `multi`; `pi.session.item_type`? string                                                                                   | `pi.session.seq` number for a single mutation or the first sequence in a multi-write append | storage rejection                                                  |
 
 Parent text maps directly to `TelemetryParentDefinition`: root/application is `root_or_external`, root/current or any caller is `any`, and finite lists are exact `spans`. Tool spans wrap only phase-two `fx.executeTool` and report raw `is_error`, not final `terminate`; plans are session-write spans. Blocked, invalid, genuine-length, aborted-before-start, and interrupted-without-replay results emit no tool span; every live execution or safe replay emits one. Live tools parent to turn with turn id; reconciliation omits turn id and parents to resumed run. `pi.hook.name` contains exactly `before_run`, `before_resume`, `before_run_end`, `transform_context`, `before_request`, `before_payload`, `after_response`, `before_tool`, `after_tool`, `before_compaction`, and `before_navigation`; `pi.event.type` contains exactly section 10 discriminants. Each handler invocation has its own span/status without failing its parent. Harness schema initially declares no span events.
 
@@ -4151,11 +4862,17 @@ async function assistantAttempt(
       const started = await fx.startAttempt(record, stepContext);
       if (started === "aborted") throw new Aborted();
       const final = await fx.streamAssistant(
-        assistantRequest(step, started), stepContext,
+        assistantRequest(step, started),
+        stepContext,
       ); // message_end has fired
-      const response = await fx.settleAttemptResponse(started, final, stepContext);
+      const response = await fx.settleAttemptResponse(
+        started,
+        final,
+        stepContext,
+      );
       await fx.appendRecord(
-        preplannedUsageRecord(started, response.message), stepContext,
+        preplannedUsageRecord(started, response.message),
+        stepContext,
       );
       return response.message; // pure classification follows outside this request span
     },
@@ -4165,16 +4882,16 @@ async function assistantAttempt(
 
 Section 14 `streamAssistant()` starts `pi.ai.request`, passes its span through Models request options, records only declared aggregates, and returns the same message. `Effects.executeTool()` wraps only phase 2; hook/event runners use the same explicit-parent pattern.
 
-| owner / method | target telemetry |
-|---|---|
-| operation dispatcher | `pi.harness.run`, `pi.harness.compaction`, or `pi.harness.navigation` |
-| checkpoint / turn / step procedure scopes | corresponding `pi.harness.*` scope span |
+| owner / method                                                                                                                   | target telemetry                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| operation dispatcher                                                                                                             | `pi.harness.run`, `pi.harness.compaction`, or `pi.harness.navigation`                                             |
+| checkpoint / turn / step procedure scopes                                                                                        | corresponding `pi.harness.*` scope span                                                                           |
 | `appendEntry`, `appendRecord`, `startStep`, `prepareBranchSummary`, `moveLane`, `setFact`, and a conditional commit that appends | one `pi.session.write` per underlying `Session.append()` call; a conditional no-append result emits no write span |
-| `streamAssistant`, `fetchDeferred`, `cancelDeferred` | `pi.ai.request` with the matching `pi.ai.operation` |
-| `executeTool` | `pi.harness.tool` |
-| `runHook` | one `pi.harness.hook` per registered handler |
-| `sleep` | `pi.harness.sleep` |
-| passive event delivery | one `pi.harness.event_handler` per listener |
+| `streamAssistant`, `fetchDeferred`, `cancelDeferred`                                                                             | `pi.ai.request` with the matching `pi.ai.operation`                                                               |
+| `executeTool`                                                                                                                    | `pi.harness.tool`                                                                                                 |
+| `runHook`                                                                                                                        | one `pi.harness.hook` per registered handler                                                                      |
+| `sleep`                                                                                                                          | `pi.harness.sleep`                                                                                                |
+| passive event delivery                                                                                                           | one `pi.harness.event_handler` per listener                                                                       |
 
 Contexts/native spans are process-local and never persisted in records, entries, snapshots, events, or deferred handles.
 
@@ -4236,25 +4953,55 @@ await session.append({
   record: opStarted("run", { originalPrompt, initialMessages: [userEntry] }),
 });
 await session.append({ kind: "entry", lane: "main", entry: userEntry });
-await session.append({ kind: "record", record: stepStarted("assistant", {
-  id: "step-1", configuration: Cseed, retryPolicy, triggerMessageId: userEntry.id,
-}) });
-await session.append({ kind: "record", record: stepAttempt("assistant", {
-  stepId: "step-1", attempt: 1, responseEntryId: "response-1", usageRecordId: "usage-1",
-  intendedOutputLimit: 4096, contextWindow: 128000,
-}) });
 await session.append({
-  kind: "entry", lane: "main", entry: { ...assistantWithToolCall, id: "response-1" },
+  kind: "record",
+  record: stepStarted("assistant", {
+    id: "step-1",
+    configuration: Cseed,
+    retryPolicy,
+    triggerMessageId: userEntry.id,
+  }),
 });
-await session.append({ kind: "record", record: assistantUsage({
-  id: "usage-1", stepId: "step-1", attempt: 1, entryId: "response-1",
-}) });
-await session.append({ kind: "record", record: toolBatchStarted({
-  assistantEntryId: "response-1", calls: [{ toolIndex: 0, resultEntryId: "result-1" }],
-}) });
-await session.append({ kind: "record", record: toolStarted({
-  assistantEntryId: "response-1", toolIndex: 0, replay: "safe",
-}) });
+await session.append({
+  kind: "record",
+  record: stepAttempt("assistant", {
+    stepId: "step-1",
+    attempt: 1,
+    responseEntryId: "response-1",
+    usageRecordId: "usage-1",
+    intendedOutputLimit: 4096,
+    contextWindow: 128000,
+  }),
+});
+await session.append({
+  kind: "entry",
+  lane: "main",
+  entry: { ...assistantWithToolCall, id: "response-1" },
+});
+await session.append({
+  kind: "record",
+  record: assistantUsage({
+    id: "usage-1",
+    stepId: "step-1",
+    attempt: 1,
+    entryId: "response-1",
+  }),
+});
+await session.append({
+  kind: "record",
+  record: toolBatchStarted({
+    assistantEntryId: "response-1",
+    calls: [{ toolIndex: 0, resultEntryId: "result-1" }],
+  }),
+});
+await session.append({
+  kind: "record",
+  record: toolStarted({
+    assistantEntryId: "response-1",
+    toolIndex: 0,
+    replay: "safe",
+  }),
+});
 // This durable prefix is X4: the planned, started call has no result.
 
 const { harness, suspended } = await AgentHarness.create(options);
@@ -4279,18 +5026,33 @@ Tier B also asserts provider-context projection and the append-only invariant (s
 `drive: "manual"` against the real `AgentHarness`, the faux provider, and a real backend. The gate is the only test hook; there is no second machine.
 
 ```ts
-const { harness } = await AgentHarness.create({ session, models, model, tools: [calc], drive: "manual" });
+const { harness } = await AgentHarness.create({
+  session,
+  models,
+  model,
+  tools: [calc],
+  drive: "manual",
+});
 const promptResult = harness.prompt("calculate");
 
-while ((await harness.peekAction())?.kind !== "execute_tool") await harness.executeAction();
+while ((await harness.peekAction())?.kind !== "execute_tool")
+  await harness.executeAction();
 
 // X4: the batch plan and call intent are durable; the effect is still parked.
-const plans = await session.findRecords({ lane: "main", type: "tool_batch_started" });
-const started = await session.findRecords({ lane: "main", type: "tool_started" });
+const plans = await session.findRecords({
+  lane: "main",
+  type: "tool_batch_started",
+});
+const started = await session.findRecords({
+  lane: "main",
+  type: "tool_started",
+});
 expect(started).toHaveLength(1);
-expect(await session.getEntry(plans[0]!.calls[0]!.resultEntryId)).toBeUndefined();
+expect(
+  await session.getEntry(plans[0]!.calls[0]!.resultEntryId),
+).toBeUndefined();
 
-expect((await harness.steer("focus on tests")).ok).toBe(true);   // surface is ungated
+expect((await harness.steer("focus on tests")).ok).toBe(true); // surface is ungated
 await harness.runToCompletion();
 expect((await promptResult).ok).toBe(true);
 ```
@@ -4354,26 +5116,26 @@ Checked package entries are historical: they describe the contract that actually
 
 This table is exhaustive. A package does not remove `HarnessNotImplemented` from a method until it owns the listed semantics and tests.
 
-| public surface | owning package |
-|---|---|
-| scaffold-safe `name`, `getLeafId`, record-free create, runtime settings | F0 |
-| `AgentHarness.create()` restore and `suspended` inventory | R3 |
-| `lane`, `createLane`, `lanes`, lane facades, lane-bound session reads and global facts | H0 |
-| resources, stream/retry/compaction settings, queue modes | F0 |
-| tool registry plus persisted active-tool selection | H4 |
-| `prompt`, `skill`, `promptFromTemplate` | H1 |
-| run `resume`, retries, terminal failure | H2 |
-| `steer`, `followUp`, `nextRun`, `cancelQueued` | H3 |
-| persisted model/thinking/active-tools, lane-view writes, `recordUsage` | H4 |
-| `abort`, `waitForIdle`, `runWhenIdle`, close settlement | H5 |
-| live tools and tool events | H6 |
-| tool recovery through `resume` | H7 |
-| deferred-handle `resume` and cancellation | H8 |
-| `compact` and compaction resume | C1–C3 |
-| `navigateTree` and navigation resume | N1 |
-| `peekAction`, `executeAction`, `runToCompletion` primitives/integration | I5/H0 |
-| hooks/events registration primitives and harness wiring | I1/I2/H0 |
-| `watch`, `watchSession`, complete snapshots | O1 |
+| public surface                                                                         | owning package |
+| -------------------------------------------------------------------------------------- | -------------- |
+| scaffold-safe `name`, `getLeafId`, record-free create, runtime settings                | F0             |
+| `AgentHarness.create()` restore and `suspended` inventory                              | R3             |
+| `lane`, `createLane`, `lanes`, lane facades, lane-bound session reads and global facts | H0             |
+| resources, stream/retry/compaction settings, queue modes                               | F0             |
+| tool registry plus persisted active-tool selection                                     | H4             |
+| `prompt`, `skill`, `promptFromTemplate`                                                | H1             |
+| run `resume`, retries, terminal failure                                                | H2             |
+| `steer`, `followUp`, `nextRun`, `cancelQueued`                                         | H3             |
+| persisted model/thinking/active-tools, lane-view writes, `recordUsage`                 | H4             |
+| `abort`, `waitForIdle`, `runWhenIdle`, close settlement                                | H5             |
+| live tools and tool events                                                             | H6             |
+| tool recovery through `resume`                                                         | H7             |
+| deferred-handle `resume` and cancellation                                              | H8             |
+| `compact` and compaction resume                                                        | C1–C3          |
+| `navigateTree` and navigation resume                                                   | N1             |
+| `peekAction`, `executeAction`, `runToCompletion` primitives/integration                | I5/H0          |
+| hooks/events registration primitives and harness wiring                                | I1/I2/H0       |
+| `watch`, `watchSession`, complete snapshots                                            | O1             |
 
 ### Track QA — legacy test salvage
 

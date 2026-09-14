@@ -37,34 +37,39 @@ import { createProvider, openAICompletionsApi } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 export default function (pi: ExtensionAPI) {
-  pi.registerProvider(createProvider({
-    id: "native-local",
-    name: "Native Local",
-    baseUrl: "http://localhost:8080/v1",
-    auth: {
-      apiKey: {
-        name: "Local server API key",
-        async login(interaction) {
-          return {
-            type: "api_key",
-            key: await interaction.prompt({ type: "secret", message: "API key" })
-          };
+  pi.registerProvider(
+    createProvider({
+      id: "native-local",
+      name: "Native Local",
+      baseUrl: "http://localhost:8080/v1",
+      auth: {
+        apiKey: {
+          name: "Local server API key",
+          async login(interaction) {
+            return {
+              type: "api_key",
+              key: await interaction.prompt({
+                type: "secret",
+                message: "API key",
+              }),
+            };
+          },
+          async resolve({ credential }) {
+            return credential?.key
+              ? { auth: { apiKey: credential.key }, source: "stored API key" }
+              : undefined;
+          },
         },
-        async resolve({ credential }) {
-          return credential?.key
-            ? { auth: { apiKey: credential.key }, source: "stored API key" }
-            : undefined;
-        }
-      }
-    },
-    models: [],
-    api: openAICompletionsApi()
-  }));
+      },
+      models: [],
+      api: openAICompletionsApi(),
+    }),
+  );
 
   // Legacy provider-config form:
   // Override baseUrl for existing provider
   pi.registerProvider("anthropic", {
-    baseUrl: "https://proxy.example.com"
+    baseUrl: "https://proxy.example.com",
   });
 
   // Register new provider with models
@@ -81,9 +86,9 @@ export default function (pi: ExtensionAPI) {
         input: ["text", "image"],
         cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
         contextWindow: 128000,
-        maxTokens: 4096
-      }
-    ]
+        maxTokens: 4096,
+      },
+    ],
   });
 }
 ```
@@ -97,22 +102,22 @@ The simplest use case: redirect an existing provider through a proxy.
 ```typescript
 // All Anthropic requests now go through your proxy
 pi.registerProvider("anthropic", {
-  baseUrl: "https://proxy.example.com"
+  baseUrl: "https://proxy.example.com",
 });
 
 // Add custom headers to OpenAI requests
 pi.registerProvider("openai", {
   headers: {
-    "X-Custom-Header": "value"
-  }
+    "X-Custom-Header": "value",
+  },
 });
 
 // Both baseUrl and headers
 pi.registerProvider("google", {
   baseUrl: "https://ai-gateway.corp.com/google",
   headers: {
-    "X-Corp-Auth": "$CORP_AUTH_TOKEN"  // env var or literal
-  }
+    "X-Corp-Auth": "$CORP_AUTH_TOKEN", // env var or literal
+  },
 });
 ```
 
@@ -160,24 +165,24 @@ This registers the fetched models before startup finishes.
 ```typescript
 pi.registerProvider("my-llm", {
   baseUrl: "https://api.my-llm.com/v1",
-  apiKey: "$MY_LLM_API_KEY",  // env var reference
-  api: "openai-completions",  // which streaming API to use
+  apiKey: "$MY_LLM_API_KEY", // env var reference
+  api: "openai-completions", // which streaming API to use
   models: [
     {
       id: "my-llm-large",
       name: "My LLM Large",
-      reasoning: true,        // supports extended thinking
+      reasoning: true, // supports extended thinking
       input: ["text", "image"],
       cost: {
-        input: 3.0,           // $/million tokens
+        input: 3.0, // $/million tokens
         output: 15.0,
         cacheRead: 0.3,
-        cacheWrite: 3.75
+        cacheWrite: 3.75,
       },
       contextWindow: 200000,
-      maxTokens: 16384
-    }
-  ]
+      maxTokens: 16384,
+    },
+  ],
 });
 ```
 
@@ -203,9 +208,9 @@ pi.registerProvider("my-llm", {
       input: ["text", "image"],
       cost: { input: 3.0, output: 15.0, cacheRead: 0.3, cacheWrite: 3.75 },
       contextWindow: 200000,
-      maxTokens: 16384
-    }
-  ]
+      maxTokens: 16384,
+    },
+  ],
 });
 
 // Later, remove it
@@ -220,42 +225,45 @@ Calls made after the initial extension load phase are applied immediately, so no
 
 The `api` field determines which streaming implementation is used:
 
-| API | Use for |
-|-----|---------|
-| `anthropic-messages` | Anthropic Claude API and compatibles |
-| `openai-completions` | OpenAI Chat Completions API and compatibles |
-| `openai-responses` | OpenAI Responses API |
-| `azure-openai-responses` | Azure OpenAI Responses API |
-| `openai-codex-responses` | OpenAI Codex Responses API |
-| `mistral-conversations` | Native Mistral Chat Completions streaming |
-| `google-generative-ai` | Google Generative AI API |
-| `google-vertex` | Google Vertex AI API |
-| `bedrock-converse-stream` | Amazon Bedrock Converse API |
+| API                       | Use for                                     |
+| ------------------------- | ------------------------------------------- |
+| `anthropic-messages`      | Anthropic Claude API and compatibles        |
+| `openai-completions`      | OpenAI Chat Completions API and compatibles |
+| `openai-responses`        | OpenAI Responses API                        |
+| `azure-openai-responses`  | Azure OpenAI Responses API                  |
+| `openai-codex-responses`  | OpenAI Codex Responses API                  |
+| `mistral-conversations`   | Native Mistral Chat Completions streaming   |
+| `google-generative-ai`    | Google Generative AI API                    |
+| `google-vertex`           | Google Vertex AI API                        |
+| `bedrock-converse-stream` | Amazon Bedrock Converse API                 |
 
 Most OpenAI-compatible providers work with `openai-completions`. Use model-level `thinkingLevelMap` for model-specific thinking levels, and `compat` for provider quirks. The `xhigh` and `max` levels are opt-in, require non-null map entries, and may be separated by unsupported holes:
 
 ```typescript
-models: [{
-  id: "custom-model",
-  // ...
-  reasoning: true,
-  thinkingLevelMap: {              // map pi levels to provider values; null hides unsupported levels
-    minimal: null,
-    low: null,
-    medium: null,
-    high: "default",
-    xhigh: null,
-    max: "max"
+models: [
+  {
+    id: "custom-model",
+    // ...
+    reasoning: true,
+    thinkingLevelMap: {
+      // map pi levels to provider values; null hides unsupported levels
+      minimal: null,
+      low: null,
+      medium: null,
+      high: "default",
+      xhigh: null,
+      max: "max",
+    },
+    compat: {
+      supportsDeveloperRole: false, // use "system" instead of "developer"
+      supportsReasoningEffort: true,
+      maxTokensField: "max_tokens", // instead of "max_completion_tokens"
+      requiresToolResultName: true, // tool results need name field
+      thinkingFormat: "qwen", // top-level enable_thinking: true
+      cacheControlFormat: "anthropic", // Anthropic-style cache_control markers
+    },
   },
-  compat: {
-    supportsDeveloperRole: false,   // use "system" instead of "developer"
-    supportsReasoningEffort: true,
-    maxTokensField: "max_tokens",   // instead of "max_completion_tokens"
-    requiresToolResultName: true,   // tool results need name field
-    thinkingFormat: "qwen",        // top-level enable_thinking: true
-    cacheControlFormat: "anthropic" // Anthropic-style cache_control markers
-  }
-}]
+];
 ```
 
 Use `openrouter` for OpenRouter-style `reasoning: { effort }` controls. Use `together` for Together-style `reasoning: { enabled }` controls; with `supportsReasoningEffort`, it also sends `reasoning_effort`. Use `qwen-chat-template` for local Qwen-compatible servers that read `chat_template_kwargs.enable_thinking` and need `preserve_thinking`.
@@ -386,9 +394,9 @@ Credentials are persisted in `~/.pi/agent/auth.json`:
 
 ```typescript
 interface OAuthCredentials {
-  refresh: string;   // Refresh token (for refreshToken())
-  access: string;    // Access token (returned by getApiKey())
-  expires: number;   // Expiration timestamp in milliseconds
+  refresh: string; // Refresh token (for refreshToken())
+  access: string; // Access token (returned by getApiKey())
+  expires: number; // Expiration timestamp in milliseconds
 }
 ```
 
@@ -397,6 +405,7 @@ interface OAuthCredentials {
 For providers with non-standard APIs, implement `streamSimple`. Study the existing provider implementations before writing your own:
 
 **Reference implementations:**
+
 - [anthropic.ts](https://github.com/earendil-works/pi-mono/blob/main/packages/ai/src/providers/anthropic.ts) - Anthropic Messages API
 - [mistral.ts](https://github.com/earendil-works/pi-mono/blob/main/packages/ai/src/providers/mistral.ts) - Mistral Conversations API
 - [openai-completions.ts](https://github.com/earendil-works/pi-mono/blob/main/packages/ai/src/providers/openai-completions.ts) - OpenAI Chat Completions
@@ -422,7 +431,7 @@ import {
 function streamMyProvider(
   model: Model<any>,
   context: Context,
-  options?: SimpleStreamOptions
+  options?: SimpleStreamOptions,
 ): AssistantMessageEventStream {
   const stream = createAssistantMessageEventStream();
 
@@ -463,12 +472,13 @@ function streamMyProvider(
       stream.push({
         type: "done",
         reason: output.stopReason,
-        message: output
+        message: output,
       });
       stream.end();
     } catch (error) {
       output.stopReason = options?.signal?.aborted ? "aborted" : "error";
-      output.errorMessage = error instanceof Error ? error.message : String(error);
+      output.errorMessage =
+        error instanceof Error ? error.message : String(error);
       stream.push({ type: "error", reason: output.stopReason, error: output });
       stream.end();
     }
@@ -506,7 +516,11 @@ Add content blocks to `output.content` as they arrive:
 ```typescript
 // Text block
 output.content.push({ type: "text", text: "" });
-stream.push({ type: "text_start", contentIndex: output.content.length - 1, partial: output });
+stream.push({
+  type: "text_start",
+  contentIndex: output.content.length - 1,
+  partial: output,
+});
 
 // As text arrives
 const block = output.content[contentIndex];
@@ -516,7 +530,12 @@ if (block.type === "text") {
 }
 
 // When block completes
-stream.push({ type: "text_end", contentIndex, content: block.text, partial: output });
+stream.push({
+  type: "text_end",
+  contentIndex,
+  content: block.text,
+  partial: output,
+});
 ```
 
 ### Tool Calls
@@ -529,9 +548,13 @@ output.content.push({
   type: "toolCall",
   id: toolCallId,
   name: toolName,
-  arguments: {}
+  arguments: {},
 });
-stream.push({ type: "toolcall_start", contentIndex: output.content.length - 1, partial: output });
+stream.push({
+  type: "toolcall_start",
+  contentIndex: output.content.length - 1,
+  partial: output,
+});
 
 // Accumulate JSON
 let partialJson = "";
@@ -539,14 +562,19 @@ partialJson += jsonDelta;
 try {
   block.arguments = JSON.parse(partialJson);
 } catch {}
-stream.push({ type: "toolcall_delta", contentIndex, delta: jsonDelta, partial: output });
+stream.push({
+  type: "toolcall_delta",
+  contentIndex,
+  delta: jsonDelta,
+  partial: output,
+});
 
 // Complete
 stream.push({
   type: "toolcall_end",
   contentIndex,
   toolCall: { type: "toolCall", id, name, arguments: block.arguments },
-  partial: output
+  partial: output,
 });
 ```
 
@@ -559,8 +587,11 @@ output.usage.input = response.usage.input_tokens;
 output.usage.output = response.usage.output_tokens;
 output.usage.cacheRead = response.usage.cache_read_tokens ?? 0;
 output.usage.cacheWrite = response.usage.cache_write_tokens ?? 0;
-output.usage.totalTokens = output.usage.input + output.usage.output +
-                           output.usage.cacheRead + output.usage.cacheWrite;
+output.usage.totalTokens =
+  output.usage.input +
+  output.usage.output +
+  output.usage.cacheRead +
+  output.usage.cacheWrite;
 calculateCost(model, output.usage);
 ```
 
@@ -579,7 +610,7 @@ If your provider returns overflow errors with a message pi does not recognize, n
 const MY_PROVIDER_OVERFLOW_PATTERN = /your provider's overflow phrase/i;
 
 export default function (pi: ExtensionAPI) {
-  pi.registerProvider("my-provider", { /* ... */ });
+  pi.registerProvider("my-provider", {/* ... */});
 
   pi.on("message_end", (event, ctx) => {
     const message = event.message;
@@ -636,19 +667,19 @@ pi.registerProvider("my-provider", {
 
 Test your provider against the same test suites used by built-in providers. Copy and adapt these test files from [packages/ai/test/](https://github.com/earendil-works/pi-mono/tree/main/packages/ai/test):
 
-| Test | Purpose |
-|------|---------|
-| `stream.test.ts` | Basic streaming, text output |
-| `tokens.test.ts` | Token counting and usage |
-| `abort.test.ts` | AbortSignal handling |
-| `empty.test.ts` | Empty/minimal responses |
-| `context-overflow.test.ts` | Context window limits |
-| `image-limits.test.ts` | Image input handling |
-| `unicode-surrogate.test.ts` | Unicode edge cases |
-| `tool-call-without-result.test.ts` | Tool call edge cases |
-| `image-tool-result.test.ts` | Images in tool results |
-| `total-tokens.test.ts` | Total token calculation |
-| `cross-provider-handoff.test.ts` | Context handoff between providers |
+| Test                               | Purpose                           |
+| ---------------------------------- | --------------------------------- |
+| `stream.test.ts`                   | Basic streaming, text output      |
+| `tokens.test.ts`                   | Token counting and usage          |
+| `abort.test.ts`                    | AbortSignal handling              |
+| `empty.test.ts`                    | Empty/minimal responses           |
+| `context-overflow.test.ts`         | Context window limits             |
+| `image-limits.test.ts`             | Image input handling              |
+| `unicode-surrogate.test.ts`        | Unicode edge cases                |
+| `tool-call-without-result.test.ts` | Tool call edge cases              |
+| `image-tool-result.test.ts`        | Images in tool results            |
+| `total-tokens.test.ts`             | Total token calculation           |
+| `cross-provider-handoff.test.ts`   | Context handoff between providers |
 
 Run tests with your provider/model pairs to verify compatibility.
 
@@ -672,7 +703,7 @@ interface ProviderConfig {
   streamSimple?: (
     model: Model<Api>,
     context: Context,
-    options?: SimpleStreamOptions
+    options?: SimpleStreamOptions,
   ) => AssistantMessageEventStream;
 
   /** Custom headers to include in requests. Values use the same resolution syntax as apiKey. */
@@ -688,7 +719,10 @@ interface ProviderConfig {
   oauth?: {
     name: string;
     login(callbacks: OAuthLoginCallbacks): Promise<OAuthCredentials>;
-    refreshToken(credentials: OAuthCredentials, signal: AbortSignal): Promise<OAuthCredentials>;
+    refreshToken(
+      credentials: OAuthCredentials,
+      signal: AbortSignal,
+    ): Promise<OAuthCredentials>;
     getApiKey(credentials: OAuthCredentials): string;
   };
 }
@@ -714,7 +748,12 @@ interface ProviderModelConfig {
   reasoning: boolean;
 
   /** Maps pi thinking levels to provider/model-specific values; null marks a level unsupported. */
-  thinkingLevelMap?: Partial<Record<"off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max", string | null>>;
+  thinkingLevelMap?: Partial<
+    Record<
+      "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max",
+      string | null
+    >
+  >;
 
   /** Supported input types. */
   input: ("text" | "image")[];
@@ -751,9 +790,34 @@ interface ProviderModelConfig {
     requiresAssistantAfterToolResult?: boolean;
     requiresThinkingAsText?: boolean;
     requiresReasoningContentOnAssistantMessages?: boolean;
-    thinkingFormat?: "openai" | "openrouter" | "deepseek" | "together" | "baseten" | "zai" | "qwen" | "chat-template" | "qwen-chat-template" | "string-thinking" | "ant-ling";
-    chatTemplateKwargs?: Record<string, string | number | boolean | null | { "$var": "thinking.enabled" | "thinking.effort"; omitWhenOff?: boolean }>;
-    chatTemplateArgs?: Record<string, string | number | boolean | null | { "$var": "thinking.enabled" | "thinking.effort"; omitWhenOff?: boolean }>;
+    thinkingFormat?:
+      | "openai"
+      | "openrouter"
+      | "deepseek"
+      | "together"
+      | "baseten"
+      | "zai"
+      | "qwen"
+      | "chat-template"
+      | "qwen-chat-template"
+      | "string-thinking"
+      | "ant-ling";
+    chatTemplateKwargs?: Record<
+      string,
+      | string
+      | number
+      | boolean
+      | null
+      | { $var: "thinking.enabled" | "thinking.effort"; omitWhenOff?: boolean }
+    >;
+    chatTemplateArgs?: Record<
+      string,
+      | string
+      | number
+      | boolean
+      | null
+      | { $var: "thinking.enabled" | "thinking.effort"; omitWhenOff?: boolean }
+    >;
     cacheControlFormat?: "anthropic";
     sessionAffinityFormat?: "openai" | "openai-nosession" | "openrouter";
     sendSessionAffinityHeaders?: boolean;

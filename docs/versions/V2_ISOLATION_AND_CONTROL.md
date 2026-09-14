@@ -9,7 +9,7 @@
 
 ## Why this version exists
 
-The deck's *"anything left?"* slide: **git worktrees** and **approvals**. Both are trust
+The deck's _"anything left?"_ slide: **git worktrees** and **approvals**. Both are trust
 infrastructure. Without them you cannot run two agents at once, you cannot let an agent run
 `bash` unattended, and you cannot review what it did before accepting it.
 
@@ -103,13 +103,14 @@ different device than the one that asked. An in-memory promise breaks both.
 ## TODO
 
 ### Slice 1 — Git-backed workspaces
+
 - [ ] On project create: `git init` the workspace, commit the template as the initial commit on `main`.
 - [ ] On session create: `git worktree add <path> -b agent/<sessionId> main`.
 - [ ] Point the agent's workspace root at the **session's worktree**, not the project root.
-      *(`projectFiles.ts` is already keyed per-**project** — `workspaceRoot(projectId)`. V2 widens
+      _(`projectFiles.ts` is already keyed per-**project** — `workspaceRoot(projectId)`. V2 widens
       that key from `projectId` to `sessionId`, since a session is now its own directory. Small
       change — **assuming V0 Slice 3 has already exported the function and repointed `PROJECTS_DIR`
-      off the deleted `apps/` path.** If that is still outstanding, do it there, not here.)*
+      off the deleted `apps/` path.** If that is still outstanding, do it there, not here.)_
 - [ ] Auto-commit after each agent turn (`agent: <first line of prompt>`) so every turn is a
       revertable checkpoint.
 - [ ] `DELETE /session/:id` → `git worktree remove` + branch cleanup.
@@ -117,6 +118,7 @@ different device than the one that asked. An in-memory promise breaks both.
       after a crash (`git worktree prune` on boot).
 
 ### Slice 2 — Diff & merge
+
 - [ ] `GET /session/:id/diff` → `git diff main...agent/<id>` parsed into per-file hunks.
 - [ ] Diff pane in the UI (reuse the file pane; add an "unstaged/changed" filter).
 - [ ] `POST /session/:id/merge` → merge into `main`, return conflicts if any.
@@ -125,6 +127,7 @@ different device than the one that asked. An in-memory promise breaks both.
 - [ ] `POST /session/:id/revert` → reset the worktree to the last checkpoint commit.
 
 ### Slice 3 — Approvals
+
 - [ ] `Approval` table: `id, sessionId, messageId, toolName, args(Json), status, createdAt, resolvedAt`.
 - [ ] Permission policy module:
   - `read_file`, `list_files`, `grep` → never ask
@@ -138,10 +141,11 @@ different device than the one that asked. An in-memory promise breaks both.
 - [ ] UI: an inline approval card in the chat stream — tool name, full args, Approve / Deny /
       "Always allow this tool in this session".
 - [ ] Timeout policy: park indefinitely, but mark the session `awaiting-approval` so the UI can
-      show it in the project list. *(Decide: does a 24h-old approval expire? — open question.)*
+      show it in the project list. _(Decide: does a 24h-old approval expire? — open question.)_
 
 ### Slice 4 — Verification
-- [ ] `libs/ts/verify`: run a command in the workspace, capture structured output.
+
+- [ ] `packages/verify`: run a command in the workspace, capture structured output.
 - [ ] Checks: `tsc --noEmit` → `bun run build` → `lint`. Each returns `{ ok, errors[] }` with
       file/line/message parsed out — not a raw log dump.
 - [ ] Run after each agent turn; emit `verification_start` / `verification_result` events.
@@ -150,6 +154,7 @@ different device than the one that asked. An in-memory promise breaks both.
 - [ ] Store the result on the `Message` row so history shows which turns were green.
 
 ### Slice 5 — Parallel sessions
+
 - [ ] Allow N concurrent runs per project (each in its own worktree).
 - [ ] Per-project run limit to stop a user starting 20 at once.
 - [ ] Preview: which session does the iframe show? **Decision: one dev server per session**, on
@@ -157,9 +162,10 @@ different device than the one that asked. An in-memory promise breaks both.
 - [ ] UI: a session switcher; show which sessions are running / awaiting approval / done.
 
 ### Slice 6 — Prove it
+
 - [ ] All five acceptance steps.
 - [ ] Kill the API while an approval is pending → restart → the approval is still pending and
-      resolvable. *(This is the test that proves approvals aren't in-memory.)*
+      resolvable. _(This is the test that proves approvals aren't in-memory.)_
 - [ ] Two sessions edit the **same file** → merge one → merge the second → conflict is surfaced
       cleanly rather than silently clobbering.
 
@@ -168,29 +174,29 @@ different device than the one that asked. An in-memory promise breaks both.
 ## Files this version touches
 
 ```
-NEW  libs/ts/tools/src/*                  worktree add/remove/diff/merge wrappers
-NEW  libs/ts/verify/src/*               tsc · build · lint runners + output parsers
-EDIT libs/ts/db/prisma/schema.prisma    Approval; Session.branch, worktreePath, mode, devPort
-EDIT libs/ts/agent-core/src/loop.ts          approval suspension hook (the ONLY loop change in V2)
-NEW  services/api/src/routes/approval.ts
-NEW  services/api/src/routes/git.ts       diff · merge · revert
-EDIT services/web/src/*                      diff pane · approval cards · verification bar · session switcher
-EDIT libs/ts/contracts/src/*            Approval + verification schemas
+NEW  packages/tools/src/*                  worktree add/remove/diff/merge wrappers
+NEW  packages/verify/src/*               tsc · build · lint runners + output parsers
+EDIT packages/db/prisma/schema.prisma    Approval; Session.branch, worktreePath, mode, devPort
+EDIT packages/agent-core/src/loop.ts          approval suspension hook (the ONLY loop change in V2)
+NEW  apps/api/src/routes/approval.ts
+NEW  apps/api/src/routes/git.ts       diff · merge · revert
+EDIT apps/web/src/*                      diff pane · approval cards · verification bar · session switcher
+EDIT packages/contracts/src/*            Approval + verification schemas
 ```
 
 ---
 
 ## Traps
 
-| Trap | Symptom | Fix |
-|---|---|---|
-| Approval state in memory | Restart loses a pending approval; can't approve from another device | It's a DB row |
-| `projectRoot` still global | Two sessions write to the same directory | Per-session context object |
-| Worktrees not pruned | Disk fills with dead directories; branch name collisions | `git worktree prune` on boot + cleanup on session delete |
-| Auto-commit swallowing secrets | `.env` committed into the branch | Respect `.gitignore`; never `git add -A` blindly |
-| Verification too slow | Every turn waits 40s for a full build | `tsc --noEmit` first (fast, catches most); full build only before merge |
-| Bypass mode outside a sandbox | An LLM `rm -rf` on your actual machine | `bypass` is only legal in V3 sandboxes — gate it |
-| Merge auto-resolve | Silent data loss | Surface conflicts, never guess |
+| Trap                           | Symptom                                                             | Fix                                                                     |
+| ------------------------------ | ------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Approval state in memory       | Restart loses a pending approval; can't approve from another device | It's a DB row                                                           |
+| `projectRoot` still global     | Two sessions write to the same directory                            | Per-session context object                                              |
+| Worktrees not pruned           | Disk fills with dead directories; branch name collisions            | `git worktree prune` on boot + cleanup on session delete                |
+| Auto-commit swallowing secrets | `.env` committed into the branch                                    | Respect `.gitignore`; never `git add -A` blindly                        |
+| Verification too slow          | Every turn waits 40s for a full build                               | `tsc --noEmit` first (fast, catches most); full build only before merge |
+| Bypass mode outside a sandbox  | An LLM `rm -rf` on your actual machine                              | `bypass` is only legal in V3 sandboxes — gate it                        |
+| Merge auto-resolve             | Silent data loss                                                    | Surface conflicts, never guess                                          |
 
 ---
 

@@ -1,5 +1,5 @@
 [test]
-# `bun run test` (package.json) passes explicit roots — services/ and libs/ —
+# `bun run test` (package.json) passes explicit roots — apps/ and packages/ —
 # so this scan never walks ref-ai/'s 438 test files. Kept root="." here only
 # so `bun test <path>` run directly still resolves relative to the repo root.
 root = "."

@@ -18,7 +18,7 @@ ref-ai
 # ─── docs and planning ───
 docs
 *.md
-!services/*/README.md
+!apps/*/README.md
 
 # ─── vcs & tooling ───
 .git

@@ -1,7 +1,7 @@
 # Session protocol
 
 > **Tool-neutral.** Claude Code wraps these as `/start` and `/wrap`. Any other tool — Gemini CLI,
-> Cursor, Copilot, Cline, Aider — can be told *"do the start ritual"* and follow this file.
+> Cursor, Copilot, Cline, Aider — can be told _"do the start ritual"_ and follow this file.
 >
 > The rituals are what keep the docs true. Skip them and the docs become fiction within a week.
 
@@ -19,7 +19,7 @@
    **This decides how much you explain:**
    - ✅ **Solid** → skip the explanation, go straight to design
    - 🟡 **Learning** → explain briefly, then make them design it
-   - ⬜ **New** → say *"this is new for you"* and use the full 7-step order
+   - ⬜ **New** → say _"this is new for you"_ and use the full 7-step order
 4. **`docs/VERSIONS.md`** — the acceptance test for this version. The definition of done.
 5. **`docs/DECISIONS.md`** — what is locked (do not reopen) and what is open (may block us)
 6. **`docs/CODE_QUALITY.md`** — how code is written here
@@ -54,7 +54,7 @@ on it.** This repo has drifted twice.
 
 ## 4. Ask exactly one question
 
-*"Ready to work on [current task], or something else today?"*
+_"Ready to work on [current task], or something else today?"_
 
 Then stop. Don't summarise everything you read. Don't re-explain the architecture.
 
@@ -87,8 +87,8 @@ Write the card into **[`docs/CRASH_COURSE.md`](./CRASH_COURSE.md) immediately** 
 by then the wording is gone.
 
 **Full depth is earned, not default.** Use the 7-step order from the global `CLAUDE.md` only when
-the current version is *actually about* that concept (leases at V3, IR design at V4), or when the
-user asks. A ⬜ **New** rating in `SKILLS.md` means *say "this is new for you"* and give the card —
+the current version is _actually about_ that concept (leases at V3, IR design at V4), or when the
+user asks. A ⬜ **New** rating in `SKILLS.md` means _say "this is new for you"_ and give the card —
 it does not automatically mean a lecture.
 
 ---
@@ -103,7 +103,7 @@ Next number in sequence, matching the existing format: goal · what we built · 
 myself** · new concepts · decisions made · mistakes · homework · next session plan.
 
 **"What I implemented myself" is the honest one.** If the user wrote the code, say so. If the tool
-wrote it because they said *"just give it"*, say that too. That distinction is the point of the log.
+wrote it because they said _"just give it"_, say that too. That distinction is the point of the log.
 
 ## 2. `docs/README.md`
 
@@ -141,7 +141,7 @@ At wrap, three things:
 
 - Update the **State** column. `🟡 taught` → `✅ shipped` only when code using it exists and runs.
   Same bar as `SKILLS.md`.
-- Promote anything from *"mentioned but not yet taught"* that got a real explanation this session.
+- Promote anything from _"mentioned but not yet taught"_ that got a real explanation this session.
 - If a concept had to be re-explained, date it. **A concept taught twice is the signal worth
   tracking** — the first analogy failed, so replace it rather than adding a second card.
 

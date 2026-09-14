@@ -9,54 +9,67 @@ import { theme } from "../theme/theme.ts";
  * The host owns transcript spacing; renderer output should provide only its content.
  */
 export class CustomEntryComponent extends Container {
-	private entry: CustomEntry<unknown>;
-	private renderer: EntryRenderer;
-	private customComponent?: Component;
-	private _expanded = false;
+  private entry: CustomEntry<unknown>;
+  private renderer: EntryRenderer;
+  private customComponent?: Component;
+  private _expanded = false;
 
-	constructor(entry: CustomEntry<unknown>, renderer: EntryRenderer) {
-		super();
-		this.entry = entry;
-		this.renderer = renderer;
-		this.rebuild();
-	}
+  constructor(entry: CustomEntry<unknown>, renderer: EntryRenderer) {
+    super();
+    this.entry = entry;
+    this.renderer = renderer;
+    this.rebuild();
+  }
 
-	hasContent(): boolean {
-		return this.customComponent !== undefined;
-	}
+  hasContent(): boolean {
+    return this.customComponent !== undefined;
+  }
 
-	setExpanded(expanded: boolean): void {
-		if (this._expanded !== expanded) {
-			this._expanded = expanded;
-			this.rebuild();
-		}
-	}
+  setExpanded(expanded: boolean): void {
+    if (this._expanded !== expanded) {
+      this._expanded = expanded;
+      this.rebuild();
+    }
+  }
 
-	override invalidate(): void {
-		super.invalidate();
-		this.rebuild();
-	}
+  override invalidate(): void {
+    super.invalidate();
+    this.rebuild();
+  }
 
-	private rebuild(): void {
-		this.clear();
-		this.customComponent = undefined;
+  private rebuild(): void {
+    this.clear();
+    this.customComponent = undefined;
 
-		let component: Component | undefined;
-		try {
-			component = this.renderer(this.entry, { expanded: this._expanded }, theme);
-		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
-			const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
-			box.addChild(new Text(theme.fg("error", `[${this.entry.customType}] renderer failed: ${message}`), 0, 0));
-			component = box;
-		}
+    let component: Component | undefined;
+    try {
+      component = this.renderer(
+        this.entry,
+        { expanded: this._expanded },
+        theme,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const box = new Box(1, 1, (text) => theme.bg("customMessageBg", text));
+      box.addChild(
+        new Text(
+          theme.fg(
+            "error",
+            `[${this.entry.customType}] renderer failed: ${message}`,
+          ),
+          0,
+          0,
+        ),
+      );
+      component = box;
+    }
 
-		if (!component) {
-			return;
-		}
+    if (!component) {
+      return;
+    }
 
-		this.customComponent = component;
-		this.addChild(new Spacer(1));
-		this.addChild(component);
-	}
+    this.customComponent = component;
+    this.addChild(new Spacer(1));
+    this.addChild(component);
+  }
 }

@@ -12,7 +12,7 @@ Start a working session on **Appwright**.
    That list, not my memory and not yours, is where we pick up.
 3. **`~/.ai/SKILLS.md`** — the live skill profile. **This decides how much you explain.**
    ✅ Solid → skip the explanation, go straight to design. 🟡 Learning → explain briefly, then make
-   me design it. ⬜ New → say *"this is new for you"* and use the full 7-step order.
+   me design it. ⬜ New → say _"this is new for you"_ and use the full 7-step order.
    `docs/LEARNING.md` has the per-version detail.
 4. `docs/VERSIONS.md` — the acceptance test for this version. It is the definition of done.
 5. `docs/DECISIONS.md` — what is locked (don't reopen it) and what is still open (may block us)
@@ -59,7 +59,7 @@ audit. If something has drifted, tell me before we start building on it.
 
 ## Step 4 — Then ask me one question
 
-*"Ready to work on [current task]? Or is there something else today?"*
+_"Ready to work on [current task]? Or is there something else today?"_
 
 That's it. Don't dump a summary of everything you read. Don't re-explain the architecture back
 to me. Show the tracker, flag any drift, ask the one question.
@@ -70,17 +70,17 @@ to me. Show the tracker, flag any drift, ask the one question.
 
 Three files answer three different questions. Use all three:
 
-| Question | File |
-|---|---|
-| **What has been built?** | the current `docs/versions/V*.md` checkboxes |
+| Question                          | File                                                |
+| --------------------------------- | --------------------------------------------------- |
+| **What has been built?**          | the current `docs/versions/V*.md` checkboxes        |
 | **What do I already understand?** | `docs/LEARNING.md` — Mastered vs Currently Learning |
-| **What happened last session?** | the newest `docs/SESSION_0N.md` |
+| **What happened last session?**   | the newest `docs/SESSION_0N.md`                     |
 
 **Then teach the first unchecked box, at the depth the learning log implies.**
 
 If the log says a concept is Mastered → skip the explanation, go straight to design.
 If it's under Currently Learning → explain, then ask me to design it.
-If it's on the gap list → say *"this is new for you"* and use the full 7-step order.
+If it's on the gap list → say _"this is new for you"_ and use the full 7-step order.
 
 **If the checkboxes and the code disagree, the code wins** — then fix the doc before we start.
 This repo has drifted twice; don't let it be three times.
@@ -93,7 +93,7 @@ Follow `CLAUDE.md` — it is already loaded. The parts that matter most:
 
 - **Guided learning is the default.** Explain the problem → explain the architecture → ask me what
   I think → ask me for pseudocode → review what I wrote. Full code only when I say **"just give it"**.
-- **Simple English.** Short sentences. Real-life analogy *before* the technical explanation.
+- **Simple English.** Short sentences. Real-life analogy _before_ the technical explanation.
   Indian products (UPI, Swiggy, Zerodha, IRCTC, WhatsApp) to make it concrete.
 - **Say "this is new for you"** when we hit something on my gap list.
 - **Follow `docs/CODE_QUALITY.md`** when writing code, and cite it when reviewing mine.

@@ -1,4 +1,4 @@
-# V4 — App Builder  ◄ Emergent parity
+# V4 — App Builder ◄ Emergent parity
 
 > **Goal:** one sentence in, a whole working application out — via a visible plan that executes
 > task by task, each verified before the next begins.
@@ -14,15 +14,15 @@ V0–V3 build **a coding agent**. V4 is what makes it **an app builder**.
 The difference is not a bigger prompt. It is a **planner** that turns an ambiguous sentence into
 a frozen architecture and an ordered task graph, so that:
 
-| Without a planner | With a planner |
-|---|---|
-| One giant prompt; the model improvises architecture mid-file | Architecture decided once, frozen, then referenced |
-| A spinner for three minutes | A visible task list ticking off |
-| One failure kills the run | One failure kills **one task**; retry that task |
-| Cannot resume | Task DAG state is in Postgres; resume from the last green node |
-| Unrepeatable | The plan is an artifact you can inspect, diff, cache, and replay |
+| Without a planner                                            | With a planner                                                   |
+| ------------------------------------------------------------ | ---------------------------------------------------------------- |
+| One giant prompt; the model improvises architecture mid-file | Architecture decided once, frozen, then referenced               |
+| A spinner for three minutes                                  | A visible task list ticking off                                  |
+| One failure kills the run                                    | One failure kills **one task**; retry that task                  |
+| Cannot resume                                                | Task DAG state is in Postgres; resume from the last green node   |
+| Unrepeatable                                                 | The plan is an artifact you can inspect, diff, cache, and replay |
 
-**The thesis:** push intelligence *out* of the LLM into deterministic engines. The LLM does
+**The thesis:** push intelligence _out_ of the LLM into deterministic engines. The LLM does
 intent classification, a few clarifying questions, and app-specific code generation. Choosing a
 stack, selecting components, composing the workspace, ordering tasks — that is **code**, not a
 prompt. The DET:LLM ratio is the moat.
@@ -53,7 +53,7 @@ User: "Build me a food delivery app"
   ▸ Preview  https://preview-9f3a.<domain>
 ```
 
-Then: *"make the cart sticky on mobile"* → it re-plans **incrementally** (one small task), does
+Then: _"make the cart sticky on mobile"_ → it re-plans **incrementally** (one small task), does
 not rebuild the app, and the preview updates.
 
 **Done means:** the generated app compiles, runs, has more than one working page, persists data,
@@ -165,7 +165,7 @@ Overlapping `owns` means the two tasks are serialised; there is no merge stage.
 
 ## Build order — revised 2026-08-13
 
-The slices below are the *inventory* of V4. This is the **order**, and it is deliberately the
+The slices below are the _inventory_ of V4. This is the **order**, and it is deliberately the
 inverse of where design energy naturally goes. Scheduling and routing are last because **neither
 can be evaluated without measurements you only get by running the steps above them.**
 
@@ -190,7 +190,7 @@ can be evaluated without measurements you only get by running the steps above th
   with no isolated cause. Step 6 comes after step 3 for that reason alone.
 - **Step 6 needs a control.** Run the same blueprint serially first and record wall-clock, token
   cost, and rework rate. Then run it with two agents. "Does parallelism help?" is otherwise
-  unanswerable, and it will get shipped because it *felt* faster.
+  unanswerable, and it will get shipped because it _felt_ faster.
 - **Priority ordering barely matters below ~4 workers.** With 8–15 tasks and 2 agents, almost
   everything ready is scheduled immediately. Start with **one** metric — transitive dependent count
   — and only add more after watching the scheduler pick wrong.
@@ -205,14 +205,16 @@ duration estimates that do not exist** — without them it degrades into longest
 ## TODO
 
 ### Slice 1 — Blueprint schema
-- [ ] Define it in `libs/ts/contracts` as a Zod schema. **This is the most important artifact in
+
+- [ ] Define it in `packages/contracts` as a Zod schema. **This is the most important artifact in
       V4** — everything else consumes it, so design it before writing any planner code.
 - [ ] Version the schema (`blueprintVersion`) from day one; it will change.
 - [ ] Persist blueprints (`Blueprint` table, one per session, immutable + revisions).
 - [ ] A blueprint viewer in the UI — a user should be able to read the plan before code exists.
 
 ### Slice 1b — The UI system: enforcement and the design block
-> **`libs/ts/ui-system` already exists from [V1.1](./V1_1_UI_SYSTEM.md)** — tokens, registry, and
+
+> **`packages/ui-system` already exists from [V1.1](./V1_1_UI_SYSTEM.md)** — tokens, registry, and
 > both templates wired to it. V4 does **not** rebuild it. V4 gives it consequences: a vocabulary
 > becomes a grammar that can reject
 > ([D46](../DECISIONS.md#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4)).
@@ -232,15 +234,17 @@ duration estimates that do not exist** — without them it degrades into longest
       context ([D52](../DECISIONS.md#decision-52-a-visual-reference-is-compiled-to-structure-once-never-re-shown-to-the-model--active-target-v4)).
 
 ### Slice 3b — Design review before generation
+
 - [ ] Emit the `design` block plus **2–3 directions** and let the user pick one
       ([D53](../DECISIONS.md#decision-53-the-design-is-reviewed-before-it-is-built--active-target-v4)).
 - [ ] Directions are **descriptions and a preview, not three generated applications** — building
       three to discard two costs three times the thing this exists to save.
 - [ ] Skippable, with the default visible. Same discipline as the 3-question cap in Slice 2: a
       decision in front of the magic moment must never be mandatory.
-- [ ] Open: how many directions, and what a preview *is* before code exists ([O21](../DECISIONS.md#open--not-yet-decided)).
+- [ ] Open: how many directions, and what a preview _is_ before code exists ([O21](../DECISIONS.md#open--not-yet-decided)).
 
 ### Slice 4c — The UI task DAG and the component graph
+
 - [ ] UI-shaped task types: design system → app shell → typography → layout → shared components →
       pages → responsive → visual verification. Edges still computed from `owns`/`reads`
       ([D30](../DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)) — nothing new is invented for UI.
@@ -249,6 +253,7 @@ duration estimates that do not exist** — without them it degrades into longest
       V4.5 map a click to the wrong file.**
 
 ### Slice 2 — Intent + requirements
+
 - [ ] Intent classifier: prompt → structured JSON. **Use structured output / tool-calling, never
       "return JSON" in prose.**
 - [ ] Requirement engine (deterministic): map intent + feature keywords → concrete needs
@@ -259,6 +264,7 @@ duration estimates that do not exist** — without them it degrades into longest
 - [ ] Sensible defaults for everything unasked — and show them, so the user can correct them.
 
 ### Slice 3 — Architecture decision engine
+
 - [ ] Deterministic rules: `needs.realtime → websockets`; `needs.payments → stripe`;
       `entities > 3 → postgres + prisma`. Rules, not vibes.
 - [ ] Once decided, the stack is **frozen** and injected into every downstream prompt.
@@ -266,6 +272,7 @@ duration estimates that do not exist** — without them it degrades into longest
       beats five done badly, and it makes the templates tractable.
 
 ### Slice 4 — Task graph builder
+
 - [ ] Blueprint → tasks. Deterministic mapping: entities → a schema task; pages → page tasks;
       features → feature tasks.
 - [ ] **Each task declares `owns` and `reads`** ([D30](../DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)).
@@ -307,13 +314,13 @@ duration estimates that do not exist** — without them it degrades into longest
       dependencies green · no ownership conflict · no exclusive-resource conflict · capacity free ·
       budget remaining. **Overlapping `owns` ⇒ serialise** — one runs, the other waits. There is no
       merge stage and no integrator (D30).
-- [ ] **A waiting task must report *why* it waits** ("blocked on T3" vs "waiting on capacity"), or a
+- [ ] **A waiting task must report _why_ it waits** ("blocked on T3" vs "waiting on capacity"), or a
       stalled build is indistinguishable from a hang.
-- [ ] **Split Scheduler from Orchestrator** — separate modules in `services/orchestrator`.
+- [ ] **Split Scheduler from Orchestrator** — separate modules in `apps/orchestrator`.
       Orchestrator owns the run lifecycle (start · pause · resume · cancel · retry · reporting);
       Scheduler owns what runs next. A scheduler bug wastes time; an orchestrator bug loses a run.
 - [ ] **The write fence is narrowed per task to its `owns` glob** — enforced in the tool layer, not
-      by the scheduler. The scheduler prevents *conflicts*; the fence prevents *violations*.
+      by the scheduler. The scheduler prevents _conflicts_; the fence prevents _violations_.
 - [ ] On task failure: retry ≤N with the error in context, then mark blocked and continue with
       any tasks that don't depend on it. Report partial completion honestly. **This is the main
       path, not the edge case** — rework rate dominates wall-clock time.
@@ -323,27 +330,30 @@ duration estimates that do not exist** — without them it degrades into longest
       ([D33](../DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)).
 
 ### Slice 4b — Architecture Change Requests
+
 - [ ] An agent blocked by the frozen stack raises an **ACR** — `{ task, wanted, why, blocks }` —
       and does **not** improvise ([D34](../DECISIONS.md#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6)).
 - [ ] Planner reviews. Reject → the task fails with a real reason. Approve → `blueprintVersion++`,
       diff, recompute **only** affected tasks.
-- [ ] A change to the *stack* requires user confirmation before anything runs.
+- [ ] A change to the _stack_ requires user confirmation before anything runs.
 - [ ] An unanswered ACR marks the task `blocked`; independent tasks keep going.
 
 ### Slice 5 — Workspace composer (deterministic, no AI)
+
 - [ ] Copy the stack template into the sandbox.
 - [ ] Apply theme tokens (colors, typography, radius, spacing) — tokens only, never generated JSX.
 - [ ] Install dependencies implied by the blueprint.
-- [ ] *(Optional, from `ROADMAP.md`'s registry design)* a small **component registry**: 3–5 blocks
+- [ ] _(Optional, from `ROADMAP.md`'s registry design)_ a small **component registry**: 3–5 blocks
       (auth, sidebar, dashboard/stats, table) copied in deterministically. Do **not** attempt 400
       blocks. The registry is a large authoring burden — validate the loop before paying it.
 
 ### Slice 6 — Generation agent, narrowed
+
 - [ ] Each task gets its **own** agent run with a tight, task-scoped prompt.
 - [ ] **Context is assembled, never generated** ([D33](../DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)):
       frozen stack + relevant entities + the recorded outputs of `dependsOn` tasks + the files in
       `owns` and `reads`. String concatenation, not a summarising model call. **Not** the entire repo.
-- [ ] *Batch by execution, retrieve by dependency* — a task depending on one that ran 30 nodes ago
+- [ ] _Batch by execution, retrieve by dependency_ — a task depending on one that ran 30 nodes ago
       still gets that node's output, because `dependsOn` says so.
 - [ ] **Token budget on the assembled context, with a documented drop order** ([O8](../DECISIONS.md#open--not-yet-decided)).
       Deterministic assembly cannot compress; without a cap, a wide `reads` list is dollars per task.
@@ -355,7 +365,8 @@ duration estimates that do not exist** — without them it degrades into longest
       ([D31](../DECISIONS.md#decision-31-tasks-request-a-capability-never-a-model-name--active-target-v4)).
 
 ### Slice 7 — Verification per task, floored by risk
-- [ ] Reuse `libs/ts/verify` from V2, now run **after every task**.
+
+- [ ] Reuse `packages/verify` from V2, now run **after every task**.
 - [ ] **Risk raises the floor, never lowers it** ([D32](../DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)):
 
 ```
@@ -370,6 +381,7 @@ high          + tier 3  interact + security checks           (tier 3 lands at V5
 - [ ] A task is not green until it verifies green. A red task never unblocks its dependents.
 
 ### Slice 7b — Per-attempt telemetry and nested budgets
+
 - [ ] Record model, tokens in/out, dollars, wall-clock, error, and `commitSha` **per `TaskAttempt`**
       ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)) —
       not per task, or attempt 3 erases what attempts 1 and 2 taught you.
@@ -384,6 +396,7 @@ high          + tier 3  interact + security checks           (tier 3 lands at V5
       superstition.
 
 ### Slice 8 — Incremental re-planning
+
 Full flow in [D18](../DECISIONS.md#decision-18-the-returning-user-flow--active-target-v4).
 
 - [ ] **Boot the sandbox lazily** — opening a project reads from Postgres and git and costs nothing.
@@ -392,18 +405,20 @@ Full flow in [D18](../DECISIONS.md#decision-18-the-returning-user-flow--active-t
 - [ ] Follow-ups go to the **planner**, not straight to the raw agent.
 - [ ] Classify: cosmetic tweak → a single task; new feature → a sub-DAG; architecture change →
       confirm with the user first, because it invalidates the frozen stack.
-- [ ] Never re-run the whole DAG for *"make the button blue"*.
+- [ ] Never re-run the whole DAG for _"make the button blue"_.
 
 ### Slice 9 — UI
+
 - [ ] Plan panel: the task list, live status per task, expandable to that task's agent transcript.
 - [ ] Blueprint panel: readable architecture summary + the raw JSON behind a toggle.
 - [ ] Question flow: inline in chat, not a modal.
 - [ ] Progress that reflects reality (`4/8 tasks`), not a fake percentage bar.
 
 ### Slice 10 — Prove it
+
 - [ ] Three different prompts across three domains (food delivery / CRM / blog). All three produce
       apps that compile, run, and have working navigation and persisted data.
-- [ ] The follow-up test: *"make the cart sticky"* re-plans incrementally.
+- [ ] The follow-up test: _"make the cart sticky"_ re-plans incrementally.
 - [ ] Kill the worker mid-DAG → resume picks up at the first non-green task, not task 1.
 
 ---
@@ -411,47 +426,47 @@ Full flow in [D18](../DECISIONS.md#decision-18-the-returning-user-flow--active-t
 ## Files this version touches
 
 ```
-NEW  libs/ts/planner/src/intent.ts        LLM classification
-NEW  libs/ts/planner/src/requirements.ts  DET
-NEW  libs/ts/planner/src/architecture.ts  DET, frozen decisions
-NEW  libs/ts/planner/src/blueprint.ts     schema + builder
-NEW  libs/ts/planner/src/taskGraph.ts     owns/reads → edges + topo sort + validation   D30
-NEW  libs/ts/planner/src/context.ts       deterministic context assembly, budgeted      D33 · O8
-NEW  libs/ts/planner/src/risk.ts          task type → riskTier → verification floor     D32
-NEW  libs/ts/planner/src/changeRequest.ts ACR review + blueprint versioning             D34
-NEW  libs/ts/agent-core/src/models/registry.ts   capability → model. The only model ids D31
-NEW  libs/ts/composer/src/*               deterministic workspace assembly
+NEW  packages/planner/src/intent.ts        LLM classification
+NEW  packages/planner/src/requirements.ts  DET
+NEW  packages/planner/src/architecture.ts  DET, frozen decisions
+NEW  packages/planner/src/blueprint.ts     schema + builder
+NEW  packages/planner/src/taskGraph.ts     owns/reads → edges + topo sort + validation   D30
+NEW  packages/planner/src/context.ts       deterministic context assembly, budgeted      D33 · O8
+NEW  packages/planner/src/risk.ts          task type → riskTier → verification floor     D32
+NEW  packages/planner/src/changeRequest.ts ACR review + blueprint versioning             D34
+NEW  packages/agent-core/src/models/registry.ts   capability → model. The only model ids D31
+NEW  packages/composer/src/*               deterministic workspace assembly
 NEW  templates/registry/                    (optional) component blocks
-EDIT libs/ts/db/prisma/schema.prisma      Blueprint, Task, ChangeRequest (see ARCHITECTURE §11)
-EDIT services/orchestrator/src/*               DAG executor
-EDIT services/web/src/*                        plan panel, blueprint panel, question flow
+EDIT packages/db/prisma/schema.prisma      Blueprint, Task, ChangeRequest (see ARCHITECTURE §11)
+EDIT apps/orchestrator/src/*               DAG executor
+EDIT apps/web/src/*                        plan panel, blueprint panel, question flow
 ```
 
 ---
 
 ## Traps
 
-| Trap | Symptom | Fix |
-|---|---|---|
-| Blueprint schema designed late | Every component parses a different shape | Design the IR first |
-| Too many clarifying questions | Users abandon at question 4 | Cap at 3; default the rest visibly |
-| Stack decided per task | Task 3 uses Prisma, task 6 invents Drizzle | Freeze it; inject into every prompt |
-| Whole-repo context per task | $4 per task and a confused model | Task-scoped context only |
-| No write fence | Task 7 rewrites task 2's schema | Allowlist in the tool layer |
-| Full re-plan on follow-ups | 3 minutes to change a color | Classify the follow-up first |
-| Registry-first | Weeks authoring blocks before the loop is proven | Prove the loop, then add blocks |
-| Optimistic task status | Green tasks that don't compile | Green requires a verification pass |
-| **Parallelism before verification** | Three agents' broken work merged, no isolated cause | Verify at the task boundary. Parallelism multiplies whatever quality verification produces |
-| **Ownership too broad** | `owns: ["src/**"]` — the whole build silently serialises | Warn on a task claiming most of the tree ([O9](../DECISIONS.md#open--not-yet-decided)) |
-| **Risk as a ceiling** | One bad guess skips verification on the payment task | Risk adds tiers, never removes them ([D32](../DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)) |
-| **Routing without telemetry** | A model policy nobody can prove helped or hurt | Per-task cost first (Slice 7b), routing second |
-| **Agent state in the generated repo** | The user downloads their app and finds `errors.json` | Postgres holds the plan; the repo holds the app ([D33](../DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)) |
-| **Silent stack improvisation** | Task 3 uses Prisma, task 6 invents Drizzle | An ACR is a visible event with a decision ([D34](../DECISIONS.md#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6)) |
-| **Telemetry on `Task`** | Attempt 3 overwrites what attempts 1–2 taught you | It belongs on `TaskAttempt` ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)) |
-| **Ownership compared as strings** | `src/**` and `src/auth/**` both dispatch; they overlap | Canonicalise before the overlap check ([D37](../DECISIONS.md#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9)) |
-| **File-only ownership** | Two "independent" tasks migrate the one database at once | Resources are owned too — `db:app`, `port:3000` |
-| **LLM repairs an invalid plan** | The graph passes validation and means something else | Reject and re-plan ([D39](../DECISIONS.md#decision-39-plan-validation-is-a-gate-never-a-repair--active-target-v4)) |
-| **A silently waiting task** | A stalled build looks identical to a hang | The scheduler reports why each waiting task waits |
+| Trap                                  | Symptom                                                  | Fix                                                                                                                                                                                       |
+| ------------------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Blueprint schema designed late        | Every component parses a different shape                 | Design the IR first                                                                                                                                                                       |
+| Too many clarifying questions         | Users abandon at question 4                              | Cap at 3; default the rest visibly                                                                                                                                                        |
+| Stack decided per task                | Task 3 uses Prisma, task 6 invents Drizzle               | Freeze it; inject into every prompt                                                                                                                                                       |
+| Whole-repo context per task           | $4 per task and a confused model                         | Task-scoped context only                                                                                                                                                                  |
+| No write fence                        | Task 7 rewrites task 2's schema                          | Allowlist in the tool layer                                                                                                                                                               |
+| Full re-plan on follow-ups            | 3 minutes to change a color                              | Classify the follow-up first                                                                                                                                                              |
+| Registry-first                        | Weeks authoring blocks before the loop is proven         | Prove the loop, then add blocks                                                                                                                                                           |
+| Optimistic task status                | Green tasks that don't compile                           | Green requires a verification pass                                                                                                                                                        |
+| **Parallelism before verification**   | Three agents' broken work merged, no isolated cause      | Verify at the task boundary. Parallelism multiplies whatever quality verification produces                                                                                                |
+| **Ownership too broad**               | `owns: ["src/**"]` — the whole build silently serialises | Warn on a task claiming most of the tree ([O9](../DECISIONS.md#open--not-yet-decided))                                                                                                    |
+| **Risk as a ceiling**                 | One bad guess skips verification on the payment task     | Risk adds tiers, never removes them ([D32](../DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4))                                             |
+| **Routing without telemetry**         | A model policy nobody can prove helped or hurt           | Per-task cost first (Slice 7b), routing second                                                                                                                                            |
+| **Agent state in the generated repo** | The user downloads their app and finds `errors.json`     | Postgres holds the plan; the repo holds the app ([D33](../DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4))             |
+| **Silent stack improvisation**        | Task 3 uses Prisma, task 6 invents Drizzle               | An ACR is a visible event with a decision ([D34](../DECISIONS.md#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6)) |
+| **Telemetry on `Task`**               | Attempt 3 overwrites what attempts 1–2 taught you        | It belongs on `TaskAttempt` ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4))                                           |
+| **Ownership compared as strings**     | `src/**` and `src/auth/**` both dispatch; they overlap   | Canonicalise before the overlap check ([D37](../DECISIONS.md#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9))                                 |
+| **File-only ownership**               | Two "independent" tasks migrate the one database at once | Resources are owned too — `db:app`, `port:3000`                                                                                                                                           |
+| **LLM repairs an invalid plan**       | The graph passes validation and means something else     | Reject and re-plan ([D39](../DECISIONS.md#decision-39-plan-validation-is-a-gate-never-a-repair--active-target-v4))                                                                        |
+| **A silently waiting task**           | A stalled build looks identical to a hang                | The scheduler reports why each waiting task waits                                                                                                                                         |
 
 ---
 
@@ -470,29 +485,29 @@ Not frontend-only with mock data. Everything below assumes that.
 
 ### What full-stack adds, over frontend-only
 
-| | Extra work |
-|---|---|
-| **Template** | `templates/nextjs-fullstack` — hand-built, committed, and **working before any AI runs** |
-| **Database per project** | Postgres inside each sandbox. Dev/prod parity beats fast boot |
-| **Task types** | schema · API route · page · auth · seed — each with its own context and verification |
-| **Migrations** | deterministic step: agent writes `schema.prisma` → executor runs `prisma migrate dev` → failure is a red task |
-| **Verification** | `prisma validate` → migrate → `tsc` → build → boot → hit routes → auth flow |
-| **Env injection** | `DATABASE_URL`, `AUTH_SECRET` generated at provision time. Never in LLM context |
+|                          | Extra work                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| **Template**             | `templates/nextjs-fullstack` — hand-built, committed, and **working before any AI runs**                      |
+| **Database per project** | Postgres inside each sandbox. Dev/prod parity beats fast boot                                                 |
+| **Task types**           | schema · API route · page · auth · seed — each with its own context and verification                          |
+| **Migrations**           | deterministic step: agent writes `schema.prisma` → executor runs `prisma migrate dev` → failure is a red task |
+| **Verification**         | `prisma validate` → migrate → `tsc` → build → boot → hit routes → auth flow                                   |
+| **Env injection**        | `DATABASE_URL`, `AUTH_SECRET` generated at provision time. Never in LLM context                               |
 
 ### The rule that makes it tractable
 
 **The more that ships in the template, the less the LLM can break.**
 
-| Template — deterministic, never generated | Generated — app-specific only |
-|---|---|
-| Next.js config, Tailwind, tsconfig, ESLint | pages and components |
-| **Auth.js wiring** — callbacks, session, middleware | the Prisma models |
-| Prisma client singleton, `DATABASE_URL` plumbing | API route handlers |
-| Base layout, error boundary, loading states | seed data |
-| The migration and seed scripts themselves | |
+| Template — deterministic, never generated           | Generated — app-specific only |
+| --------------------------------------------------- | ----------------------------- |
+| Next.js config, Tailwind, tsconfig, ESLint          | pages and components          |
+| **Auth.js wiring** — callbacks, session, middleware | the Prisma models             |
+| Prisma client singleton, `DATABASE_URL` plumbing    | API route handlers            |
+| Base layout, error boundary, loading states         | seed data                     |
+| The migration and seed scripts themselves           |                               |
 
 Auth is fiddly and near-identical in every app. Generating it from scratch is a pure downside —
-the agent adds *models and routes*, it does not invent session handling.
+the agent adds _models and routes_, it does not invent session handling.
 
 ### Build order — Slice 0 comes before everything
 
@@ -513,11 +528,11 @@ planner and the template simultaneously, with no way to tell which is wrong.
 **Every bug the template can eliminate is a bug class the agent cannot introduce.** Hunt these
 while hand-building it, because each one otherwise repeats in every generated app forever:
 
-| Trap | Why it bites here | Template's answer |
-|---|---|---|
-| **`Decimal` for money** | Prisma's `Decimal` is a Decimal.js object; Next.js cannot serialise it across the Server → Client Component boundary. **Every e-commerce app has a product page**, so this fires on app one | `priceCents Int` — `4999` is `$49.99`. Verify against the Prisma version pinned here |
-| `Date` across the same boundary | The same serialisation class of bug, quieter | Decide the convention once, in the template |
-| Prisma client instantiated per request | Connection exhaustion under any real traffic | Singleton ships in the template ([D14](../DECISIONS.md#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1)) |
+| Trap                                   | Why it bites here                                                                                                                                                                           | Template's answer                                                                                                                       |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **`Decimal` for money**                | Prisma's `Decimal` is a Decimal.js object; Next.js cannot serialise it across the Server → Client Component boundary. **Every e-commerce app has a product page**, so this fires on app one | `priceCents Int` — `4999` is `$49.99`. Verify against the Prisma version pinned here                                                    |
+| `Date` across the same boundary        | The same serialisation class of bug, quieter                                                                                                                                                | Decide the convention once, in the template                                                                                             |
+| Prisma client instantiated per request | Connection exhaustion under any real traffic                                                                                                                                                | Singleton ships in the template ([D14](../DECISIONS.md#decision-14-the-generator-produces-full-stack-apps--active-target-v4-closes-o1)) |
 
 The point is not these three. It is the pass itself: **write a page that reads every field type the
 schema can produce, and run it, before any AI runs.**

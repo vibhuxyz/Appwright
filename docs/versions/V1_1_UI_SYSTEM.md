@@ -11,16 +11,22 @@
 
 **This rung is justified by a felt limitation, not by anticipation.** V1 shipped on 2026-08-16.
 The agent works, the loop chains, the preview renders — and what it renders reads as a first draft.
-That is the trigger, and the repo's rule (*never optimise before feeling the limitation*) is
+That is the trigger, and the repo's rule (_never optimise before feeling the limitation_) is
 satisfied because the limitation was seen in a working product, not predicted.
 
 There is also evidence that does not depend on taste. `templates/vite-react/src/index.css`, the
 **pristine** starter every project is copied from, already ships a hand-rolled proto-design-system:
 
 ```css
-.btn           { @apply py-4 px-4 ... rounded-[30px] text-lg ... }
-.head-text     { @apply mt-4 text-6xl leading-[72px] ... }
-.section-text  { @apply text-[32px] font-semibold }
+.btn {
+  @apply py-4 px-4 ... rounded-[30px] text-lg ...;
+}
+.head-text {
+  @apply mt-4 text-6xl leading-[72px] ...;
+}
+.section-text {
+  @apply text-[32px] font-semibold;
+}
 ```
 
 `rounded-[30px]` · `leading-[72px]` · `text-[32px]` — **off-scale invented values, in the file
@@ -52,7 +58,7 @@ against, and a validator with no plan behind it is a linter that will be rewritt
 
 ## Acceptance test
 
-1. Create a project on **`vite-react`**. Prompt: *"build a pricing page with three tiers."*
+1. Create a project on **`vite-react`**. Prompt: _"build a pricing page with three tiers."_
 2. Create a project on **`nextjs-fullstack`**. Same prompt.
 3. Both pages use shadcn `Card` and `Button`, Radix behaviour, and Lucide icons — **the agent did
    not hand-roll a button.**
@@ -71,14 +77,14 @@ tokens actually live in the shared library and not in two copies that will drift
 All six pass. Both runs used the real agent against a scratch copy of each template, then the two
 builds were served side by side in a browser.
 
-| Step | Result |
-|---|---|
-| 3 — composed, not hand-rolled | Both imported `Card`, `Button`, `Badge` and `lucide-react`. Neither wrote a button. |
-| 4 — zero bracket values | Zero, **on the second run.** See below. |
-| 5 — one look | Same primary blue, same badge, same card radius and border, same button shapes, same check icons. Different frameworks, one product. |
-| 6 — proto-system gone | `grep` clean; the `.btn`/`.head-text`/`.section-text` block is deleted from both stylesheets. |
+| Step                          | Result                                                                                                                               |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 3 — composed, not hand-rolled | Both imported `Card`, `Button`, `Badge` and `lucide-react`. Neither wrote a button.                                                  |
+| 4 — zero bracket values       | Zero, **on the second run.** See below.                                                                                              |
+| 5 — one look                  | Same primary blue, same badge, same card radius and border, same button shapes, same check icons. Different frameworks, one product. |
+| 6 — proto-system gone         | `grep` clean; the `.btn`/`.head-text`/`.section-text` block is deleted from both stylesheets.                                        |
 
-**Step 4 failed the first time, and how it failed is the useful part.** Given one prompt, *both*
+**Step 4 failed the first time, and how it failed is the useful part.** Given one prompt, _both_
 templates independently produced `tracking-[0.2em]` for an uppercase eyebrow label. They converged
 on the same bracket value because they were solving the same real problem: **the scale had no
 letter-spacing in it at all**, and Tailwind's own tracking scale stops at `0.1em`.
@@ -89,7 +95,7 @@ added to the scale once**, not a bracket value per file, and not a looser rule. 
 bracket values in either diff.
 
 The convergence is worth noting on its own. Two models, two frameworks, two prompts' worth of
-independent generation, reaching for the *same* missing value is not noise — it is the scale
+independent generation, reaching for the _same_ missing value is not noise — it is the scale
 telling you where its hole is. **A repeated bracket value is a feature request for the token
 scale.** That heuristic is what V4's validator should surface rather than merely reject.
 
@@ -98,7 +104,7 @@ scale.** That heuristic is what V4's validator should surface rather than merely
 ## Architecture
 
 ```
-                    libs/ts/ui-system/            ← ONE definition
+                    packages/ui-system/            ← ONE definition
                     ├── src/tokens/     colors · spacing · typography · radius
                     │                   shadows · breakpoints · letterSpacing
                     ├── src/registry/   Button → shadcn/ui, variants, allowed: true
@@ -131,8 +137,8 @@ full-stack generation lands at V4; that is accepted deliberately, because it kee
 working default template untouched and it **proves the library is template-agnostic**, which is
 the property V4 depends on and would otherwise discover late.
 
-But *"two shadcn installs to keep in sync"* is **not** a cost we ended up paying. The components
-live in `libs/ts/ui-system/components/` exactly once and are emitted into both templates by the
+But _"two shadcn installs to keep in sync"_ is **not** a cost we ended up paying. The components
+live in `packages/ui-system/components/` exactly once and are emitted into both templates by the
 same script that emits the tokens. What replaced that cost is smaller and different: **two
 generated trees that can be hand-edited and silently drift.** The guard is explicit — `bun run
 ui:check` fails on any difference, and a test compares every emitted file to what the emitter
@@ -143,20 +149,22 @@ would write today. A cost you can detect automatically beats a cost you have to 
 ## TODO
 
 ### Slice 1 — Resolve the naming collision first
-- [x] **`libs/ts/ui` is `@repo/ui`, a Turborepo starter leftover** — `button.tsx`, `card.tsx`,
-      `code.tsx`, and **verified zero importers** across `services/`, `libs/`, and `templates/`.
+
+- [x] **`packages/ui` is `@repo/ui`, a Turborepo starter leftover** — `button.tsx`, `card.tsx`,
+      `code.tsx`, and **verified zero importers** across `apps/`, `packages/`, and `templates/`.
 - [x] Delete it, or rename it to something that cannot be confused with the new package.
       [ARCHITECTURE §14](../ARCHITECTURE.md#14-the-generated-application--what-it-is-and-what-it-owns)'s
       rule is **two of everything** — Appwright owns one set of things, the generated app owns
       another. `ui` (ours, dead) sitting beside `ui-system` (theirs, load-bearing) is a trap for
-      precisely that confusion, and it costs nothing to remove *before* the second package exists.
+      precisely that confusion, and it costs nothing to remove _before_ the second package exists.
 - [x] Do this **first**. Renaming after `ui-system` lands means touching both.
 
-**Done.** Deleted. Zero importers re-verified across `services/`, `libs/`, `templates/` before
+**Done.** Deleted. Zero importers re-verified across `apps/`, `packages/`, `templates/` before
 removal — the only remaining references were in these docs.
 
 ### Slice 2 — The token scale
-- [x] `libs/ts/ui-system/tokens/` — `colors.ts`, `spacing.ts`, `typography.ts`, `radius.ts`,
+
+- [x] `packages/ui-system/tokens/` — `colors.ts`, `spacing.ts`, `typography.ts`, `radius.ts`,
       `shadows.ts`, `breakpoints.ts`. Plain TypeScript objects, exported and typed.
 - [x] Emit them as Tailwind theme config **and** as CSS variables, so both templates consume one
       source rather than each redeclaring the scale.
@@ -167,13 +175,18 @@ removal — the only remaining references were in these docs.
       genuine shared vocabulary and they are not the problem.
 
 ### Slice 3 — The component registry
-- [x] `libs/ts/ui-system/registry/` — one entry per primitive:
+
+- [x] `packages/ui-system/registry/` — one entry per primitive:
 
 ```json
 {
-  "Button": { "source": "shadcn/ui", "variants": ["default","secondary","outline","ghost"],
-              "sizes": ["sm","md","lg"], "allowed": true },
-  "Card":   { "source": "shadcn/ui", "variants": ["default"], "allowed": true }
+  "Button": {
+    "source": "shadcn/ui",
+    "variants": ["default", "secondary", "outline", "ghost"],
+    "sizes": ["sm", "md", "lg"],
+    "allowed": true
+  },
+  "Card": { "source": "shadcn/ui", "variants": ["default"], "allowed": true }
 }
 ```
 
@@ -183,10 +196,11 @@ removal — the only remaining references were in these docs.
       habit applied again.
 - [x] Start with what a real page needs: Button · Card · Input · Label · Select · Dialog · Badge ·
       Table · Tabs. **Nine, not forty.** An unused registry entry is inventory with no demand, and
-      [V4's trap](./V4_APP_BUILDER.md#traps) is explicit about this — *prove the loop, then add
-      blocks*.
+      [V4's trap](./V4_APP_BUILDER.md#traps) is explicit about this — _prove the loop, then add
+      blocks_.
 
 ### Slice 4 — Install into both templates
+
 - [x] `shadcn/ui` + Radix + Lucide in `templates/vite-react` and `templates/nextjs-fullstack`.
 - [x] Point both at the shared tokens. **Neither template redefines a scale value.**
 - [x] `bun install` clean in both; both still boot and serve.
@@ -197,10 +211,10 @@ removal — the only remaining references were in these docs.
       instead of the agent's edits and the preview then lies about what was generated.
 
 **Done, with a deviation worth recording.** The primitives were **vendored by hand into
-`libs/ts/ui-system/components/` and emitted**, not installed with `bunx shadcn@latest init`. The
+`packages/ui-system/components/` and emitted**, not installed with `bunx shadcn@latest init`. The
 CLI is interactive, needs network, writes its own `components.json`, and — decisively — **rewrites
 `globals.css` with its own token block**, which would have overwritten the generated `tokens.css`
-wiring this rung exists to create. shadcn's model is *source you own*, so vendoring is not a
+wiring this rung exists to create. shadcn's model is _source you own_, so vendoring is not a
 workaround; it is the supported shape.
 
 **The recorded cost of "two shadcn installs to keep in sync" was avoidable and is now gone.** The
@@ -211,7 +225,8 @@ Router — a missing directive there is a 500 at runtime, not a type error, so `
 catch it.
 
 ### Slice 5 — Teach the agent the vocabulary
-- [x] Inject the registry into `libs/ts/agent-core/prompts/system.md`, alongside the file tree that
+
+- [x] Inject the registry into `packages/agent-core/prompts/system.md`, alongside the file tree that
       is already injected there.
 - [x] State the rule plainly: **compose from these primitives; do not hand-roll one that exists.**
 - [x] State the scale rule: **use scale classes (`p-4`, `rounded-lg`); a bracket value is a last
@@ -219,7 +234,7 @@ catch it.
 - [x] Keep it **short**. This competes for the same context budget as everything else, and a
       registry dumped in full is [O8](../DECISIONS.md#open--not-yet-decided)'s problem arriving
       early. Names and variants — not descriptions. **~1.4k chars, test-enforced under 2.5k.**
-- [x] **The old prompt actively contradicted this rung and had to go.** `system.md` *instructed*
+- [x] **The old prompt actively contradicted this rung and had to go.** `system.md` _instructed_
       the agent to use `.btn`, `.head-text`, `.section-text` — the very utilities Slice 2 deletes.
       Deleting them without rewriting that block would have left the agent writing class names
       that match nothing: no error, types pass, build succeeds, app renders unstyled.
@@ -229,6 +244,7 @@ catch it.
       and a tool that hides real files from its caller is a tool that lies.
 
 ### Slice 6 — Prove it
+
 - [x] All six acceptance steps.
 - [x] **The side-by-side is the demo.** Two templates, one prompt, one look.
 - [x] Re-run V1's acceptance test unchanged. **V1.1 must not break a shipped rung** — if the
@@ -243,34 +259,34 @@ catch it.
 ## Files this version touches
 
 ```
-NEW  libs/ts/ui-system/tokens/*        colors · spacing · typography · radius · shadows · breakpoints
-NEW  libs/ts/ui-system/registry/*      the primitives the agent may compose
-DEL  libs/ts/ui/                       @repo/ui — starter leftover, zero importers
+NEW  packages/ui-system/tokens/*        colors · spacing · typography · radius · shadows · breakpoints
+NEW  packages/ui-system/registry/*      the primitives the agent may compose
+DEL  packages/ui/                       @repo/ui — starter leftover, zero importers
 EDIT templates/vite-react/*            shadcn + Radix + Lucide; index.css proto-system removed
 EDIT templates/nextjs-fullstack/*      same
-EDIT libs/ts/agent-core/prompts/system.md   the registry, injected
+EDIT packages/agent-core/prompts/system.md   the registry, injected
 ```
 
 ---
 
 ## Traps
 
-| Trap | Symptom | Fix |
-|---|---|---|
-| **Building the validator here** | A linter with no Blueprint to validate against, rewritten at V4 | Vocabulary now, enforcement at V4 |
-| **Tokens copied into each template** | They drift on the first edit nobody mirrors | One definition in `libs/ts/ui-system`, consumed twice |
-| **Leaving `@repo/ui` in place** | `ui` and `ui-system` side by side; §14's *two of everything* blurs | Delete it in Slice 1, before the second package exists |
-| **Forty registry entries** | Weeks of inventory before one page is generated | Nine primitives. Add on demand |
-| **Full registry in the prompt** | Context budget spent on components this task will not use | Names and variants only |
-| **Leaving the `.btn` utilities** | The template keeps teaching `rounded-[30px]` by example | Delete them; the starter is the strongest prompt there is |
-| **Copying `node_modules`** | Project creation back to 90 seconds | The V1 exclusion still applies, and shadcn makes it matter more |
-| **Breaking V1** | A shipped rung silently regresses | Re-run V1's acceptance test as a Slice 6 item |
-| **A prompt that contradicts the template** ⚠️ *hit* | The rules say "use the design system", the starter demonstrates `rounded-[30px]`, and the model imitates the file | Delete the utilities **and** rewrite the `system.md` block that named them, in the same change |
-| **A scale with a real hole in it** ⚠️ *hit* | Both templates independently write the same bracket value | Add the value to the scale once. A repeated bracket value is a feature request, not a violation |
-| **Generated files edited by hand** | Two templates quietly stop matching; nothing errors | `bun run ui:check` plus a test comparing every emitted file to the emitter's output |
-| **Filtering the tree inside `listDir`** | `list_files` hides real files from the agent that calls it | Filter in `buildSystemPrompt` only — trim what is *summarised*, never what a tool reports |
-| **Stale build output in the workspace copy** ⚠️ *hit* | The dev server serves the template's prebuilt page and the preview lies about what was generated | `dist`, `.next`, `.turbo` added to the rsync excludes beside `node_modules` |
-| **A template depending on generated types** ⚠️ *hit* | `tsc --noEmit` fails on a pristine Next workspace (no `.next/types`), and the agent burns a repair cycle "fixing" a file it never touched — every run | Explicit props types in the template; do not rely on `LayoutProps<"/">` |
+| Trap                                                  | Symptom                                                                                                                                               | Fix                                                                                             |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **Building the validator here**                       | A linter with no Blueprint to validate against, rewritten at V4                                                                                       | Vocabulary now, enforcement at V4                                                               |
+| **Tokens copied into each template**                  | They drift on the first edit nobody mirrors                                                                                                           | One definition in `packages/ui-system`, consumed twice                                          |
+| **Leaving `@repo/ui` in place**                       | `ui` and `ui-system` side by side; §14's _two of everything_ blurs                                                                                    | Delete it in Slice 1, before the second package exists                                          |
+| **Forty registry entries**                            | Weeks of inventory before one page is generated                                                                                                       | Nine primitives. Add on demand                                                                  |
+| **Full registry in the prompt**                       | Context budget spent on components this task will not use                                                                                             | Names and variants only                                                                         |
+| **Leaving the `.btn` utilities**                      | The template keeps teaching `rounded-[30px]` by example                                                                                               | Delete them; the starter is the strongest prompt there is                                       |
+| **Copying `node_modules`**                            | Project creation back to 90 seconds                                                                                                                   | The V1 exclusion still applies, and shadcn makes it matter more                                 |
+| **Breaking V1**                                       | A shipped rung silently regresses                                                                                                                     | Re-run V1's acceptance test as a Slice 6 item                                                   |
+| **A prompt that contradicts the template** ⚠️ _hit_   | The rules say "use the design system", the starter demonstrates `rounded-[30px]`, and the model imitates the file                                     | Delete the utilities **and** rewrite the `system.md` block that named them, in the same change  |
+| **A scale with a real hole in it** ⚠️ _hit_           | Both templates independently write the same bracket value                                                                                             | Add the value to the scale once. A repeated bracket value is a feature request, not a violation |
+| **Generated files edited by hand**                    | Two templates quietly stop matching; nothing errors                                                                                                   | `bun run ui:check` plus a test comparing every emitted file to the emitter's output             |
+| **Filtering the tree inside `listDir`**               | `list_files` hides real files from the agent that calls it                                                                                            | Filter in `buildSystemPrompt` only — trim what is _summarised_, never what a tool reports       |
+| **Stale build output in the workspace copy** ⚠️ _hit_ | The dev server serves the template's prebuilt page and the preview lies about what was generated                                                      | `dist`, `.next`, `.turbo` added to the rsync excludes beside `node_modules`                     |
+| **A template depending on generated types** ⚠️ _hit_  | `tsc --noEmit` fails on a pristine Next workspace (no `.next/types`), and the agent burns a repair cycle "fixing" a file it never touched — every run | Explicit props types in the template; do not rely on `LayoutProps<"/">`                         |
 
 ---
 

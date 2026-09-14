@@ -8,7 +8,7 @@
 
 ## Why this version exists
 
-After V5 the agent can generate an app **and prove it works in a browser**. V6 is about the two things that decide whether people *keep*
+After V5 the agent can generate an app **and prove it works in a browser**. V6 is about the two things that decide whether people _keep_
 using it:
 
 1. **It doesn't hand you broken code.** When something is red, the system diagnoses and fixes it
@@ -27,10 +27,10 @@ Self-healing on top of an unreliable planner just automates the wrong thing fast
    both — one from `tsc`, one from the browser console — fixes both within the retry budget, and
    ends green.
 2. Plant an **unfixable** error (import a package that does not exist on npm). The system tries,
-   fails, stops cleanly at the budget, and reports *what* it could not fix. No infinite loop, no
+   fails, stops cleanly at the budget, and reports _what_ it could not fix. No infinite loop, no
    false success.
 3. Click **Deploy**. The app is live on a public URL with a real database, within a few minutes.
-4. Ask *"what changed in this project last week?"* — memory answers from history, not from an
+4. Ask _"what changed in this project last week?"_ — memory answers from history, not from an
    empty context.
 
 ---
@@ -75,6 +75,7 @@ Self-healing on top of an unreliable planner just automates the wrong thing fast
 ## TODO
 
 ### Slice 1 — Observability
+
 - [ ] Stream build output, dev-server stdout/stderr, and the browser console **out of the sandbox**
       into the event stream.
 - [ ] Capture runtime errors from the preview iframe (inject an error handler into the dev server's
@@ -84,6 +85,7 @@ Self-healing on top of an unreliable planner just automates the wrong thing fast
       You cannot debug an agent you cannot see.
 
 ### Slice 2 — Error classifier
+
 - [ ] Taxonomy: `type` · `syntax` · `dependency` · `runtime` · `config` · `database` · `auth` · `network`.
 - [ ] Deterministic-first: regexes and parsers on `tsc`/vite/npm output cover most cases at zero cost.
       LLM classification only for what falls through.
@@ -91,13 +93,14 @@ Self-healing on top of an unreliable planner just automates the wrong thing fast
       to re-run).
 
 ### Slice 3 — Self-healing loop
+
 - [ ] Failure → classify → build a targeted fix prompt (error + the relevant file slice + the
       strategy) → agent fixes → re-verify.
 - [ ] **Retry budget** per task (start at 3) and per run.
 - [ ] **Loop detection**: same error signature twice in a row → stop and escalate. Do not let it
       grind.
 - [ ] On budget exhaustion: mark the task `blocked`, keep going on independent tasks, and report
-      honestly. *"7 of 8 tasks completed; task 5 blocked on X"* is a good outcome. A silent green
+      honestly. _"7 of 8 tasks completed; task 5 blocked on X"_ is a good outcome. A silent green
       is not.
 - [ ] Every heal attempt is persisted — it is training data for Slice 6 and the only way to tune
       the budget. **It is a `TaskAttempt` with `trigger = heal`, not a separate table**
@@ -127,7 +130,7 @@ db   →  the user's managed Postgres                connected at Deploy, never 
       Vercel deploy API → smoke-test the live URL → return it.
 - [ ] **Write-through secrets**: push the user's keys into their Vercel project env and keep no
       copy. **Never** in LLM context, never printed to logs, never in our database. The `Secret`
-      model in `libs/ts/db` is then only needed for what [O5](../DECISIONS.md#open--not-yet-decided)
+      model in `packages/db` is then only needed for what [O5](../DECISIONS.md#open--not-yet-decided)
       leaves — preview-time keys, if we hold them at all.
 - [ ] Write to the `production` [`Environment`](../DECISIONS.md#decision-42-environment-is-a-first-class-entity-and-it-ships-with-two-rows--active-target-v4-tables-used-at-v6),
       never to the project. `development` keeps the sandbox's generated `DATABASE_URL`.
@@ -139,14 +142,16 @@ db   →  the user's managed Postgres                connected at Deploy, never 
       an export, Appwright disappearing takes the user's application with it. See Definition of done.
 
 ### Slice 5 — Memory
+
 - [ ] Per-project memory: decisions made, conventions adopted, errors already fixed.
 - [ ] Retrieval: hybrid keyword + vector + recency, injected into the planner and the agent.
-- [ ] Cross-project learning: *"this dependency combination always breaks"* — a failure→fix→outcome
+- [ ] Cross-project learning: _"this dependency combination always breaks"_ — a failure→fix→outcome
       store consulted before repeating a known mistake.
 - [ ] Keep it small and evaluated. Unmeasured memory is a context-window tax that feels
       sophisticated and helps nothing.
 
-### Slice 6 — Quality passes *(from `ROADMAP.md` P9)*
+### Slice 6 — Quality passes _(from `ROADMAP.md` P9)_
+
 - [ ] Security scan on generated code: secrets in source, missing input validation, SQLi, XSS,
       unauthenticated routes.
 - [ ] Accessibility pass: contrast, labels, focus order, keyboard navigation.
@@ -154,6 +159,7 @@ db   →  the user's managed Postgres                connected at Deploy, never 
 - [ ] Report findings in the UI; offer a one-click "fix these" run.
 
 ### Slice 7 — Prove it
+
 - [ ] All four acceptance steps.
 - [ ] Measure the heal rate: of N planted errors of each class, what fraction healed? Publish the
       number to yourself. It is the only honest measure of whether this version works.
@@ -163,37 +169,37 @@ db   →  the user's managed Postgres                connected at Deploy, never 
 ## Files this version touches
 
 ```
-NEW  libs/ts/observability/src/*     log capture, runtime error bridge, timeline
-NEW  libs/ts/healer/src/*            classifier + fix strategies + budget/loop detection
-NEW  libs/ts/deploy/src/*            provider adapters, migrations, env injection, smoke tests
-NEW  libs/ts/memory/src/*            store + hybrid retrieval
-EDIT services/orchestrator/src/*          heal loop wired into the DAG executor
-EDIT services/web/src/*                   log panel, timeline, deploy button, findings report
-EDIT libs/ts/db/prisma/schema.prisma Deployment, Memory   (HealAttempt = TaskAttempt, D35)
+NEW  packages/observability/src/*     log capture, runtime error bridge, timeline
+NEW  packages/healer/src/*            classifier + fix strategies + budget/loop detection
+NEW  packages/deploy/src/*            provider adapters, migrations, env injection, smoke tests
+NEW  packages/memory/src/*            store + hybrid retrieval
+EDIT apps/orchestrator/src/*          heal loop wired into the DAG executor
+EDIT apps/web/src/*                   log panel, timeline, deploy button, findings report
+EDIT packages/db/prisma/schema.prisma Deployment, Memory   (HealAttempt = TaskAttempt, D35)
 ```
 
 ---
 
 ## Traps
 
-| Trap | Symptom | Fix |
-|---|---|---|
-| No retry budget | Infinite fix loop, unbounded spend | Hard budget + loop detection |
-| Fix without diagnosis | Agent rewrites random files hoping something works | Classify first, then a targeted fix |
-| Silent partial success | User ships an app with a broken checkout | Report blocked tasks loudly |
-| Secrets in LLM context | Production credentials in a model provider's logs | Inject at deploy time only |
-| Asking for a database mid-build | Signup wall before the first preview; kills the magic moment and breaks D29 | Connect at Deploy. The sandbox has its own Postgres |
-| Storing a key we could have passed through | A vault to encrypt, rotate, and eventually leak | Write-through: push to their Vercel env, keep no copy |
-| Shipping B without an export | The user's app cannot outlive us | Export project is a definition-of-done item |
-| Memory as a dumping ground | Context bloat, worse output, higher cost | Curate; measure retrieval quality |
-| Deploying unverified builds | Broken production | Smoke-test the live URL before returning it |
+| Trap                                       | Symptom                                                                     | Fix                                                   |
+| ------------------------------------------ | --------------------------------------------------------------------------- | ----------------------------------------------------- |
+| No retry budget                            | Infinite fix loop, unbounded spend                                          | Hard budget + loop detection                          |
+| Fix without diagnosis                      | Agent rewrites random files hoping something works                          | Classify first, then a targeted fix                   |
+| Silent partial success                     | User ships an app with a broken checkout                                    | Report blocked tasks loudly                           |
+| Secrets in LLM context                     | Production credentials in a model provider's logs                           | Inject at deploy time only                            |
+| Asking for a database mid-build            | Signup wall before the first preview; kills the magic moment and breaks D29 | Connect at Deploy. The sandbox has its own Postgres   |
+| Storing a key we could have passed through | A vault to encrypt, rotate, and eventually leak                             | Write-through: push to their Vercel env, keep no copy |
+| Shipping B without an export               | The user's app cannot outlive us                                            | Export project is a definition-of-done item           |
+| Memory as a dumping ground                 | Context bloat, worse output, higher cost                                    | Curate; measure retrieval quality                     |
+| Deploying unverified builds                | Broken production                                                           | Smoke-test the live URL before returning it           |
 
 ---
 
 ## Concepts to learn here
 
 Error taxonomy & structured diagnostics · bounded retry / circuit breakers · deployment pipelines
-& migrations · secret management · retrieval-augmented generation · evaluation (how do you *know*
+& migrations · secret management · retrieval-augmented generation · evaluation (how do you _know_
 the healer works?). See [LEARNING.md → V6](../LEARNING.md#v6--autonomy-and-operations).
 
 ---
@@ -221,6 +227,6 @@ From the old M1–M5 / P2–P11 board (now folded into
       Vercel and Postgres accounts** ([D41](../DECISIONS.md#decision-41-deployment-targets-the-users-own-accounts-and-the-connect-moment-is-at-deploy--active-target-v6-slice-4)).
 - [ ] **Nothing is asked of the user before the preview works.** The connect flow fires on Deploy.
 - [ ] **The user can export their project and it builds outside Appwright.** Download it, `bun
-      install`, `bun run build` — green. This is the check that Option B did not quietly become
+    install`, `bun run build` — green. This is the check that Option B did not quietly become
       lock-in.
-- [ ] No secret ever enters an LLM prompt — and no *deployed* secret is stored by us at all.
+- [ ] No secret ever enters an LLM prompt — and no _deployed_ secret is stored by us at all.

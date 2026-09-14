@@ -4,14 +4,20 @@ const CLOUDFLARE_ACCOUNT_ID = "CLOUDFLARE_ACCOUNT_ID";
 const CLOUDFLARE_GATEWAY_ID = "CLOUDFLARE_GATEWAY_ID";
 
 export function resolveCloudflareModel<TApi extends Api>(
-	model: Model<TApi>,
-	env: ProviderEnv | undefined,
+  model: Model<TApi>,
+  env: ProviderEnv | undefined,
 ): Model<TApi> {
-	if (!env) return model;
-	const baseUrl = model.baseUrl
-		.replaceAll(`{${CLOUDFLARE_ACCOUNT_ID}}`, env[CLOUDFLARE_ACCOUNT_ID] ?? `{${CLOUDFLARE_ACCOUNT_ID}}`)
-		.replaceAll(`{${CLOUDFLARE_GATEWAY_ID}}`, env[CLOUDFLARE_GATEWAY_ID] ?? `{${CLOUDFLARE_GATEWAY_ID}}`);
-	return baseUrl === model.baseUrl ? model : { ...model, baseUrl };
+  if (!env) return model;
+  const baseUrl = model.baseUrl
+    .replaceAll(
+      `{${CLOUDFLARE_ACCOUNT_ID}}`,
+      env[CLOUDFLARE_ACCOUNT_ID] ?? `{${CLOUDFLARE_ACCOUNT_ID}}`,
+    )
+    .replaceAll(
+      `{${CLOUDFLARE_GATEWAY_ID}}`,
+      env[CLOUDFLARE_GATEWAY_ID] ?? `{${CLOUDFLARE_GATEWAY_ID}}`,
+    );
+  return baseUrl === model.baseUrl ? model : { ...model, baseUrl };
 }
 
 /**
@@ -19,10 +25,18 @@ export function resolveCloudflareModel<TApi extends Api>(
  * placeholders materialize from the resolved provider env before dispatch.
  */
 export function cloudflareStreams(streams: ProviderStreams): ProviderStreams {
-	return {
-		stream: (model, context, options) =>
-			streams.stream(resolveCloudflareModel(model, options?.env), context, options),
-		streamSimple: (model, context, options) =>
-			streams.streamSimple(resolveCloudflareModel(model, options?.env), context, options),
-	};
+  return {
+    stream: (model, context, options) =>
+      streams.stream(
+        resolveCloudflareModel(model, options?.env),
+        context,
+        options,
+      ),
+    streamSimple: (model, context, options) =>
+      streams.streamSimple(
+        resolveCloudflareModel(model, options?.env),
+        context,
+        options,
+      ),
+  };
 }

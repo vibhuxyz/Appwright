@@ -9,13 +9,13 @@ import { xaiOAuth } from "./auth/oauth/xai.ts";
 
 /** Register OAuth flows statically embedded in the standalone Bun binary. */
 export function registerBunOAuthFlows(): void {
-	registerBundledOAuthFlowLoaders({
-		anthropic: () => anthropicOAuth,
-		openaiCodex: () => openaiCodexOAuth,
-		githubCopilot: () => githubCopilotOAuth,
-		openrouter: () => openRouterOAuth,
-		kimiCoding: () => kimiCodingOAuth,
-		xai: () => xaiOAuth,
-		radius: createRadiusOAuth,
-	});
+  registerBundledOAuthFlowLoaders({
+    anthropic: () => anthropicOAuth,
+    openaiCodex: () => openaiCodexOAuth,
+    githubCopilot: () => githubCopilotOAuth,
+    openrouter: () => openRouterOAuth,
+    kimiCoding: () => kimiCodingOAuth,
+    xai: () => xaiOAuth,
+    radius: createRadiusOAuth,
+  });
 }

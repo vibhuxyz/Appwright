@@ -1,6 +1,6 @@
 # Appwright
 
-An AI app builder in the shape of Emergent/Lovable. You type *"build me a food delivery app"*;
+An AI app builder in the shape of Emergent/Lovable. You type _"build me a food delivery app"_;
 a planner turns it into requirements, a frozen architecture, and a task list; a coding agent runs
 those tasks in an isolated sandbox; you watch a live preview, review, iterate, and deploy.
 
@@ -45,15 +45,15 @@ codegen. Python returns at V6 only if a specific job needs it ([D13](./docs/DECI
 
 ## Docs
 
-| | |
-|---|---|
-| [docs/README.md](./docs/README.md) | **Start here** — status and index |
-| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | The whole system, with diagrams |
-| [docs/VERSIONS.md](./docs/VERSIONS.md) | V0 → V6, one acceptance test each |
-| [docs/DECISIONS.md](./docs/DECISIONS.md) | Every decision, its trade-off, what's still open |
-| [docs/CODE_QUALITY.md](./docs/CODE_QUALITY.md) | How to write code here — patterns from `ref-ai` |
-| [docs/LEARNING.md](./docs/LEARNING.md) | What to learn at each version, and what's stuck |
-| [CLAUDE.md](./CLAUDE.md) | How Claude works in this repo |
+|                                                |                                                  |
+| ---------------------------------------------- | ------------------------------------------------ |
+| [docs/README.md](./docs/README.md)             | **Start here** — status and index                |
+| [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md) | The whole system, with diagrams                  |
+| [docs/VERSIONS.md](./docs/VERSIONS.md)         | V0 → V6, one acceptance test each                |
+| [docs/DECISIONS.md](./docs/DECISIONS.md)       | Every decision, its trade-off, what's still open |
+| [docs/CODE_QUALITY.md](./docs/CODE_QUALITY.md) | How to write code here — patterns from `ref-ai`  |
+| [docs/LEARNING.md](./docs/LEARNING.md)         | What to learn at each version, and what's stuck  |
+| [CLAUDE.md](./CLAUDE.md)                       | How Claude works in this repo                    |
 
 ## Requirements
 

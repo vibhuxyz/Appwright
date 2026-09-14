@@ -20,7 +20,7 @@ preview, review, iterate, deploy.
       → **hard refresh mid-run → full transcript recovered** → preview iframe shows the change.
       **Gap closed 2026-08-22:** cost/token tracking now populates. See V1.1 below.
 
-- [x] **V1.1 — done 2026-08-22.** `libs/ts/ui-system` — token scale, nine-primitive registry,
+- [x] **V1.1 — done 2026-08-22.** `packages/ui-system` — token scale, nine-primitive registry,
       shadcn/Radix/Lucide vendored once and emitted into both templates, registry injected into the
       system prompt. Acceptance test passed: same prompt on `vite-react` and `nextjs-fullstack`,
       both composed `Card`/`Button`/`Badge`, **zero arbitrary bracket values**, and the two
@@ -31,30 +31,30 @@ preview, review, iterate, deploy.
       an atomic `increment` on `Session` → a live SSE frame. Verified in-browser: a Gemini run
       moved the header to `$0.0550 · 41732↑ 281↓` while it ran. **`maxCostUsd` is reachable for
       the first time.**
-      **Deleted:** `libs/ts/ui` (`@repo/ui`), the Turborepo leftover — zero importers re-verified
+      **Deleted:** `packages/ui` (`@repo/ui`), the Turborepo leftover — zero importers re-verified
       before removal.
 
-- [x] Architecture extracted from the *Coding Agents + Cloud* deck
+- [x] Architecture extracted from the _Coding Agents + Cloud_ deck
 - [x] V0–V6 ladder defined, each with one acceptance test
 - [x] **TypeScript end to end** ([D4](./DECISIONS.md)) — the agent is a library, not a service
-- [x] Repo restructured: `services/` + `libs/` + `docker/`, no task runner
+- [x] Repo restructured: `services/` + `libs/` + `docker/`, no task runner (superseded — see below)
 - [x] Slice 0 — workspace scaffolded, `bun install` clean, API imports `@repo/agent-core`
 - [x] **D22–D24 added** — HTTP sandbox contract · untrusted tool results · dependency allowlist
 - [x] **D25 — E2B is the sandbox provider**, closing O1. Firecracker considered, deferred, with
       two written triggers that would reopen it
-- [x] **D26–D29 added 2026-08-11** — six loop exits + a loop budget · the agent is a *client* of a
+- [x] **D26–D29 added 2026-08-11** — six loop exits + a loop budget · the agent is a _client_ of a
       runtime, not a resident · `/workspace` is the only root · the environment is prepared before
       the agent starts. **Four of them land in `types.ts` and `runtime.ts` — V0, not later.**
       Rejected the same day: an agent-swapping abstraction and a multi-language runtime matrix,
       both premature before one loop exists
 - [x] **D30–D34 added 2026-08-13** — task ownership declares the graph · capability-not-model-name ·
-      risk as its own axis with verification *floors* · state in Postgres, context assembled not
+      risk as its own axis with verification _floors_ · state in Postgres, context assembled not
       generated · Architecture Change Requests, **closing O6**. V4's build order revised so
       scheduling and routing come last, behind the telemetry that makes them falsifiable.
       Rejected the same day: a `.project/` state directory, an LLM context synthesiser, a
       parallel-write integrator, and five-dimensional priority scoring
 - [x] **D35–D40 added 2026-08-13** — plan vs execution (`Run` · `Task` · `TaskAttempt`) · five
-      dispatch gates and **Orchestrator ≠ Scheduler** · normalised ownership over files *and*
+      dispatch gates and **Orchestrator ≠ Scheduler** · normalised ownership over files _and_
       resources, **closing O9** · nested budgets user→run→task, which finally gives cost control a
       home · plan validation as a gate that never LLM-repairs · `RunEvent` as the execution log,
       distinct from `Message`. **`ARCHITECTURE.md` §11 had no `Blueprint` table at all** — the data
@@ -80,15 +80,15 @@ preview, review, iterate, deploy.
       fairness · connection pooling · preview-URL auth · where the reconnect buffer lives once the
       API has two instances
 - [x] **New rung: [V1.1 UI System](./versions/V1_1_UI_SYSTEM.md)** (2026-08-22). **D46's target
-      moved V4 → V1.1**, split into *vocabulary now, enforcement at V4*. The trigger was felt, not
+      moved V4 → V1.1**, split into _vocabulary now, enforcement at V4_. The trigger was felt, not
       predicted: V1 is shipped and its output reads as a first draft — and the taste-independent
       evidence is that the **pristine** `vite-react` starter already ships `rounded-[30px]`,
       `leading-[72px]`, and `text-[32px]` in hand-rolled `.btn`/`.head-text` utilities. The
       template was inventing off-scale values before the agent ever did. **Both templates share one
       token library** so two token files cannot become two design systems; recorded cost is two
       shadcn installs and `vite-react` possibly becoming dead weight at V4. Also found:
-      **`libs/ts/ui` (`@repo/ui`) is a Turborepo starter leftover with zero importers** — delete or
-      rename it before `ui-system` lands, or §14's *two of everything* blurs
+      **`packages/ui` (`@repo/ui`) is a Turborepo starter leftover with zero importers** — delete or
+      rename it before `ui-system` lands, or §14's _two of everything_ blurs
 - [x] **D46–D53 added 2026-08-22** — the UI system as a **registry + token scale** the agent
       composes from, never invents ([D9](./DECISIONS.md)'s determinism argument applied to pixels,
       [D24](./DECISIONS.md)'s allowlist shape applied to components) · a `design` block in the
@@ -96,7 +96,7 @@ preview, review, iterate, deploy.
       is a staging buffer, discarded on green** — a durable design layer would be
       [D44](./DECISIONS.md) in a new costume · **`data-aw-id` injected at dev-build time**, so the
       exported repo never contains a marker and there is no strip pass to forget · **exact edits
-      never reach the model** (`width = 286px` is a codemod; *"feel more premium"* is a prompt) ·
+      never reach the model** (`width = 286px` is a codemod; _"feel more premium"_ is a prompt) ·
       **verification checks the request that was made**, not a quality score — and a UI score stays
       advisory and deterministic, because a model rating its own UI is [D32](./DECISIONS.md)'s
       refused mistake · references compiled to structure **once** · the design **reviewed before it
@@ -104,7 +104,27 @@ preview, review, iterate, deploy.
       before V5 by the user against the recommendation to place it after V6 — the recorded cost and
       its mitigation are written into the version doc. Raised O20–O23: id stability · variant budget
       · visual-verification cost · the token-scale escape hatch
-- [x] Slice 1 — `Message`, `AgentEvent` (with `seq`), `StopReason`, `Budget`, `AgentEventSink` in `libs/ts/agent-core/src/types.ts`
+- [x] **D54, D56, D57 added 2026-09-15** — repo layout reversed to `apps/` + `packages/` +
+      `infrastructure/`, Turborepo reintroduced (**supersedes [D11](./DECISIONS.md), [D12](./DECISIONS.md)** —
+      explicitly, before either's own revisit trigger fired) · `packages/events` (Kafka) +
+      `workers/{ingestion,indexing,evaluation,maintenance}`, gated behind
+      `docker compose --profile events`, off by default · `packages/auth` split out of `apps/api`
+      (auth primitives vs. Prisma-coupled ownership checks, now `apps/api/src/ownership.ts`).
+      **This was a user-directed reversal, not an earned one** — D11's own honesty section says so
+      explicitly; see `docs/DECISIONS.md` for the full trade-offs
+- [x] **D55 added, then reversed same day by D58** — a full `inference/` model-serving platform
+      (gateway, vLLM Dockerfiles, model manifests) was scaffolded and verified working, then
+      **deleted on purpose**: the goal here is to learn these concepts by building them by hand,
+      one version at a time, not start from an AI-generated platform. `docs/CRASH_COURSE.md`'s
+      "Model gateway" card stays — taught, not built — for whichever future version actually earns
+      it. **`packages/logger` and `packages/cache` are live**, wired into `apps/api` (request/error
+      logging throughout, Redis-backed login rate limiting) — those survived because they're small,
+      real, and already load-bearing, not because they were part of the same platform push
+- [x] **`packages/cache`/`packages/logger` integrated into `apps/api`, 2026-09-15** — every
+      `console.*` call replaced with structured logs (`method`/`path`/`status`/`ms` on every
+      request); `/auth/login` rate-limited via a Redis `INCR`+`EXPIRE` counter, **fails open** if
+      Redis is unreachable rather than locking out login over an auxiliary dependency
+- [x] Slice 1 — `Message`, `AgentEvent` (with `seq`), `StopReason`, `Budget`, `AgentEventSink` in `packages/agent-core/src/types.ts`
 - [x] Slice 2 — provider abstraction (`providers/types.ts`), `FakeProvider`, `OpenAiProvider` (real, streaming, fetch-based, no SDK dep)
 - [x] Slice 3 — tools (`list_files`, `read_file`, `write_file`, `edit_file`, `grep`, `bash`), path fence + deny-list, `wrapUntrusted`, `deps.allow.json` guard
 - [x] Slice 4 — the loop (`loop.ts`): six exits, sequential/parallel tool execution, length-stop handling
@@ -121,22 +141,23 @@ preview, review, iterate, deploy.
 
 Not "todo". These are things the docs claimed were working and are not.
 
-| What | Where | Fix in |
-|---|---|---|
-| `bun run check-types` covers 4 of 11 packages — `db`, `config`, `orchestrator` have no script (contracts and web now do) | `package.json` × 3 | V0 Slice 7 |
-| `services/web` is a 255-line UI from the deleted architecture, wired to `:4000`; nothing listens there | `services/web/src/App.tsx` | V1 — delete, don't extend |
-| Preview iframe blank: dev-server port allocation had no liveness check, orphans survived API restarts, and dead processes stayed in the port map. **Fixed 2026-08-22** — `allocatePort()` probes the OS, `stopAllDevServers()` runs on exit, `exitCode` is checked before reusing a port, and both spawns use `inherit` instead of an undrained pipe | `services/api/src/workspace/manager.ts` | fixed |
-| `MODEL_PROVIDERS` lists `llama-3.1-8b-instant`, which Groq no longer serves — picking it returns `model_not_found`. The xAI key in `.env` is also rejected. Found while verifying usage reporting; **not** fixed, because neither is about V1.1 | `libs/ts/agent-core/src/providers/openai.ts` · `.env` | next session |
+| What                                                                                                                                                                                                                                                                                                                                                 | Where                                                  | Fix in                    |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------- |
+| `bun run check-types` covers 14 of 20 workspace members post-restructure — `apps/web`, `packages/config`, `packages/contracts`, `packages/db` still have none (`eslint-config`/`typescript-config` legitimately never will, no code to check)                                                                                                        | `package.json` × 4                                     | V0 Slice 7                |
+| `apps/web` is a 255-line UI from the deleted architecture, wired to `:4000`; nothing listens there                                                                                                                                                                                                                                                   | `apps/web/src/App.tsx`                                 | V1 — delete, don't extend |
+| Preview iframe blank: dev-server port allocation had no liveness check, orphans survived API restarts, and dead processes stayed in the port map. **Fixed 2026-08-22** — `allocatePort()` probes the OS, `stopAllDevServers()` runs on exit, `exitCode` is checked before reusing a port, and both spawns use `inherit` instead of an undrained pipe | `apps/api/src/workspace/manager.ts`                    | fixed                     |
+| `MODEL_PROVIDERS` lists `llama-3.1-8b-instant`, which Groq no longer serves — picking it returns `model_not_found`. The xAI key in `.env` is also rejected. Found while verifying usage reporting; **not** fixed, because neither is about V1.1                                                                                                      | `packages/agent-core/src/providers/openai.ts` · `.env` | next session              |
 
 **Fixed this session, previously listed here:**
+
 - `safeResolve` / `workspaceRoot` — already exported when checked; the real bug was the fallback
   path in `PROJECTS_DIR` being off by one directory level (`../../../../templates` resolved to
-  `libs/templates`, not the repo root) — fixed to `../../../../../templates`.
+  `packages/templates`, not the repo root) — fixed to `../../../../../templates`.
 - `bun test` walking `ref-ai/`'s 438 tests — fixed via explicit roots in the `test` script
-  (`bun test services libs`) plus `--path-ignore-patterns 'ref-ai/**'`.
+  (`bun test apps packages`) plus `--path-ignore-patterns 'ref-ai/**'`.
 
-**Rule that caused all of this:** *"if a doc disagrees with the code, the code wins — then fix the
-doc that session."* It was written after the first two drifts and not applied. Re-run the audit at
+**Rule that caused all of this:** _"if a doc disagrees with the code, the code wins — then fix the
+doc that session."_ It was written after the first two drifts and not applied. Re-run the audit at
 every `/wrap`: open the files the docs name and check they say what the docs claim.
 
 **Exit criterion for V0:** `bun run agent "read package.json, then add a clean script to it"`
@@ -169,17 +190,17 @@ Every version has **one** acceptance test. No partial credit. Never skip a rung.
 
 ## The files
 
-| | |
-|---|---|
-| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | The system. Diagrams, data model, every layer, where we deviate from the deck |
-| **[VERSIONS.md](./VERSIONS.md)** | The ladder: eight rungs, ship criteria, estimates, sequencing rules |
-| **[versions/](./versions/)** | The actual TODO list per version, with traps and definition of done |
-| **[DECISIONS.md](./DECISIONS.md)** | 53 decisions with trade-offs, plus 14 open questions that block work when reached |
-| **[CODE_QUALITY.md](./CODE_QUALITY.md)** | How we write code here — patterns from `ref-ai/packages`. Keep it open while coding |
-| **[CRASH_COURSE.md](./CRASH_COURSE.md)** | Every concept explained so far, six lines each, dated. Written the moment it's taught |
-| **[LEARNING.md](./LEARNING.md)** | What to learn at each version, and what's actually been mastered |
-| **[INTERVIEW_PREP.md](./INTERVIEW_PREP.md)** | Questions built from this architecture |
-| **[sessions/](./sessions/)** | Session notes |
+|                                              |                                                                                       |
+| -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| **[ARCHITECTURE.md](./ARCHITECTURE.md)**     | The system. Diagrams, data model, every layer, where we deviate from the deck         |
+| **[VERSIONS.md](./VERSIONS.md)**             | The ladder: eight rungs, ship criteria, estimates, sequencing rules                   |
+| **[versions/](./versions/)**                 | The actual TODO list per version, with traps and definition of done                   |
+| **[DECISIONS.md](./DECISIONS.md)**           | 53 decisions with trade-offs, plus 14 open questions that block work when reached     |
+| **[CODE_QUALITY.md](./CODE_QUALITY.md)**     | How we write code here — patterns from `ref-ai/packages`. Keep it open while coding   |
+| **[CRASH_COURSE.md](./CRASH_COURSE.md)**     | Every concept explained so far, six lines each, dated. Written the moment it's taught |
+| **[LEARNING.md](./LEARNING.md)**             | What to learn at each version, and what's actually been mastered                      |
+| **[INTERVIEW_PREP.md](./INTERVIEW_PREP.md)** | Questions built from this architecture                                                |
+| **[sessions/](./sessions/)**                 | Session notes                                                                         |
 
 ---
 

@@ -223,18 +223,18 @@ interface QueueDispositionRecord {
 
 Capture and entry append occur in the same run-acceptance transaction, so no captured-but-unappended state exists. Queue modes affect which pending steer/follow-up items a checkpoint consumes, but every consumed set is removed and appended atomically.
 
-| Public input | Admission | Total-state transition |
-|---|---|---|
-| `nextRun` | any open harness state | append to `LaneStateRecord.pendingNextRun`; never starts a run |
-| `steer` | active running run | append complete item to `ActiveRunState.inbox.steer` |
-| `followUp` | active running run | append complete item to `ActiveRunState.inbox.followUp` |
-| lane-view tree write during run | active run, including suspension/cancellation | append complete item to `inbox.writes`; survives abort |
-| lane-view tree write while idle | idle lane | append entry directly and advance leaf |
-| lane-view tree write during compaction/navigation | structural operation open | wait until structural operation ends, then re-evaluate |
-| `cancelQueued` | item currently pending | remove from total state and append disposition atomically |
-| checkpoint consumes input | eligible pending item | append entry, remove item, and update continuation atomically |
-| first abort | running run | move steer/follow-up into durable abort control; writes remain pending |
-| finish | inbox empty and no required continuation | final operation state and lane current-operation clear atomically |
+| Public input                                      | Admission                                     | Total-state transition                                                 |
+| ------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| `nextRun`                                         | any open harness state                        | append to `LaneStateRecord.pendingNextRun`; never starts a run         |
+| `steer`                                           | active running run                            | append complete item to `ActiveRunState.inbox.steer`                   |
+| `followUp`                                        | active running run                            | append complete item to `ActiveRunState.inbox.followUp`                |
+| lane-view tree write during run                   | active run, including suspension/cancellation | append complete item to `inbox.writes`; survives abort                 |
+| lane-view tree write while idle                   | idle lane                                     | append entry directly and advance leaf                                 |
+| lane-view tree write during compaction/navigation | structural operation open                     | wait until structural operation ends, then re-evaluate                 |
+| `cancelQueued`                                    | item currently pending                        | remove from total state and append disposition atomically              |
+| checkpoint consumes input                         | eligible pending item                         | append entry, remove item, and update continuation atomically          |
+| first abort                                       | running run                                   | move steer/follow-up into durable abort control; writes remain pending |
+| finish                                            | inbox empty and no required continuation      | final operation state and lane current-operation clear atomically      |
 
 Acceptance, cancellation, application, abort, and finish all run on the same lane mutation line. Thus each race has only caller-A-first or caller-B-first history; no item can be both pending and applied in durable current state.
 
@@ -643,19 +643,19 @@ There is no durable response-without-usage or accounted-response-without-classif
 
 Classification is pure and runs before the atomic settlement transaction. Cancellation control takes priority. Without cancellation, evaluate in this order:
 
-| Durable response | Next state |
-|---|---|
-| explicit provider context-limit error | overflow handling |
-| `stop` with reported input plus cache-read greater than captured context window | overflow handling |
-| Xiaomi-compatible zero-output/full-window pressure | overflow handling |
-| `length` with output below captured intended output limit | overflow handling |
-| `deferred` with valid handle | deferred suspended |
-| unmarked `aborted`, attempts remain | generation retry wait |
-| unmarked `aborted`, no attempts remain | failure drain |
-| retryable `error`, attempts remain | generation retry wait |
-| other `error` | failure drain |
-| `toolUse` or accepted response with calls | tools with complete result plan |
-| `stop` or genuine output-limit `length` | checkpoint `may_finish` |
+| Durable response                                                                | Next state                      |
+| ------------------------------------------------------------------------------- | ------------------------------- |
+| explicit provider context-limit error                                           | overflow handling               |
+| `stop` with reported input plus cache-read greater than captured context window | overflow handling               |
+| Xiaomi-compatible zero-output/full-window pressure                              | overflow handling               |
+| `length` with output below captured intended output limit                       | overflow handling               |
+| `deferred` with valid handle                                                    | deferred suspended              |
+| unmarked `aborted`, attempts remain                                             | generation retry wait           |
+| unmarked `aborted`, no attempts remain                                          | failure drain                   |
+| retryable `error`, attempts remain                                              | generation retry wait           |
+| other `error`                                                                   | failure drain                   |
+| `toolUse` or accepted response with calls                                       | tools with complete result plan |
+| `stop` or genuine output-limit `length`                                         | checkpoint `may_finish`         |
 
 `intendedOutputLimit` is the caller's explicit limit or model limit before context clamping. The percentage heuristic is only the existing Xiaomi-compatible signal. Overflow handling never creates a tool plan.
 
@@ -687,16 +687,16 @@ If a crash leaves `effect_pending`, replay only when the declaration and impleme
 
 The complete batch plan exists before tool lookup, argument validation, or `before_tool`. Calls are identified privately by source index; public hooks/events/tool context use provider `toolCallId` and tool name. Tool IDs are required to be response-local unique.
 
-| Call state/input | Atomic result and next state |
-|---|---|
-| planned, unknown tool or invalid arguments | planned error result; mark completed |
-| planned, `before_tool` blocks or throws | planned blocked error; mark completed |
-| planned, control cancelled | planned aborted error; mark completed |
-| planned, clearance succeeds | total state becomes `effect_pending`; then dispatch effect |
-| live effect settles | run `after_tool`; usage + finalized result + completed state |
+| Call state/input                                          | Atomic result and next state                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------- |
+| planned, unknown tool or invalid arguments                | planned error result; mark completed                                  |
+| planned, `before_tool` blocks or throws                   | planned blocked error; mark completed                                 |
+| planned, control cancelled                                | planned aborted error; mark completed                                 |
+| planned, clearance succeeds                               | total state becomes `effect_pending`; then dispatch effect            |
+| live effect settles                                       | run `after_tool`; usage + finalized result + completed state          |
 | restored effect pending, replay safe now and when started | re-execute persisted args, finalize, usage + result + completed state |
-| restored effect pending, replay unsafe | interrupted error + completed state |
-| genuine `length` planned call | explanatory error + completed state; no clearance/effect |
+| restored effect pending, replay unsafe                    | interrupted error + completed state                                   |
+| genuine `length` planned call                             | explanatory error + completed state; no clearance/effect              |
 
 `after_tool` may patch content, details, error status, usage, and `terminate`; the finalized decision is stored in the result entry/state. Hook output must satisfy its contract. A hook crash before the atomic result transaction may rerun after a safe replay.
 
@@ -716,17 +716,17 @@ A crash cannot consume an item without updating operation state, or update opera
 
 ### Structural decision and generation transitions
 
-| State/input | Atomic result and next state |
-|---|---|
-| deciding, hook declines | finished `declined` for standalone operation; threshold returns to prior continuation; overflow enters failure drain |
-| deciding, hook supplies result | usage + exact typed entry + continuation/finished state |
-| deciding, hook selects generation | total state with generated summary `ready`; hook will not rerun |
-| generation ready or retry elapsed | total state `effect_pending`; then provider request(s) |
-| generation retryable failure | reported usage + retry-wait state |
-| generation terminal/exhausted | standalone finished failed or run failure drain |
-| generated compaction succeeds | usage + compaction entry + prior continuation/finished state |
-| generated branch summary succeeds | usage + move + summary + label + finished state |
-| cancellation before structural commit | reported usage still commits; generated result is discarded; finish aborted |
+| State/input                           | Atomic result and next state                                                                                         |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| deciding, hook declines               | finished `declined` for standalone operation; threshold returns to prior continuation; overflow enters failure drain |
+| deciding, hook supplies result        | usage + exact typed entry + continuation/finished state                                                              |
+| deciding, hook selects generation     | total state with generated summary `ready`; hook will not rerun                                                      |
+| generation ready or retry elapsed     | total state `effect_pending`; then provider request(s)                                                               |
+| generation retryable failure          | reported usage + retry-wait state                                                                                    |
+| generation terminal/exhausted         | standalone finished failed or run failure drain                                                                      |
+| generated compaction succeeds         | usage + compaction entry + prior continuation/finished state                                                         |
+| generated branch summary succeeds     | usage + move + summary + label + finished state                                                                      |
+| cancellation before structural commit | reported usage still commits; generated result is discarded; finish aborted                                          |
 
 Structural provider streams are internal and emit no public assistant-message lifecycle. Every provider request still crosses the effect boundary and writes reported usage before another request or structural completion. Hook-provided details remain opaque; generated details may use harness-owned structure.
 
@@ -765,43 +765,43 @@ Determine whether useful context exists before operation acceptance. If not, ret
 
 This is the normative high-level machine. Detailed transition functions must refine, not contradict, it.
 
-| Current state | Trigger | Durable transaction | Next state |
-|---|---|---|---|
-| idle lane | accepted prompt | lane state + operation record + initial entries + total operation state | run checkpoint `need_assistant` |
-| checkpoint `need_assistant` | drive | generation intent state | assistant effect pending |
-| assistant effect pending | settled response | response + usage + classified total state | retry/tools/deferred/compaction/checkpoint/failure |
-| assistant retry wait | delay elapsed | next generation intent state | assistant effect pending |
-| tools planned | clearance succeeds | call effect-pending total state | tools with started call |
-| tool effect pending | finalized result | usage + result + total state | tools or checkpoint |
-| checkpoint | accepted steer/follow-up/write | total state containing item | same checkpoint |
-| checkpoint | apply/consume item | entry + total state without item | `need_assistant` or prior continuation |
-| checkpoint | context threshold | compaction decision state | compaction |
-| compaction deciding | hook result | decline/result/generated-source transaction | continuation/generating/failure |
-| summary effect pending | provider outcome | usage + retry or final structural transaction | retry/continuation/finished/failure |
-| assistant response deferred | settlement | response + usage + copied deferred state | suspended |
-| deferred suspended | one `resume()` | poll intent state | deferred effect pending |
-| deferred effect pending | poll settles | response + usage + classified state | suspended/tools/checkpoint/failure |
-| failure drain | new user-context item applied | entry + total state | checkpoint `need_assistant` |
-| finish boundary | no hook follow-up or pending work | final state + lane state clears operation | finished |
-| any active state | first abort | cancellation control + drained inbox | same workflow under cancellation |
-| cancellation control | reconciliation complete | required results/writes + final state + clear lane operation | finished aborted |
+| Current state               | Trigger                           | Durable transaction                                                     | Next state                                         |
+| --------------------------- | --------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------- |
+| idle lane                   | accepted prompt                   | lane state + operation record + initial entries + total operation state | run checkpoint `need_assistant`                    |
+| checkpoint `need_assistant` | drive                             | generation intent state                                                 | assistant effect pending                           |
+| assistant effect pending    | settled response                  | response + usage + classified total state                               | retry/tools/deferred/compaction/checkpoint/failure |
+| assistant retry wait        | delay elapsed                     | next generation intent state                                            | assistant effect pending                           |
+| tools planned               | clearance succeeds                | call effect-pending total state                                         | tools with started call                            |
+| tool effect pending         | finalized result                  | usage + result + total state                                            | tools or checkpoint                                |
+| checkpoint                  | accepted steer/follow-up/write    | total state containing item                                             | same checkpoint                                    |
+| checkpoint                  | apply/consume item                | entry + total state without item                                        | `need_assistant` or prior continuation             |
+| checkpoint                  | context threshold                 | compaction decision state                                               | compaction                                         |
+| compaction deciding         | hook result                       | decline/result/generated-source transaction                             | continuation/generating/failure                    |
+| summary effect pending      | provider outcome                  | usage + retry or final structural transaction                           | retry/continuation/finished/failure                |
+| assistant response deferred | settlement                        | response + usage + copied deferred state                                | suspended                                          |
+| deferred suspended          | one `resume()`                    | poll intent state                                                       | deferred effect pending                            |
+| deferred effect pending     | poll settles                      | response + usage + classified state                                     | suspended/tools/checkpoint/failure                 |
+| failure drain               | new user-context item applied     | entry + total state                                                     | checkpoint `need_assistant`                        |
+| finish boundary             | no hook follow-up or pending work | final state + lane state clears operation                               | finished                                           |
+| any active state            | first abort                       | cancellation control + drained inbox                                    | same workflow under cancellation                   |
+| cancellation control        | reconciliation complete           | required results/writes + final state + clear lane operation            | finished aborted                                   |
 
 ### Crash table
 
 Atomic transactions have no internal crash prefix. For each repeat-sensitive effect, only these states exist:
 
-| Crash point | Durable state | Recovery |
-|---|---|---|
-| before effect-intent transaction | previous total state | plan the effect normally |
-| after effect intent, before dispatch | effect pending; effect did not run or dispatch status was lost | apply the effect's uncertainty policy; cancellation prevents dispatch |
-| during/after external effect, before settlement transaction | effect pending; external outcome unknown | generation retries under captured policy, tools replay only when safe, deferred waits for another application resume, cancellation settles as specified |
-| after settlement transaction | output, usage, and next total state all durable | continue from next state; never repeat settlement |
-| before queue/write application transaction | item remains fully pending in total state | apply later |
-| after queue/write application transaction | entry exists and item is absent; continuation updated | continue; never apply twice |
-| before final structural transaction | source leaf and generated/hook work remain uncommitted | retry/recompute only according to current state and external-effect policy |
-| after final structural transaction | move/entry/label/usage/finished state all durable | operation is complete |
-| after first abort transaction | cancellation and drained payloads durable | never start new ordinary effects; reconcile pending workflow |
-| after terminal transaction | finished state and lane clear are durable | lane is idle |
+| Crash point                                                 | Durable state                                                  | Recovery                                                                                                                                                |
+| ----------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| before effect-intent transaction                            | previous total state                                           | plan the effect normally                                                                                                                                |
+| after effect intent, before dispatch                        | effect pending; effect did not run or dispatch status was lost | apply the effect's uncertainty policy; cancellation prevents dispatch                                                                                   |
+| during/after external effect, before settlement transaction | effect pending; external outcome unknown                       | generation retries under captured policy, tools replay only when safe, deferred waits for another application resume, cancellation settles as specified |
+| after settlement transaction                                | output, usage, and next total state all durable                | continue from next state; never repeat settlement                                                                                                       |
+| before queue/write application transaction                  | item remains fully pending in total state                      | apply later                                                                                                                                             |
+| after queue/write application transaction                   | entry exists and item is absent; continuation updated          | continue; never apply twice                                                                                                                             |
+| before final structural transaction                         | source leaf and generated/hook work remain uncommitted         | retry/recompute only according to current state and external-effect policy                                                                              |
+| after final structural transaction                          | move/entry/label/usage/finished state all durable              | operation is complete                                                                                                                                   |
+| after first abort transaction                               | cancellation and drained payloads durable                      | never start new ordinary effects; reconcile pending workflow                                                                                            |
+| after terminal transaction                                  | finished state and lane clear are durable                      | lane is idle                                                                                                                                            |
 
 The unavoidable uncertain interval is effect intent durable with settlement absent. Provider, tool, hook, and billing examples all belong to the single external-effect non-goal.
 

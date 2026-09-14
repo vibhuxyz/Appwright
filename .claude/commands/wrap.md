@@ -12,15 +12,22 @@ Next number in sequence. Match the format of the existing session notes:
 
 ```markdown
 # Session 0N
+
 **Date:** [today, absolute date]
 **Goal of the Session:** [what we set out to do]
 
 ## What We Built
+
 ## What I Implemented Myself
+
 ## New Concepts Learned
+
 ## Engineering Decisions Made
+
 ## Mistakes I Made
+
 ## Homework Before Next Session
+
 ## Next Session Plan
 ```
 
@@ -58,7 +65,7 @@ for its only job — deciding how much to explain next time.
 
 ## 5. Update `docs/LEARNING.md`
 
-- Move a concept to **Mastered** only if I can explain it *and* shipped code using it. Date it.
+- Move a concept to **Mastered** only if I can explain it _and_ shipped code using it. Date it.
 - Add anything new to **Currently Learning**
 - If I repeated a mistake, write it down — repeated mistakes are the signal worth tracking
 
@@ -68,7 +75,7 @@ The six-line cards should already be in there — they get written the moment a 
 not at wrap. So here, just three things:
 
 - Update the **State** column. `🟡 taught` → `✅ shipped` only when I have code using it that runs.
-- Promote anything from *"mentioned but not yet taught"* that got a real explanation today.
+- Promote anything from _"mentioned but not yet taught"_ that got a real explanation today.
 - If you had to re-explain a concept, date it. **A concept taught twice means the first analogy
   failed** — replace it, don't add a second card.
 

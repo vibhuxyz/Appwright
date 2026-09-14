@@ -3,6 +3,7 @@
 LLMs have limited context windows. When conversations grow too long, Pi uses compaction to summarize older content while preserving recent work. This page covers both auto-compaction and branch summarization.
 
 **Source files** ([pi-mono](https://github.com/earendil-works/pi-mono)):
+
 - [`packages/coding-agent/src/core/compaction/compaction.ts`](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/src/core/compaction/compaction.ts) - Auto-compaction logic
 - [`packages/coding-agent/src/core/compaction/branch-summarization.ts`](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/src/core/compaction/branch-summarization.ts) - Branch summarization
 - [`packages/coding-agent/src/core/compaction/utils.ts`](https://github.com/earendil-works/pi-mono/blob/main/packages/coding-agent/src/core/compaction/utils.ts) - Shared utilities (file tracking, serialization)
@@ -15,10 +16,10 @@ For TypeScript definitions in your project, inspect `node_modules/@earendil-work
 
 Pi has two summarization mechanisms:
 
-| Mechanism | Trigger | Purpose |
-|-----------|---------|---------|
-| Compaction | Context exceeds threshold, or `/compact` | Summarize old messages to free up context |
-| Branch summarization | `/tree` navigation | Preserve context when switching branches |
+| Mechanism            | Trigger                                  | Purpose                                   |
+| -------------------- | ---------------------------------------- | ----------------------------------------- |
+| Compaction           | Context exceeds threshold, or `/compact` | Summarize old messages to free up context |
+| Branch summarization | `/tree` navigation                       | Preserve context when switching branches  |
 
 Both use the same structured summary format and track file operations cumulatively. Compaction and branch-summary requests use fresh routing session IDs and, where supported by the provider, disable prompt-cache writes because these one-off prompts are unlikely to be reused.
 
@@ -103,12 +104,14 @@ Split turn (one huge turn exceeds budget):
 ```
 
 For split turns, Pi generates two summaries and merges them:
+
 1. **History summary**: Previous context (if any)
 2. **Turn prefix summary**: The early part of the split turn
 
 ### Cut Point Rules
 
 Valid cut points are:
+
 - User messages
 - Assistant messages
 - BashExecution messages
@@ -129,9 +132,9 @@ interface CompactionEntry<T = unknown> {
   summary: string;
   firstKeptEntryId: string;
   tokensBefore: number;
-  usage?: Usage;       // LLM usage that generated the summary
-  fromHook?: boolean;  // true if provided by extension (legacy field name)
-  details?: T;         // implementation-specific data
+  usage?: Usage; // LLM usage that generated the summary
+  fromHook?: boolean; // true if provided by extension (legacy field name)
+  details?: T; // implementation-specific data
 }
 
 // Default compaction uses this for details (from compaction.ts):
@@ -179,6 +182,7 @@ After navigation with summary:
 ### Cumulative File Tracking
 
 Both compaction and branch summarization track files cumulatively. When generating a summary, pi extracts file operations from:
+
 - Tool calls in the messages being summarized
 - Previous compaction or branch summary `details` (if any)
 
@@ -195,10 +199,10 @@ interface BranchSummaryEntry<T = unknown> {
   parentId: string;
   timestamp: number;
   summary: string;
-  fromId: string;      // Entry we navigated from
-  usage?: Usage;       // LLM usage that generated the summary
-  fromHook?: boolean;  // true if provided by extension (legacy field name)
-  details?: T;         // implementation-specific data
+  fromId: string; // Entry we navigated from
+  usage?: Usage; // LLM usage that generated the summary
+  fromHook?: boolean; // true if provided by extension (legacy field name)
+  details?: T; // implementation-specific data
 }
 
 // Default branch summarization uses this for details (from branch-summarization.ts):
@@ -218,28 +222,37 @@ Both compaction and branch summarization use the same structured format:
 
 ```markdown
 ## Goal
+
 [What the user is trying to accomplish]
 
 ## Constraints & Preferences
+
 - [Requirements mentioned by user]
 
 ## Progress
+
 ### Done
+
 - [x] [Completed tasks]
 
 ### In Progress
+
 - [ ] [Current work]
 
 ### Blocked
+
 - [Issues, if any]
 
 ## Key Decisions
+
 - **[Decision]**: [Rationale]
 
 ## Next Steps
+
 1. [What should happen next]
 
 ## Critical Context
+
 - [Data needed to continue]
 
 <read-files>
@@ -278,7 +291,14 @@ Fired before auto-compaction or `/compact`. Can cancel or provide custom summary
 
 ```typescript
 pi.on("session_before_compact", async (event, ctx) => {
-  const { preparation, branchEntries, customInstructions, reason, willRetry, signal } = event;
+  const {
+    preparation,
+    branchEntries,
+    customInstructions,
+    reason,
+    willRetry,
+    signal,
+  } = event;
 
   // preparation.messagesToSummarize - messages to summarize
   // preparation.turnPrefixMessages - split turn prefix (if isSplitTurn)
@@ -303,8 +323,8 @@ pi.on("session_before_compact", async (event, ctx) => {
       firstKeptEntryId: preparation.firstKeptEntryId,
       tokensBefore: preparation.tokensBefore,
       // usage: summaryResponse.usage, // Optional; included in session totals
-      details: { /* custom data */ },
-    }
+      details: {/* custom data */},
+    },
   };
 });
 ```
@@ -314,14 +334,17 @@ pi.on("session_before_compact", async (event, ctx) => {
 To generate a summary with your own model, convert messages to text using `serializeConversation`:
 
 ```typescript
-import { convertToLlm, serializeConversation } from "@earendil-works/pi-coding-agent";
+import {
+  convertToLlm,
+  serializeConversation,
+} from "@earendil-works/pi-coding-agent";
 
 pi.on("session_before_compact", async (event, ctx) => {
   const { preparation } = event;
-  
+
   // Convert AgentMessage[] to Message[], then serialize to text
   const conversationText = serializeConversation(
-    convertToLlm(preparation.messagesToSummarize)
+    convertToLlm(preparation.messagesToSummarize),
   );
   // Returns:
   // [User]: message text
@@ -332,14 +355,14 @@ pi.on("session_before_compact", async (event, ctx) => {
 
   // Now send to your model for summarization
   const { summary, usage } = await myModel.summarize(conversationText);
-  
+
   return {
     compaction: {
       summary,
       firstKeptEntryId: preparation.firstKeptEntryId,
       tokensBefore: preparation.tokensBefore,
       usage,
-    }
+    },
   };
 });
 ```
@@ -369,8 +392,8 @@ pi.on("session_before_tree", async (event, ctx) => {
       summary: {
         summary: "Your summary...",
         // usage: summaryResponse.usage, // Optional; included in session totals
-        details: { /* custom data */ },
-      }
+        details: {/* custom data */},
+      },
     };
   }
 });
@@ -392,10 +415,10 @@ Configure compaction in `~/.pi/agent/settings.json` or `<project-dir>/.pi/settin
 }
 ```
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `enabled` | `true` | Enable auto-compaction |
-| `reserveTokens` | `16384` | Tokens to reserve for LLM response |
+| Setting            | Default | Description                            |
+| ------------------ | ------- | -------------------------------------- |
+| `enabled`          | `true`  | Enable auto-compaction                 |
+| `reserveTokens`    | `16384` | Tokens to reserve for LLM response     |
 | `keepRecentTokens` | `20000` | Recent tokens to keep (not summarized) |
 
 Disable auto-compaction with `"enabled": false`. You can still compact manually with `/compact`.

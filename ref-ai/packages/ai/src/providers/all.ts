@@ -1,6 +1,15 @@
-import { createImagesModels, type ImagesProvider, type MutableImagesModels } from "../images-models.ts";
+import {
+  createImagesModels,
+  type ImagesProvider,
+  type MutableImagesModels,
+} from "../images-models.ts";
 import { MODELS } from "../models.generated.ts";
-import { type CreateModelsOptions, createModels, type MutableModels, type Provider } from "../models.ts";
+import {
+  type CreateModelsOptions,
+  createModels,
+  type MutableModels,
+  type Provider,
+} from "../models.ts";
 import type { Api, Model } from "../types.ts";
 import { amazonBedrockProvider } from "./amazon-bedrock.ts";
 import { antLingProvider } from "./ant-ling.ts";
@@ -53,103 +62,116 @@ export { radiusProvider };
 export type BuiltinProvider = keyof typeof MODELS;
 
 type BuiltinModelApi<
-	TProvider extends BuiltinProvider,
-	TModelId extends keyof (typeof MODELS)[TProvider],
-> = (typeof MODELS)[TProvider][TModelId] extends { api: infer TApi } ? (TApi extends Api ? TApi : never) : never;
+  TProvider extends BuiltinProvider,
+  TModelId extends keyof (typeof MODELS)[TProvider],
+> = (typeof MODELS)[TProvider][TModelId] extends { api: infer TApi }
+  ? TApi extends Api
+    ? TApi
+    : never
+  : never;
 
 /** Typed read of the generated built-in catalog. */
-export function getBuiltinModel<TProvider extends BuiltinProvider, TModelId extends keyof (typeof MODELS)[TProvider]>(
-	provider: TProvider,
-	modelId: TModelId,
+export function getBuiltinModel<
+  TProvider extends BuiltinProvider,
+  TModelId extends keyof (typeof MODELS)[TProvider],
+>(
+  provider: TProvider,
+  modelId: TModelId,
 ): Model<BuiltinModelApi<TProvider, TModelId>> {
-	const models = MODELS[provider] as Record<string, Model<Api>> | undefined;
-	return models?.[modelId as string] as Model<BuiltinModelApi<TProvider, TModelId>>;
+  const models = MODELS[provider] as Record<string, Model<Api>> | undefined;
+  return models?.[modelId as string] as Model<
+    BuiltinModelApi<TProvider, TModelId>
+  >;
 }
 
 export function getBuiltinProviders(): BuiltinProvider[] {
-	return Object.keys(MODELS) as BuiltinProvider[];
+  return Object.keys(MODELS) as BuiltinProvider[];
 }
 
 /** Generation timestamp shared by all built-in provider catalogs. */
 export function getBuiltinModelDataGeneratedAt(): number | undefined {
-	const generatedAt = Date.parse(modelDataManifest.generatedAt);
-	return Number.isNaN(generatedAt) ? undefined : generatedAt;
+  const generatedAt = Date.parse(modelDataManifest.generatedAt);
+  return Number.isNaN(generatedAt) ? undefined : generatedAt;
 }
 
 export function getBuiltinModels<TProvider extends BuiltinProvider>(
-	provider: TProvider,
+  provider: TProvider,
 ): Model<BuiltinModelApi<TProvider, keyof (typeof MODELS)[TProvider]>>[] {
-	const models = MODELS[provider] as Record<string, Model<Api>> | undefined;
-	return models
-		? (Object.values(models) as Model<BuiltinModelApi<TProvider, keyof (typeof MODELS)[TProvider]>>[])
-		: [];
+  const models = MODELS[provider] as Record<string, Model<Api>> | undefined;
+  return models
+    ? (Object.values(models) as Model<
+        BuiltinModelApi<TProvider, keyof (typeof MODELS)[TProvider]>
+      >[])
+    : [];
 }
 
 /** All built-in providers, freshly constructed. */
 export function builtinProviders(): Provider[] {
-	return [
-		amazonBedrockProvider(),
-		antLingProvider(),
-		anthropicProvider(),
-		azureOpenAIResponsesProvider(),
-		basetenProvider(),
-		cerebrasProvider(),
-		cloudflareAIGatewayProvider(),
-		cloudflareWorkersAIProvider(),
-		deepseekProvider(),
-		fireworksProvider(),
-		githubCopilotProvider(),
-		googleProvider(),
-		googleVertexProvider(),
-		groqProvider(),
-		huggingfaceProvider(),
-		kimiCodingProvider(),
-		minimaxProvider(),
-		minimaxCnProvider(),
-		mistralProvider(),
-		moonshotaiProvider(),
-		moonshotaiCnProvider(),
-		nvidiaProvider(),
-		openaiProvider(),
-		openaiCodexProvider(),
-		opencodeProvider(),
-		opencodeGoProvider(),
-		openrouterProvider(),
-		qwenTokenPlanProvider(),
-		qwenTokenPlanCnProvider(),
-		qwenTokenPlanIndividualProvider(),
-		radiusProvider(),
-		togetherProvider(),
-		vercelAIGatewayProvider(),
-		xaiProvider(),
-		xiaomiProvider(),
-		xiaomiTokenPlanAmsProvider(),
-		xiaomiTokenPlanCnProvider(),
-		xiaomiTokenPlanSgpProvider(),
-		zaiProvider(),
-		zaiCodingCnProvider(),
-	];
+  return [
+    amazonBedrockProvider(),
+    antLingProvider(),
+    anthropicProvider(),
+    azureOpenAIResponsesProvider(),
+    basetenProvider(),
+    cerebrasProvider(),
+    cloudflareAIGatewayProvider(),
+    cloudflareWorkersAIProvider(),
+    deepseekProvider(),
+    fireworksProvider(),
+    githubCopilotProvider(),
+    googleProvider(),
+    googleVertexProvider(),
+    groqProvider(),
+    huggingfaceProvider(),
+    kimiCodingProvider(),
+    minimaxProvider(),
+    minimaxCnProvider(),
+    mistralProvider(),
+    moonshotaiProvider(),
+    moonshotaiCnProvider(),
+    nvidiaProvider(),
+    openaiProvider(),
+    openaiCodexProvider(),
+    opencodeProvider(),
+    opencodeGoProvider(),
+    openrouterProvider(),
+    qwenTokenPlanProvider(),
+    qwenTokenPlanCnProvider(),
+    qwenTokenPlanIndividualProvider(),
+    radiusProvider(),
+    togetherProvider(),
+    vercelAIGatewayProvider(),
+    xaiProvider(),
+    xiaomiProvider(),
+    xiaomiTokenPlanAmsProvider(),
+    xiaomiTokenPlanCnProvider(),
+    xiaomiTokenPlanSgpProvider(),
+    zaiProvider(),
+    zaiCodingCnProvider(),
+  ];
 }
 
 /** A `Models` collection with every built-in provider registered. */
 export function builtinModels(options?: CreateModelsOptions): MutableModels {
-	const models = createModels(options);
-	for (const provider of builtinProviders()) {
-		models.setProvider(provider);
-	}
-	return models;
+  const models = createModels(options);
+  for (const provider of builtinProviders()) {
+    models.setProvider(provider);
+  }
+  return models;
 }
 
 /** All built-in image-generation providers, freshly constructed. */
 export function builtinImagesProviders(): ImagesProvider[] {
-	return [openrouterImagesProvider()];
+  return [openrouterImagesProvider()];
 }
 
 /** An `ImagesModels` collection with every built-in image-generation provider registered. */
-export function builtinImagesModels(options?: CreateModelsOptions): MutableImagesModels {
-	const models = createImagesModels(options);
-	for (const provider of builtinImagesProviders()) {
-		models.setProvider(provider);
-	}
-	return models;
+export function builtinImagesModels(
+  options?: CreateModelsOptions,
+): MutableImagesModels {
+  const models = createImagesModels(options);
+  for (const provider of builtinImagesProviders()) {
+    models.setProvider(provider);
+  }
+  return models;
 }

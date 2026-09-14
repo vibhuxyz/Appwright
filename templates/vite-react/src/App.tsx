@@ -1,7 +1,13 @@
-import { Sparkles } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Sparkles } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 // This page is a starter, and a starter is the strongest prompt in the
 // repo — whatever it demonstrates is what gets imitated. So it composes
@@ -27,7 +33,7 @@ function App() {
         </CardContent>
       </Card>
     </main>
-  )
+  );
 }
 
-export default App
+export default App;

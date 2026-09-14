@@ -27,7 +27,7 @@ open /login → type an email → type a password → click Login → assert /da
 That is the difference between a code generator and something you would let a company use.
 
 **And it is what makes V6's self-healing worth building.** A healer fed `tsc` errors can fix
-types. A healer fed *"login returned 500, the API threw on a null user"* can fix the product.
+types. A healer fed _"login returned 500, the API threw on a null user"_ can fix the product.
 Building the healer first means tuning it against the weaker signal, then re-tuning.
 
 ---
@@ -52,7 +52,7 @@ User: "Build a signup page"
   2 issues found. Investigating…
 ```
 
-**Done means:** the agent found real bugs *by using the app*, not by reading the code — including
+**Done means:** the agent found real bugs _by using the app_, not by reading the code — including
 one the compiler could never catch (the overflow).
 
 ---
@@ -117,6 +117,7 @@ Playwright's `getByRole` is built on exactly this.
 ## TODO
 
 ### Slice 1 — Playwright in the sandbox
+
 - [ ] Add Chromium + Playwright to the sandbox image. It is large — measure the cold-start cost
       before and after, because [D19](../DECISIONS.md#decision-19-object-storage--snapshots-and-dumps-not-git--active-target-v3)'s
       snapshots have to carry it.
@@ -126,6 +127,7 @@ Playwright's `getByRole` is built on exactly this.
 - [ ] Hard limits: page-load timeout, action timeout, max actions per run.
 
 ### Slice 2 — The tools
+
 - [ ] `browser_navigate(url)`
 - [ ] `browser_snapshot()` → the accessibility tree, **truncated** (see traps)
 - [ ] `browser_click({ role, name })`
@@ -139,9 +141,10 @@ Playwright's `getByRole` is built on exactly this.
       ([CODE_QUALITY.md §12](../CODE_QUALITY.md))
 
 ### Slice 3 — Authoring tests
+
 - [ ] The blueprint's `pages` and `features` become **test intents**: signup → happy path, each
       validation rule, the duplicate case.
-- [ ] LLM writes the **intent** (*"a duplicate email should show an inline error"*).
+- [ ] LLM writes the **intent** (_"a duplicate email should show an inline error"_).
       Deterministic code runs it. Same split as [D9](../DECISIONS.md#decision-9-deterministic-engines-over-bigger-prompts--active-target-v4).
 - [ ] Persist test intents so the same suite re-runs on every future change — this is how a
       returning user's change gets caught breaking an old feature.
@@ -149,6 +152,7 @@ Playwright's `getByRole` is built on exactly this.
       created that user, and the agent "fixes" a bug that does not exist.
 
 ### Slice 4 — Visual checking
+
 - [ ] Screenshot at 3 viewports: 375 (mobile), 768 (tablet), 1440 (desktop).
 - [ ] Store in the bucket, keyed by `project/session/page/viewport`.
 - [ ] **Start with rule-based checks, not pixel diffing:** horizontal overflow
@@ -157,14 +161,15 @@ Playwright's `getByRole` is built on exactly this.
       breakage.
 - [ ] Pixel diffing **only against a previous run of the same project**. Never against a "correct"
       baseline — there isn't one for a freshly generated app.
-- [ ] A vision-model pass (*"does this look broken?"*) is the last resort, not the first tool.
+- [ ] A vision-model pass (_"does this look broken?"_) is the last resort, not the first tool.
 
 ### Slice 4b — Requested-change and regression checking
+
 - [ ] **Deepen [V4.5](./V4_5_VISUAL_EDITOR.md)'s requested-change verification**, do not rebuild it.
       V4.5 already asserts `asked 286 → rendered 286`
       ([D51](../DECISIONS.md#decision-51-verification-checks-the-request-that-was-made-not-a-general-notion-of-good--active-target-v45-deepens-at-v5)).
-      V5 adds the checks that need a driven browser: *"sticky"* → scroll and re-measure,
-      *"side by side"* → same row.
+      V5 adds the checks that need a driven browser: _"sticky"_ → scroll and re-measure,
+      _"side by side"_ → same row.
 - [ ] **UI regression detection.** An agent fixing a button must not silently break the navbar —
       compare DOM snapshots and screenshots against **the previous run**, never an absolute ideal.
 - [ ] Full-page checks across the four viewports: 390 · 768 · 1024 · 1440. Overflow, alignment,
@@ -177,12 +182,14 @@ Playwright's `getByRole` is built on exactly this.
       adds up fast ([O22](../DECISIONS.md#open--not-yet-decided)).
 
 ### Slice 5 — Wire it into verification
+
 - [ ] Extend the verification tiers ([D21](../DECISIONS.md)): compile → run → **interact** → **look**.
 - [ ] A task is not green until its tier passes.
 - [ ] Emit browser events into the same stream — the user watches the agent click through their app.
       This is a genuinely great demo, and it is free once `emit` is threaded.
 
 ### Slice 6 — Prove it
+
 - [ ] The full acceptance test above.
 - [ ] Plant a runtime bug the compiler cannot see (an API that throws on a null field). The browser
       test must catch it.
@@ -195,31 +202,31 @@ Playwright's `getByRole` is built on exactly this.
 ## Files this version touches
 
 ```
-NEW  libs/ts/browser/src/session.ts      BrowserSession interface + Playwright adapter
-NEW  libs/ts/browser/src/snapshot.ts     accessibility tree → compact text, truncated
-NEW  libs/ts/browser/src/visual.ts       rule-based layout checks
-NEW  libs/ts/tools/src/browser.ts        the tool definitions
-EDIT libs/ts/agent-core/src/types.ts     browser_* event variants
-EDIT libs/ts/verify/src/*                add the interact + look tiers
-EDIT libs/ts/db/prisma/schema.prisma     TestIntent, TestRun, Screenshot
-EDIT services/web/src/*                  render browser steps + screenshots in the stream
+NEW  packages/browser/src/session.ts      BrowserSession interface + Playwright adapter
+NEW  packages/browser/src/snapshot.ts     accessibility tree → compact text, truncated
+NEW  packages/browser/src/visual.ts       rule-based layout checks
+NEW  packages/tools/src/browser.ts        the tool definitions
+EDIT packages/agent-core/src/types.ts     browser_* event variants
+EDIT packages/verify/src/*                add the interact + look tiers
+EDIT packages/db/prisma/schema.prisma     TestIntent, TestRun, Screenshot
+EDIT apps/web/src/*                  render browser steps + screenshots in the stream
 ```
 
 ---
 
 ## Traps
 
-| Trap | Symptom | Fix |
-|---|---|---|
-| **Coordinates instead of roles** | Tests break on every style change | Accessibility tree only |
-| **Untruncated snapshots** | One complex page fills the context window | Truncate like file reads — depth limit + interactive elements first |
-| **`sleep` instead of waiting** | Flaky. Passes on your machine, fails in CI | `wait_for` a role/name, never a timer |
-| **No DB reset between cases** | Test 2 fails from test 1's data; agent "fixes" a non-bug | Reset or transaction-rollback per case |
-| **Pixel diff against a "correct" baseline** | Everything fails — there is no baseline for new code | Diff against the previous run only |
-| **Testing against HMR dev server** | Random failures mid-hot-reload | Production build for test runs |
-| **Vision model as the first tool** | Slow, expensive, vague | Rule-based checks first; vision last |
-| **Flaky suite** | V6's healer chases ghosts and burns budget | Slice 6's "run it twice" gate |
-| **Browser per tool call** | 2s of launch overhead per click | One browser per session |
+| Trap                                        | Symptom                                                  | Fix                                                                 |
+| ------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------------- |
+| **Coordinates instead of roles**            | Tests break on every style change                        | Accessibility tree only                                             |
+| **Untruncated snapshots**                   | One complex page fills the context window                | Truncate like file reads — depth limit + interactive elements first |
+| **`sleep` instead of waiting**              | Flaky. Passes on your machine, fails in CI               | `wait_for` a role/name, never a timer                               |
+| **No DB reset between cases**               | Test 2 fails from test 1's data; agent "fixes" a non-bug | Reset or transaction-rollback per case                              |
+| **Pixel diff against a "correct" baseline** | Everything fails — there is no baseline for new code     | Diff against the previous run only                                  |
+| **Testing against HMR dev server**          | Random failures mid-hot-reload                           | Production build for test runs                                      |
+| **Vision model as the first tool**          | Slow, expensive, vague                                   | Rule-based checks first; vision last                                |
+| **Flaky suite**                             | V6's healer chases ghosts and burns budget               | Slice 6's "run it twice" gate                                       |
+| **Browser per tool call**                   | 2s of launch overhead per click                          | One browser per session                                             |
 
 ---
 

@@ -13,14 +13,14 @@ preview, review, iterate, deploy.
 
 ## Read before working
 
-| | |
-|---|---|
-| `docs/README.md` | **Start here.** Current version, current slice, and the known-broken list |
-| `docs/versions/V*.md` | Only the current version. **Its checkboxes are the progress record** |
-| `docs/DECISIONS.md` | 53 entries. What is locked (don't reopen) and what is open (may block) |
-| `docs/SESSION_PROTOCOL.md` | The `/start` and `/wrap` rituals, tool-neutral |
-| `docs/CRASH_COURSE.md` | Every concept explained so far, six lines each |
-| `docs/ARCHITECTURE.md` | Only when the task touches a layer you're unsure about |
+|                            |                                                                           |
+| -------------------------- | ------------------------------------------------------------------------- |
+| `docs/README.md`           | **Start here.** Current version, current slice, and the known-broken list |
+| `docs/versions/V*.md`      | Only the current version. **Its checkboxes are the progress record**      |
+| `docs/DECISIONS.md`        | 53 entries. What is locked (don't reopen) and what is open (may block)    |
+| `docs/SESSION_PROTOCOL.md` | The `/start` and `/wrap` rituals, tool-neutral                            |
+| `docs/CRASH_COURSE.md`     | Every concept explained so far, six lines each                            |
+| `docs/ARCHITECTURE.md`     | Only when the task touches a layer you're unsure about                    |
 
 ---
 
@@ -61,7 +61,7 @@ Go deeper   the version where this stops being enough
 Write it into `docs/CRASH_COURSE.md` **immediately**, not at wrap — by then the wording is gone.
 
 **Full depth is earned, not default.** Use the long 7-step explanation only when the current version
-is *actually about* that concept, or when asked. Never stack two or three explanations before
+is _actually about_ that concept, or when asked. Never stack two or three explanations before
 writing a line of code.
 
 ---
@@ -81,7 +81,7 @@ writing a line of code.
 
 - **Delete `ref-ai/`** — read-only reference. 10 MIT TypeScript packages, 252k lines. The loop is at
   `ref-ai/packages/agent/src/agent-loop.ts`.
-- **Import `node:fs` or `node:child_process` in `libs/ts/agent-core`** — tools go through the
+- **Import `node:fs` or `node:child_process` in `packages/agent-core`** — tools go through the
   `Runtime` seam ([D27](docs/DECISIONS.md)). A leak here turns V3 into a rewrite.
 - **Put a secret in an LLM prompt.** `DATABASE_URL` and `AUTH_SECRET` are generated at provision
   time and injected as env vars. The path fence denies `.env` explicitly ([D15](docs/DECISIONS.md)).
@@ -92,34 +92,43 @@ writing a line of code.
 
 ## Commands
 
-No task runner ([D11](docs/DECISIONS.md)) — `package.json` scripts are the surface, Docker Compose
-runs the stack.
+Turborepo since [D54](docs/DECISIONS.md) (reverses [D11](docs/DECISIONS.md)) — `package.json`
+scripts are still the surface, now delegating to `turbo run <task>` for `build`/`dev`/`check-types`/`lint`.
+Docker Compose runs the stateful stack (Postgres, Redis; Kafka + workers behind `--profile events`).
 
 ```bash
 bun install
 bun run agent "…"        # the V0 harness
 bun run dev:api          # :3001
 bun run dev:web          # :3000
-bun run dev              # docker compose up — Postgres, Redis, api, web
+bun run dev              # turbo run dev — apps/api + apps/web, host-native
+docker compose up        # Postgres, Redis, api, web — add `--profile events` for Kafka + workers
 bun run check-types      bun run test      bun run lint
 ```
 
 **Known broken, verified 2026-08-11:** `bun test` has no `bunfig.toml`, so it walks `ref-ai`'s 438
-tests and hangs. `bun run check-types` covers 4 of 11 packages. See `docs/README.md`.
+tests and hangs. `bun run check-types` covers 14 of 20 workspace members. See `docs/README.md`.
 
 ---
 
 ## Layout
 
 ```
-services/   web · api · orchestrator          things that run as a process
-libs/ts/    agent-core · tools · contracts · db · ui · config
-templates/  vite-react · nextjs-fullstack (V4)   pristine starters the agent copies
-docker/     one Dockerfile per service, root build context
-ref-ai/     read-only reference — never delete
-docs/       the plan, and the memory
+apps/            web · api · orchestrator          things that run as a process
+packages/        agent-core · auth · cache · config · contracts · db · events ·
+                  logger · tools · ui-system · eslint-config · typescript-config
+workers/         ingestion · indexing · evaluation · maintenance   D56, `--profile events`
+infrastructure/  docker · compose · k8s (reserved) · terraform (reserved)
+templates/       vite-react · nextjs-fullstack (V4)   pristine starters the agent copies
+ref-ai/          read-only reference — never delete
+docs/            the plan, and the memory
 ```
 
+**Renamed from `services/` + `libs/ts/` + `docker/` on 2026-09-15** — see
+[D54](docs/DECISIONS.md) for why (reverses [D11](docs/DECISIONS.md), [D12](docs/DECISIONS.md), a
+user-directed call, not an earned one). If a stale doc still says `services/` or `libs/ts/`, the
+new tree above wins per the "code wins" rule.
+
 **TypeScript end to end** ([D4](docs/DECISIONS.md)). The agent is a library the API imports — no
-service boundary, no codegen. `services/worker` appears at V3 for **isolation**, which is a real
-reason.
+service boundary, no codegen. `apps/orchestrator` is still the empty stub V3 fills in, for
+**isolation**, which is a real reason.

@@ -2,8 +2,8 @@
 
 > Every rule below was pulled out of **`ref-ai/packages`** — a real, production-quality agent
 > codebase: **252k lines** of TypeScript across 10 packages — 119k of source, 109k across 438 test
-> files. MIT licensed. *(Counted 2026-08-11: `find ref-ai -name '*.ts' -o -name '*.tsx' | xargs wc -l`.
-> Earlier drafts said "142k", which no counting method reproduces.)*
+> files. MIT licensed. _(Counted 2026-08-11: `find ref-ai -name '*.ts' -o -name '*.tsx' | xargs wc -l`.
+> Earlier drafts said "142k", which no counting method reproduces.)_
 >
 > Not generic clean-code advice. Each one is a rule they follow consistently, and most exist
 > because of a specific failure they clearly hit once. **We write TypeScript too**
@@ -18,16 +18,16 @@
 **`ref-ai/` is READ-ONLY reference. Never delete it.** Most of it only makes sense once you hit the
 problem it solves.
 
-| Package | Lines | What it is | Read at |
-|---|---|---|---|
-| `agent` | 12k | **The harness.** Loop, tools, sessions, compaction, telemetry, state machine | **V0** → V5 |
-| `ai` | 23k | Unified LLM API: 31 provider adapters, auth, token + cost tracking | **V0**, V1 |
-| `protocol` · `client` · `session-backends` | 3.7k | Schemas, CBOR framing, transport-neutral client, pluggable storage | V1 |
-| `server` | 2.3k | Session server | V1, V3 |
-| `telemetry` | 0.9k | Vendor-neutral telemetry contracts | V3, V5 |
-| `coding-agent` | 59k | The full product: sessions, settings, extensions, modes | V2, V4 |
-| `evals` | 1.3k | Model-backed behavioural checks | **V5** — how you prove the healer works |
-| `tui` | 16k | Terminal UI | Skip — we're building for the web |
+| Package                                    | Lines | What it is                                                                   | Read at                                 |
+| ------------------------------------------ | ----- | ---------------------------------------------------------------------------- | --------------------------------------- |
+| `agent`                                    | 12k   | **The harness.** Loop, tools, sessions, compaction, telemetry, state machine | **V0** → V5                             |
+| `ai`                                       | 23k   | Unified LLM API: 31 provider adapters, auth, token + cost tracking           | **V0**, V1                              |
+| `protocol` · `client` · `session-backends` | 3.7k  | Schemas, CBOR framing, transport-neutral client, pluggable storage           | V1                                      |
+| `server`                                   | 2.3k  | Session server                                                               | V1, V3                                  |
+| `telemetry`                                | 0.9k  | Vendor-neutral telemetry contracts                                           | V3, V5                                  |
+| `coding-agent`                             | 59k   | The full product: sessions, settings, extensions, modes                      | V2, V4                                  |
+| `evals`                                    | 1.3k  | Model-backed behavioural checks                                              | **V5** — how you prove the healer works |
+| `tui`                                      | 16k   | Terminal UI                                                                  | Skip — we're building for the web       |
 
 **Their design docs beat most blog posts:** `packages/agent/docs/harness-v2.md` (4.6k lines),
 `harness-v2-state-machine.md`, `harness-v2-test-matrix.md`, `telemetry-schema.md`.
@@ -64,17 +64,23 @@ packages**. The honest split:
 
 ```ts
 export type Result<TValue, TError> =
-  | { ok: true;  value: TValue }
-  | { ok: false; error: TError };
+  { ok: true; value: TValue } | { ok: false; error: TError };
 ```
 
 `env/nodejs.ts` returns them instead of throwing:
 
 ```ts
-function resolveTimeoutMs(timeout: number | undefined): Result<number | undefined, ExecutionError> {
+function resolveTimeoutMs(
+  timeout: number | undefined,
+): Result<number | undefined, ExecutionError> {
   if (timeout === undefined) return ok(undefined);
   if (!Number.isFinite(timeout) || timeout <= 0) {
-    return err(new ExecutionError("timeout", "Invalid timeout: must be a finite number of seconds"));
+    return err(
+      new ExecutionError(
+        "timeout",
+        "Invalid timeout: must be a finite number of seconds",
+      ),
+    );
   }
   return ok(timeout * 1000);
 }
@@ -82,7 +88,7 @@ function resolveTimeoutMs(timeout: number | undefined): Result<number | undefine
 
 **Why it matters.** A thrown exception is a waiter shouting across the room and running out the
 door — whoever catches it has no idea what dish it was about. A `Result` is the waiter coming back
-to your table: *"the fish is off, pick something else."*
+to your table: _"the fish is off, pick something else."_
 
 For an agent this isn't style. **A tool that throws kills the run. A tool that returns an error
 lets the model read it and try again.** That single difference is most of what makes an agent feel
@@ -103,12 +109,24 @@ now.
 `harness/events.ts`:
 
 ```ts
-export interface RunStartEvent { type: "run_start"; lane: string; runId: string; }
-export interface RunEndEvent   { type: "run_end"; lane: string; runId: string;
-                                 outcome: "completed" | "aborted" | "failed"; leafId: string; }
+export interface RunStartEvent {
+  type: "run_start";
+  lane: string;
+  runId: string;
+}
+export interface RunEndEvent {
+  type: "run_end";
+  lane: string;
+  runId: string;
+  outcome: "completed" | "aborted" | "failed";
+  leafId: string;
+}
 
 export type HarnessEvent = RunStartEvent | RunEndEvent;
-export type HarnessEventOfType<T extends HarnessEventType> = Extract<HarnessEvent, { type: T }>;
+export type HarnessEventOfType<T extends HarnessEventType> = Extract<
+  HarnessEvent,
+  { type: T }
+>;
 ```
 
 The `type` field decides which other fields exist. TypeScript then refuses to let you read
@@ -117,24 +135,35 @@ The `type` field decides which other fields exist. TypeScript then refuses to le
 The alternative — one big type with everything optional — means `event.outcome` is
 `string | undefined` everywhere, and you find out at runtime, in production, on a Friday.
 
-**Ours uses Zod**, because agent input is untrusted and we want runtime validation *and* the static
+**Ours uses Zod**, because agent input is untrusted and we want runtime validation _and_ the static
 type from one definition:
 
 ```ts
-const RunStart = z.object({ type: z.literal("run_start"), seq: z.number(), sessionId: z.string() });
+const RunStart = z.object({
+  type: z.literal("run_start"),
+  seq: z.number(),
+  sessionId: z.string(),
+});
 const ToolCallStart = z.object({
-  type: z.literal("tool_call_start"), seq: z.number(), sessionId: z.string(),
-  toolCallId: z.string(), toolName: z.string(), args: z.unknown(),
+  type: z.literal("tool_call_start"),
+  seq: z.number(),
+  sessionId: z.string(),
+  toolCallId: z.string(),
+  toolName: z.string(),
+  args: z.unknown(),
 });
 
-export const AgentEvent = z.discriminatedUnion("type", [RunStart, ToolCallStart, /* … */]);
+export const AgentEvent = z.discriminatedUnion("type", [
+  RunStart,
+  ToolCallStart /* … */,
+]);
 export type AgentEvent = z.infer<typeof AgentEvent>;
 ```
 
 One definition, three jobs: validates at runtime, infers the static type, and `z.toJSONSchema()`
 produces the schema the model is given. See [D10](./DECISIONS.md).
 
-> **Rule:** about to make a field optional because *"it's only there sometimes"*? Stop. That's two
+> **Rule:** about to make a field optional because _"it's only there sometimes"_? Stop. That's two
 > types wearing a trenchcoat. Split them.
 
 ---
@@ -155,7 +184,7 @@ async execute(_toolCallId, { command, timeout }, signal, onUpdate, context) {
 dam or a solar panel — it cares about the shape of the socket.
 
 **This is the most important pattern for us.** At V3 the same tools must run against a local
-filesystem *and* a remote sandbox. Import `node:fs` directly and V3 is a rewrite. Take an `env` and
+filesystem _and_ a remote sandbox. Import `node:fs` directly and V3 is a rewrite. Take an `env` and
 V3 is a new class.
 
 ```ts
@@ -184,10 +213,10 @@ a port. Everything else is pure logic and needs no abstraction at all.
 export type AgentEventSink = (event: AgentEvent) => Promise<void> | void;
 ```
 
-Threaded through *everything* — `runLoop`, `streamAssistantResponse`, `executeToolCallsSequential`,
+Threaded through _everything_ — `runLoop`, `streamAssistantResponse`, `executeToolCallsSequential`,
 `failToolCallsFromTruncatedMessage`. **The loop never calls `console.log`. Not once.**
 
-That's why the same loop serves a CLI *and* a server unchanged. It's exactly the mistake our
+That's why the same loop serves a CLI _and_ a server unchanged. It's exactly the mistake our
 deleted code made — `appwrightAgent.ts:263` passed a **no-op `emit`** and threw the stream away, which
 is why "see code in real time" became a milestone instead of being free.
 
@@ -206,37 +235,43 @@ expect(events.map((e) => e.type)).toEqual(["run_start", "tool_call_start", …, 
 The habit worth stealing hardest.
 
 **A** — `agent-loop.ts:208`:
+
 ```ts
 // A "length" stop means the output was cut off by the token limit, so
 // every tool call in the message may carry truncated arguments. Fail
 // them all instead of executing potentially borked calls.
 ```
+
 You could read that code all day and never work out why a length stop invalidates the tool calls.
 The comment is the only place that knowledge exists.
 
 **B** — `events.ts:88`:
+
 ```ts
 // Stay in buffering mode while flushing so reentrant emissions preserve order.
 ```
+
 Six words that save a two-day debugging session.
 
 **C** — `env/nodejs.ts:61`, inside an empty `catch`:
+
 ```ts
 } catch {
   // Keep malformed URLs as ordinary paths so filesystem methods preserve their non-throwing contract.
 }
 ```
-An empty `catch` normally screams *"someone gave up here."* This one documents a contract.
 
-**D** — `reducer.ts:15` encodes an **invariant** (*"these are states the protocol cannot produce"*)
-and a **policy** (*"reject, don't repair"*). Neither is visible in the code.
+An empty `catch` normally screams _"someone gave up here."_ This one documents a contract.
 
-| Write a comment when | Don't when |
-|---|---|
-| The code is surprising and you know why | You're restating the line below |
+**D** — `reducer.ts:15` encodes an **invariant** (_"these are states the protocol cannot produce"_)
+and a **policy** (_"reject, don't repair"_). Neither is visible in the code.
+
+| Write a comment when                          | Don't when                        |
+| --------------------------------------------- | --------------------------------- |
+| The code is surprising and you know why       | You're restating the line below   |
 | There's a non-obvious constraint or invariant | The function name already says it |
-| You chose this over an obvious alternative | It's a section header |
-| Something looks like a bug but isn't | You're explaining the language |
+| You chose this over an obvious alternative    | It's a section header             |
+| Something looks like a bug but isn't          | You're explaining the language    |
 
 ---
 
@@ -262,10 +297,14 @@ export interface TruncationResult {
   content: string;
   truncated: boolean;
   truncatedBy: "lines" | "bytes" | null;
-  totalLines: number; totalBytes: number;
-  outputLines: number; outputBytes: number;
-  lastLinePartial: boolean; firstLineExceedsLimit: boolean;
-  maxLines: number; maxBytes: number;      // the limits that were applied
+  totalLines: number;
+  totalBytes: number;
+  outputLines: number;
+  outputBytes: number;
+  lastLinePartial: boolean;
+  firstLineExceedsLimit: boolean;
+  maxLines: number;
+  maxBytes: number; // the limits that were applied
 }
 ```
 
@@ -277,7 +316,7 @@ That richness is what makes this possible:
 
 A `boolean` gives you `[output truncated]`, which helps nobody — least of all the model.
 
-**Rule:** when a function makes a decision, return *what it decided and why*. The caller almost
+**Rule:** when a function makes a decision, return _what it decided and why_. The caller almost
 always has to explain it to a human, or to the LLM.
 
 ---
@@ -287,11 +326,11 @@ always has to explain it to a human, or to the LLM.
 ```ts
 const MAX_TIMEOUT_SECONDS = 2_147_483_647 / 1000;
 const BASH_UPDATE_THROTTLE_MS = 100;
-export const DEFAULT_MAX_BYTES = 50 * 1024;      // reads better than 51200
+export const DEFAULT_MAX_BYTES = 50 * 1024; // reads better than 51200
 ```
 
 `timeout = 30` — seconds or milliseconds? Get it wrong and you have a 30-second hang or a
-30-millisecond one. Both look like *"the network is flaky."*
+30-millisecond one. Both look like _"the network is flaky."_
 
 ---
 
@@ -302,8 +341,10 @@ export const DEFAULT_MAX_BYTES = 50 * 1024;      // reads better than 51200
 ```ts
 function validateTimeout(timeout: number | undefined): void {
   if (timeout === undefined) return;
-  if (!Number.isFinite(timeout) || timeout <= 0) throw new Error("Invalid timeout: …");
-  if (timeout > MAX_TIMEOUT_SECONDS) throw new Error(`Invalid timeout: maximum is …`);
+  if (!Number.isFinite(timeout) || timeout <= 0)
+    throw new Error("Invalid timeout: …");
+  if (timeout > MAX_TIMEOUT_SECONDS)
+    throw new Error(`Invalid timeout: maximum is …`);
 }
 ```
 
@@ -316,8 +357,12 @@ With Zod it's nearly free, and the same schema documents the tool to the model:
 ```ts
 const bashArgs = z.object({
   command: z.string().describe("Bash command to execute"),
-  timeout: z.number().positive().max(MAX_TIMEOUT_SECONDS).optional()
-           .describe("Timeout in seconds"),
+  timeout: z
+    .number()
+    .positive()
+    .max(MAX_TIMEOUT_SECONDS)
+    .optional()
+    .describe("Timeout in seconds"),
 });
 ```
 
@@ -327,7 +372,7 @@ Validate once, at the edge. Don't re-check the same value in six nested function
 
 ## 10. Cancellation is a parameter
 
-`signal: AbortSignal | undefined` runs through every signature — and is checked *between* units of
+`signal: AbortSignal | undefined` runs through every signature — and is checked _between_ units of
 work, not only at the top:
 
 ```ts
@@ -338,7 +383,7 @@ for (const toolCall of toolCalls) {
 ```
 
 A user clicks Stop. A run can be five minutes of LLM calls and subprocesses. Without threading the
-signal, "stop" means *"stop showing me things while it keeps burning tokens."*
+signal, "stop" means _"stop showing me things while it keeps burning tokens."_
 
 ---
 
@@ -378,7 +423,7 @@ whole batch goes sequential. The tool that knows it's unsafe says so — the cal
 and one such tool poisons the batch conservatively.
 
 `read_file` and `grep` can run together all day. `write_file` and `bash` cannot — two writes to one
-file in parallel is a race, and it looks like *"the agent randomly corrupts files sometimes."*
+file in parallel is a race, and it looks like _"the agent randomly corrupts files sometimes."_
 
 Their parallel path still **emits results in call order** (`agent-loop.ts:540`) even though
 execution was concurrent. Non-deterministic transcript ordering is a debugging nightmare —
@@ -391,8 +436,12 @@ execution was concurrent. Non-deterministic transcript ordering is a debugging n
 `packages/agent/test/agent.test.ts`:
 
 ```ts
-import { fauxAssistantMessage, fauxToolCall, registerFauxProvider, streamSimple }
-  from "@earendil-works/pi-ai/compat";
+import {
+  fauxAssistantMessage,
+  fauxToolCall,
+  registerFauxProvider,
+  streamSimple,
+} from "@earendil-works/pi-ai/compat";
 ```
 
 They built a **faux provider into the AI package itself**. Tests script exactly what the "model"
@@ -423,7 +472,7 @@ errors, the iteration budget, and the exit condition.
 ```
 
 What it does, when to use it, and — the valuable bit — **a precondition the code cannot check, and
-why it can't.** Backed by a runtime guard where they *can* check:
+why it can't.** Backed by a runtime guard where they _can_ check:
 
 ```ts
 if (context.messages[context.messages.length - 1].role === "assistant") {
@@ -438,42 +487,50 @@ if (context.messages[context.messages.length - 1].role === "assistant") {
 # Part 3 — Checklist before you call a file done
 
 **Types**
+
 - [ ] Events, messages, and tool args are Zod schemas — not `any`, not a bare interface
 - [ ] Unions use `z.discriminatedUnion`
 - [ ] No optional field that really means "two different shapes"
 - [ ] `bun run check-types` passes
 
 **Errors**
+
 - [ ] Tool failures **return** `err(...)`; they don't throw. The model must be able to read them
 - [ ] Programmer bugs and startup misconfiguration **do** throw
 - [ ] Every error carries a discriminator so it survives serialisation
 
 **Boundaries**
+
 - [ ] Disk, network, clock, and subprocess access sits behind an interface
 - [ ] The loop imports no `node:fs`, no `node:child_process` — only its ports
 - [ ] There's a `Fake*` implementation of every port, used by tests
 
 **Async**
+
 - [ ] Every subprocess has a timeout and is killed on abort
 - [ ] `AbortSignal` is threaded through and checked between units of work
 - [ ] Parallel work uses `Promise.all` (order-preserving)
 - [ ] Never `shell: true` with model-supplied input — pass an argv array
 
 **Cleanup**
+
 - [ ] Timers, subprocesses, and handles released in `finally`
 
 **Naming**
+
 - [ ] Constants carry their unit: `_MS`, `_SECONDS`, `_BYTES`, `_LINES`
 - [ ] No `handle*` / `process*` / `manage*` / `do*`
 - [ ] The dangerous path is named as dangerous
 
 **Comments**
+
 - [ ] Every comment explains **why**
 - [ ] Every non-obvious invariant is written down
 - [ ] Every deliberate empty `catch` says why
 - [ ] Docstrings state preconditions the code can't check
 
 **Tests**
+
 - [ ] `FakeProvider` scripts the LLM. No test hits a real API
 - [ ] The loop is tested by collecting events into an array — no mocks
 - [ ] The path fence has a test that tries to escape and asserts it fails
