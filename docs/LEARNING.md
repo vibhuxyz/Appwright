@@ -241,7 +241,12 @@ These never belong to one version — they compound.
 
 _(Move items here from "Currently Learning" once both conditions above are met. Date them.)_
 
-- _Nothing yet — V0 hasn't started._
+- [x] **The agentic loop** (2026-08-16) — `while`, not `if`; 6 distinct exits, sequential writes / parallel reads, length-stop detection (`packages/agent-core`).
+- [x] **Provider abstraction & cost telemetry** (2026-08-16, 2026-08-22) — streaming fetch provider, async iterables, live usage pricing and atomic session cost rollup (`packages/agent-core/src/providers/`).
+- [x] **Event-sourced history & resume** (2026-08-16) — Postgres `Message` schema with monotonic `seq`, SSE stream replay on browser refresh (`apps/api/src/stream/sse.ts`).
+- [x] **Design tokens as a constraint system** (2026-08-22) — byte-identical CSS token scale emitted to both templates, 9 vendored primitives, bracket-value rule (`packages/ui-system`).
+- [x] **Durable stop reasons & reactive pause/resume UI** (2026-09-15) — stop reasons persisted on `Message.data: { stopReason }` and SSE status frames, color-coded Pause cards in web UI, 1-click continuation button (closes O7).
+- [x] **Dynamic capability registry for prompt enhancement** (2026-09-15) — self-describing tools via `capabilityHint` and `describeTools()`, runtime prompt composition querying `@repo/tools` and `@repo/ui-system` (D60).
 
 ---
 
@@ -260,6 +265,11 @@ _(Move items here from "Currently Learning" once both conditions above are met. 
 
 - [ ] Iterative system design
 - [ ] Building deterministic boundaries for LLM agents
+- [ ] **Two-way headless browser inspection (Playwright)** — extracting a11y trees, computed CSS palettes, and network payloads from external URLs; post-build autonomous runtime console error detection and UI interaction tests
+- [ ] **Git worktrees per session (V2)** — isolated parallel agent branches sharing a single `.git` repository
+- [ ] **Shared-cluster multi-tenancy & access control** — scoping databases per project (`db_proj_${id}`) via admin privileges in MongoDB and key prefixes (`~p:${id}:*`) with blocked dangerous commands (`-@dangerous`) via Redis 6+ ACLs (D61)
+- [ ] **Delegated OAuth proxy architecture** — centralized proxy holding verified provider credentials, signing project-scoped JWTs with per-project secrets to eliminate developer setup friction (D61)
+- [ ] **Usage metering & unified credit accounting** — asynchronous polling of storage volume (MB) and request counters with credit decrementing (D61)
 
 ---
 

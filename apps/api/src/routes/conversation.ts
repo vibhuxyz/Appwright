@@ -20,10 +20,14 @@ import {
   attachSseClient,
   publishDelta,
   publishMessage,
+  publishStatus,
   publishUsage,
 } from "../stream/sse";
 
 export const conversationRouter = Router();
+
+// Active abort controllers keyed by sessionId to support user stopping/canceling runs
+export const activeControllers = new Map<string, AbortController>();
 
 // The SSE route is the one exception to the app-wide bearer-token wall:
 // EventSource cannot set headers, so it takes the JWT as a query param and
@@ -105,6 +109,23 @@ conversationRouter.get("/conversations/:sessionId", async (req, res) => {
   res.json(rows.map(serializeRow));
 });
 
+conversationRouter.post("/conversation/:sessionId/stop", async (req, res) => {
+  if (!(await ownedSessionProjectId(req.params.sessionId, req.userId!))) {
+    return res.status(404).json({ error: "not found" });
+  }
+  const controller = activeControllers.get(req.params.sessionId);
+  if (controller) {
+    controller.abort();
+    activeControllers.delete(req.params.sessionId);
+  }
+  await prisma.session.update({
+    where: { id: req.params.sessionId },
+    data: { status: "IDLE" },
+  });
+  publishStatus(req.params.sessionId, "IDLE", "Stopped by user", "cancelled");
+  res.json({ ok: true, stopped: true });
+});
+
 streamRouter.get("/stream/:sessionId", async (req, res) => {
   if (!(await ownedSessionProjectId(req.params.sessionId, req.userId!))) {
     return res.status(404).json({ error: "not found" });
@@ -158,6 +179,29 @@ conversationRouter.post("/conversation", async (req, res) => {
     return row;
   }
 
+  const currentUser = await prisma.user.findUnique({
+    where: { id: req.userId! },
+    select: { credits: true },
+  });
+  if (!currentUser || currentUser.credits <= 0) {
+    publishStatus(
+      session.id,
+      "IDLE",
+      "Out of credits. Please add credits to continue building.",
+      "outOfCredits",
+    );
+    await persist({
+      role: "assistant",
+      type: "text",
+      content:
+        "⚠️ Run paused: Out of credits. You have 0 available credits. Click 'Add Credits' to top up your balance and keep building.",
+      data: { stopReason: "outOfCredits" },
+    });
+    return res.status(402).json({
+      error: "Out of credits. Please add credits to continue building.",
+    });
+  }
+
   const userRow = await persist({
     role: "user",
     type: "text",
@@ -167,6 +211,7 @@ conversationRouter.post("/conversation", async (req, res) => {
     where: { id: session.id },
     data: { status: "RUNNING" },
   });
+  publishStatus(session.id, "RUNNING", "Analyzing request & planning…");
 
   const runtime = new LocalRuntime(session.projectId);
 
@@ -200,6 +245,7 @@ conversationRouter.post("/conversation", async (req, res) => {
       type: "text",
       content: formatPlanForAgent(tasks),
     };
+    publishStatus(session.id, "RUNNING", "Plan formulated. Executing tasks…");
   } catch (err) {
     log.error("planning failed, continuing without a plan", {
       sessionId: session.id,
@@ -214,8 +260,7 @@ conversationRouter.post("/conversation", async (req, res) => {
     ...(planMessage ? [planMessage] : []),
   ];
   const controller = new AbortController();
-  // No abort on req close: the run is a background job that happens to have
-  // a listener, not a request that happens to be slow (V1 trap table).
+  activeControllers.set(session.id, controller);
 
   let textBuffer = "";
 
@@ -226,6 +271,7 @@ conversationRouter.post("/conversation", async (req, res) => {
         publishDelta(session!.id, event.delta);
         break;
       case "tool_call_start":
+        publishStatus(session!.id, "RUNNING", `Running ${event.toolName}…`);
         await persist({
           role: "assistant",
           type: "toolCall",
@@ -255,20 +301,32 @@ conversationRouter.post("/conversation", async (req, res) => {
         });
         break;
       case "usage": {
-        // `increment`, not read-then-write. Two runs on one session (or one
-        // run and a stale read) would otherwise each write the total they
-        // saw, and the second silently erases the first — the same
-        // read-then-check race D45 records for budgets, in miniature.
-        const updated = await prisma.session.update({
-          where: { id: session!.id },
-          data: {
-            cost: { increment: event.costUsd },
-            tokenIn: { increment: event.inputTokens },
-            tokenOut: { increment: event.outputTokens },
-          },
-          select: { cost: true, tokenIn: true, tokenOut: true },
+        // `increment`, not read-then-write. Atomically update session totals
+        // and decrement user credits by tokens used.
+        const tokensUsed = event.inputTokens + event.outputTokens;
+        const [updatedSession, updatedUser] = await prisma.$transaction([
+          prisma.session.update({
+            where: { id: session!.id },
+            data: {
+              cost: { increment: event.costUsd },
+              tokenIn: { increment: event.inputTokens },
+              tokenOut: { increment: event.outputTokens },
+            },
+            select: { cost: true, tokenIn: true, tokenOut: true },
+          }),
+          prisma.user.update({
+            where: { id: req.userId! },
+            data: {
+              credits: { decrement: tokensUsed },
+            },
+            select: { credits: true },
+          }),
+        ]);
+        publishUsage(session!.id, {
+          kind: "usage",
+          ...updatedSession,
+          creditsRemaining: Math.max(0, updatedUser.credits),
         });
-        publishUsage(session!.id, { kind: "usage", ...updated });
         break;
       }
       case "error":
@@ -306,9 +364,37 @@ conversationRouter.post("/conversation", async (req, res) => {
   // forever.
   const MAX_VERIFY_ATTEMPTS = 2;
   let finalStopReason: string = "completed";
+  let finalReason: string | undefined;
+  let finalDetail: string | undefined;
 
   try {
     for (let attempt = 0; attempt <= MAX_VERIFY_ATTEMPTS; attempt++) {
+      if (controller.signal.aborted) {
+        finalStopReason = "cancelled";
+        finalReason = "cancelled";
+        finalDetail = "Stopped by user";
+        break;
+      }
+
+      const userCheck = await prisma.user.findUnique({
+        where: { id: req.userId! },
+        select: { credits: true },
+      });
+      const remainingCredits = userCheck?.credits ?? 0;
+      if (remainingCredits <= 0) {
+        finalStopReason = "outOfCredits";
+        finalReason = "outOfCredits";
+        finalDetail = "Out of credits: available token balance exhausted";
+        await persist({
+          role: "assistant",
+          type: "text",
+          content:
+            "⚠️ Run paused: Out of credits. You have used all your available credits. Click 'Add Credits' to top up your balance and resume building.",
+          data: { stopReason: "outOfCredits" },
+        });
+        break;
+      }
+
       const stopReason = await runAgentLoop({
         messages,
         tools: ALL_TOOLS,
@@ -316,21 +402,94 @@ conversationRouter.post("/conversation", async (req, res) => {
         runtime,
         emit,
         budget: {
-          // A multi-item checklist means more read/edit/verify cycles than a
-          // single-edit turn — 20 was tuned for the latter and cut runs off
-          // mid-checklist.
-          maxIterations: 40,
-          maxTokens: 150_000,
+          maxIterations: 60,
+          maxTokens: Math.max(500, Math.min(remainingCredits, 2_000_000)),
           maxCostUsd: 5,
-          deadline: Date.now() + 8 * 60_000,
+          deadline: Date.now() + 10 * 60_000,
         },
         signal: controller.signal,
         sessionId: session.id,
       });
       finalStopReason = stopReason;
+      finalReason = stopReason;
+
+      if (stopReason === "cancelled") {
+        finalDetail = "Stopped by user";
+        await persist({
+          role: "assistant",
+          type: "text",
+          content: "⏹ Run stopped by user.",
+          data: { stopReason: "cancelled" },
+        });
+        break;
+      }
+
+      if (stopReason === "budgetExceeded") {
+        const postRunUser = await prisma.user.findUnique({
+          where: { id: req.userId! },
+          select: { credits: true },
+        });
+        const isOutOfCredits = (postRunUser?.credits ?? 0) <= 0;
+        if (isOutOfCredits) {
+          finalStopReason = "outOfCredits";
+          finalReason = "outOfCredits";
+          finalDetail = "Out of credits: available token balance exhausted";
+          await persist({
+            role: "assistant",
+            type: "text",
+            content:
+              "⚠️ Run paused: Out of credits. You have used all your available credits. Click 'Add Credits' to top up your balance and resume building.",
+            data: { stopReason: "outOfCredits" },
+          });
+        } else {
+          finalDetail = "Out of tokens / budget ceiling reached";
+          await persist({
+            role: "assistant",
+            type: "text",
+            content:
+              "⚠️ Run paused: Out of tokens or budget ceiling reached. Click 'Continue Building' to proceed.",
+            data: { stopReason: "budgetExceeded" },
+          });
+        }
+        break;
+      }
+
+      if (stopReason === "maxIterations") {
+        finalDetail = "Maximum iterations reached";
+        await persist({
+          role: "assistant",
+          type: "text",
+          content: "⚠️ Run paused: Maximum turn limit reached (60 steps). Click 'Continue Building' to work on remaining tasks.",
+          data: { stopReason: "maxIterations" },
+        });
+        break;
+      }
+
+      if (stopReason === "timeout") {
+        finalDetail = "Execution timed out";
+        await persist({
+          role: "assistant",
+          type: "text",
+          content: "⏱️ Run paused: The execution timed out after 10 minutes. Click 'Continue Building' to resume.",
+          data: { stopReason: "timeout" },
+        });
+        break;
+      }
+
+      if (stopReason === "fatalError") {
+        finalDetail = "Model provider error";
+        await persist({
+          role: "assistant",
+          type: "text",
+          content: "❌ Run stopped due to an error from the model provider. Click 'Retry' to continue.",
+          data: { stopReason: "fatalError" },
+        });
+        break;
+      }
 
       if (stopReason !== "completed") break;
 
+      publishStatus(session.id, "RUNNING", "Verifying TypeScript builds cleanly…");
       const verifyResult = await verifyTypeScript(runtime);
       if (verifyResult.ok) break;
 
@@ -339,16 +498,18 @@ conversationRouter.post("/conversation", async (req, res) => {
           role: "assistant",
           type: "text",
           content: `❌ Type-check still failing after ${MAX_VERIFY_ATTEMPTS} attempts. Giving up.`,
+          data: { stopReason: "fatalError" },
         });
         finalStopReason = "fatalError";
+        finalReason = "fatalError";
+        finalDetail = "Type-check failed after multiple attempts";
         break;
       }
 
       const fixMessage: CoreMessage = {
         role: "user",
         type: "text",
-        content: `Running \`tsc --noEmit\` on your changes found real errors — fix them, then
-stop. Do not describe the fix, make it with edit_file/write_file.\n\n${verifyResult.output}`,
+        content: `Running \`tsc --noEmit\` on your changes found real errors — fix them, then\nstop. Do not describe the fix, make it with edit_file/write_file.\n\n${verifyResult.output}`,
       };
       await persist({
         role: "user",
@@ -363,12 +524,22 @@ stop. Do not describe the fix, make it with edit_file/write_file.\n\n${verifyRes
       data: { status: finalStopReason === "fatalError" ? "ERROR" : "IDLE" },
     });
   } catch (err) {
+    finalStopReason = "fatalError";
+    finalReason = "fatalError";
+    finalDetail = "Execution error";
     await prisma.session.update({
       where: { id: session.id },
       data: { status: "ERROR" },
     });
     log.error("run failed", { sessionId: session.id, err: String(err) });
   } finally {
+    activeControllers.delete(session.id);
+    publishStatus(
+      session.id,
+      finalStopReason === "fatalError" ? "ERROR" : "IDLE",
+      finalDetail,
+      finalReason,
+    );
     if (!res.writableEnded) res.end();
   }
 });

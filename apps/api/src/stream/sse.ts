@@ -1,11 +1,12 @@
 import type { Response } from "express";
 
-// Two frame kinds go over the wire:
+// Three frame kinds go over the wire:
 //   "delta"   ephemeral text streaming, never buffered — a refresh loses the
 //             mid-word animation, which is fine, the final text is a message.
 //   "message" a persisted DB row (Project's Message). Buffered per session so
 //             a reconnect within a few seconds (Slice 4) replays without a
 //             DB round-trip, ordered by Message.seq.
+//   "status"  session state notifications (e.g. RUNNING, IDLE, ERROR) with details and reason.
 export interface SseMessageFrame {
   kind: "message";
   seq: number;
@@ -34,9 +35,21 @@ export interface SseUsageFrame {
   cost: number;
   tokenIn: number;
   tokenOut: number;
+  creditsRemaining?: number;
 }
 
-export type SseFrame = SseMessageFrame | SseDeltaFrame | SseUsageFrame;
+export interface SseStatusFrame {
+  kind: "status";
+  status: "IDLE" | "RUNNING" | "ERROR";
+  detail?: string;
+  reason?: string;
+}
+
+export type SseFrame =
+  | SseMessageFrame
+  | SseDeltaFrame
+  | SseUsageFrame
+  | SseStatusFrame;
 
 const MAX_BUFFER = 200;
 const buffers = new Map<string, SseMessageFrame[]>();
@@ -97,6 +110,18 @@ export function publishDelta(sessionId: string, delta: string): void {
 export function publishUsage(sessionId: string, frame: SseUsageFrame): void {
   const set = listeners.get(sessionId);
   if (!set) return;
+  for (const res of [...set]) write(res, sessionId, frame);
+}
+
+export function publishStatus(
+  sessionId: string,
+  status: "IDLE" | "RUNNING" | "ERROR",
+  detail?: string,
+  reason?: string,
+): void {
+  const set = listeners.get(sessionId);
+  if (!set) return;
+  const frame: SseStatusFrame = { kind: "status", status, detail, reason };
   for (const res of [...set]) write(res, sessionId, frame);
 }
 

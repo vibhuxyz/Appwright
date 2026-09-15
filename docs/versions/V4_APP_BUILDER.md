@@ -493,6 +493,7 @@ Not frontend-only with mock data. Everything below assumes that.
 | **Migrations**           | deterministic step: agent writes `schema.prisma` → executor runs `prisma migrate dev` → failure is a red task |
 | **Verification**         | `prisma validate` → migrate → `tsc` → build → boot → hit routes → auth flow                                   |
 | **Env injection**        | `DATABASE_URL`, `AUTH_SECRET` generated at provision time. Never in LLM context                               |
+| **Managed Data & Auth**  | MongoDB database per project + Redis 6+ ACLs + Appwright Auth Gateway ([D61](../DECISIONS.md))                  |
 
 ### The rule that makes it tractable
 

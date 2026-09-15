@@ -27,7 +27,19 @@ export const SendMessageRequest = z.object({
   prompt: z.string().min(1),
 });
 
+export const EnhancePromptRequest = z.object({
+  prompt: z.string().min(1),
+  context: z.string().optional(),
+});
+
+export const EnhancePromptResponse = z.object({
+  enhancedPrompt: z.string(),
+  suggestions: z.array(z.string()).optional(),
+});
+
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequest>;
 export type UpdateSessionRequest = z.infer<typeof UpdateSessionRequest>;
 export type SessionResponse = z.infer<typeof SessionResponse>;
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
+export type EnhancePromptRequest = z.infer<typeof EnhancePromptRequest>;
+export type EnhancePromptResponse = z.infer<typeof EnhancePromptResponse>;

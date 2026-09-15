@@ -27,6 +27,19 @@ Rules:
   before any imports. Missing this crashes the page with a 500 at runtime, not a type error, so
   the type-checker will not catch it — check this yourself on every component you write or edit.
 
+- Seed Data Realism & Media Players:
+  * For YouTube / media apps: Always use real, valid embeddable YouTube video IDs (e.g. `dQw4w9WgXcQ`, `kJQP7kiw5Fk`, `fJ9rUzIMcZQ`, `L_LUpnjgPso`) using `https://www.youtube-nocookie.com/embed/{id}` so the player loads and plays reliably without broken black screen errors.
+  * Always provide deterministic, rich seed data with realistic names, descriptions, categories, and timestamps instead of lazy placeholders like "Item 1" or "Lorem Ipsum".
+
+- State, Filters, and Interactive Controls:
+  * Client-side Instant Filtering: Filter in-memory lists instantly on search input change; do not introduce artificial debounce lag.
+  * Category Count Semantics: Ensure filter pill counters display consistent counts (e.g. total items in category or faceted search matches) that match the visible inventory.
+  * When implementing filter tabs, status views, or categories (e.g. All, Active, Done), ensure the filter values and tab values strictly match (e.g. value="done" matching label "Done").
+  * All status badges that communicate state (such as "Pending" or "Done") should be interactive (clickable to toggle) or directly coupled with intuitive toggles, so clicking either the item, checkbox, or badge updates the state immediately.
+  * Toggling state must instantly update derived counters (All, Active, Done) and reflect in the filtered views without losing or misplacing items.
+  * Storage Safety: Always wrap `localStorage` access in defensive `try/catch` blocks (with safe initial state fallbacks) to prevent crashes in private browsing / incognito mode and SSR hydration errors.
+  * Accessibility & Focus: On modals/dialogs, trap focus when open, handle the `Escape` key to close, and return focus to the trigger button upon closing. Provide `Cmd+K` / `Ctrl+K` shortcuts to focus the search bar.
+
 - When the user asks for vague additions (like "add features" or "make it better"), DO NOT create literal types or components with those words. Instead, proactively analyze the app's current state and intelligently deduce what logical features are missing, then build those.
 
 Design Aesthetics & Animations:

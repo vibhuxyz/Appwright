@@ -9,6 +9,7 @@ export interface Tool {
   description: string;
   args: z.ZodType;
   executionMode: "parallel" | "sequential";
+  capabilityHint?: string;
   // Tools are responsible for wrapping their own result in wrapUntrusted()
   // before returning it (@repo/tools) — the loop never re-wraps, and never
   // imports @repo/tools, which would cycle back into agent-core.
@@ -286,6 +287,7 @@ export async function runAgentLoop(
       }
     }
   } catch (err) {
+    if (signal.aborted) return end("cancelled");
     await emit({
       type: "error",
       seq: nextSeq(),

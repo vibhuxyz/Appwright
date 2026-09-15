@@ -14,7 +14,7 @@ import {
   type RegistryEntry,
 } from "../src/registry";
 
-const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
+const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
 
 const TEMPLATE_STYLESHEETS = [
   "templates/vite-react/src/index.css",
@@ -132,7 +132,7 @@ describe("the vendored components have not drifted from their source", () => {
     for (const target of TARGETS) {
       for (const file of COMPONENT_FILES) {
         const source = await Bun.file(
-          path.join(REPO_ROOT, "libs/ts/ui-system/components", file),
+          path.join(REPO_ROOT, "packages/ui-system/components", file),
         ).text();
         const expected = renderComponent(
           file,

@@ -8,6 +8,7 @@ import { authRouter } from "./routes/auth";
 import { conversationRouter, streamRouter } from "./routes/conversation";
 import { filesRouter } from "./routes/files";
 import { projectRouter } from "./routes/project";
+import { promptRouter } from "./routes/prompt";
 import { sessionRouter } from "./routes/session";
 import { vercelCallbackRouter, vercelRouter } from "./routes/vercel";
 
@@ -39,7 +40,7 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "api" });
 });
 
-// ── Public ─────────────────────────────────────────────────────────────
+// ── Public ───────────────────────────────────────────────────────────────────
 // Login/register, and the OAuth callback Vercel calls with no session of
 // ours (it is trusted via its signed `state`, not a token).
 app.use(authRouter);
@@ -49,7 +50,7 @@ app.use(vercelCallbackRouter);
 // Authorization header, so it verifies the same JWT from a query param.
 app.use(streamRouter);
 
-// ── The auth wall ──────────────────────────────────────────────────────
+// ── The auth wall ────────────────────────────────────────────────────────────
 // One line, one place. Previously each router applied requireAuth with its
 // own `.use()`, which looked local but was not: a root-mounted `.use()` runs
 // for every request reaching it, not only the paths that router defines, and
@@ -58,12 +59,13 @@ app.use(streamRouter);
 // here, is what makes it impossible to reintroduce by reordering.
 app.use(requireAuth);
 
-// ── Authenticated ──────────────────────────────────────────────────────
+// ── Authenticated ────────────────────────────────────────────────────────────
 app.use(projectRouter);
 app.use(sessionRouter);
 app.use(conversationRouter);
 app.use(filesRouter);
 app.use(vercelRouter);
+app.use(promptRouter);
 
 app.use(
   (

@@ -33,13 +33,13 @@ Six lines. If a card grows past that, the concept deserved a real session and be
 | ------------------------------------------------------------------------------------------ | ---------- | ---------------------------------- | ---------------------- |
 | [Leases vs health checks](#leases-vs-health-checks)                                        | 2026-08-11 | V3                                 | 🟡 taught, not shipped |
 | [At-least-once & idempotency](#at-least-once--idempotency)                                 | 2026-08-11 | V3                                 | 🟡 taught, not shipped |
-| [Sequence numbers & resume](#sequence-numbers--resume)                                     | 2026-08-11 | V1                                 | 🟡 taught, not shipped |
+| [Sequence numbers & resume](#sequence-numbers--resume)                                     | 2026-08-11 | V1                                 | ✅ shipped             |
 | [Hot path vs durable path](#hot-path-vs-durable-path)                                      | 2026-08-11 | V3                                 | 🟡 taught, not shipped |
 | [An IR, and why the Blueprint is one](#an-ir-and-why-the-blueprint-is-one)                 | 2026-08-11 | V4                                 | 🟡 taught, not shipped |
 | [The determinism boundary](#the-determinism-boundary)                                      | 2026-08-11 | V4                                 | 🟡 taught, not shipped |
 | [Prompt injection](#prompt-injection)                                                      | 2026-08-11 | V0 Slice 3                         | 🟡 taught, not shipped |
 | [Supply-chain risk & postinstall](#supply-chain-risk--postinstall)                         | 2026-08-11 | V0 Slice 3                         | 🟡 taught, not shipped |
-| [Bounded loops — six exits](#bounded-loops--six-exits)                                     | 2026-08-11 | V0 Slice 1                         | 🟡 taught, not shipped |
+| [Bounded loops — six exits](#bounded-loops--six-exits)                                     | 2026-08-11 | V0 Slice 1                         | ✅ shipped             |
 | [Control / execution / durable planes](#control--execution--durable-planes)                | 2026-08-12 | V3                                 | 🟡 taught, not shipped |
 | [Boxes are easy, arrows are hard](#boxes-are-easy-arrows-are-hard)                         | 2026-08-12 | V3                                 | 🟡 taught, not shipped |
 | [Ownership as the dependency graph](#ownership-as-the-dependency-graph)                    | 2026-08-13 | V4                                 | 🟡 taught, not shipped |
@@ -59,10 +59,12 @@ Six lines. If a card grows past that, the concept deserved a real session and be
 | [Monorepo task orchestration](#monorepo-task-orchestration)                                | 2026-09-15 | now (D54)                          | ✅ shipped             |
 | [Model gateway](#model-gateway)                                                            | 2026-09-15 | unscheduled (D55, reversed by D58) | 🟡 taught, not shipped |
 | [Durable event streaming](#durable-event-streaming)                                        | 2026-09-15 | unscheduled (D56)                  | 🟡 taught, not shipped |
+| [Durable stop reasons & resume](#durable-stop-reasons--resume)                             | 2026-09-15 | V1 (D59, closes O7)                | ✅ shipped             |
+| [Self-describing capability registry](#self-describing-capability-registry)                 | 2026-09-15 | V1.1 / V4 (D60)                    | ✅ shipped             |
+| [Accessibility tree as an agent interface](#accessibility-tree-as-an-agent-interface)       | 2026-09-15 | V5                                 | 🟡 taught, not shipped |
 
 **Mentioned but not yet taught** — these got a sentence, not a card. They are owed one when the
-version reaches them: backpressure (V1) · DAG scheduling & topological sort (V4) · accessibility
-tree as an agent interface (V5) · warm pools & cold start (V3) · circuit breakers (V6).
+version reaches them: backpressure (V1) · DAG scheduling & topological sort (V4) · warm pools & cold start (V3) · circuit breakers (V6).
 
 ---
 
@@ -373,6 +375,61 @@ tree as an agent interface (V5) · warm pools & cold start (V3) · circuit break
 **Here** — `packages/events` wraps Kafka. `workers/ingestion` publishes `documentIngested`; `workers/indexing` and `workers/evaluation` would consume it and downstream topics. Gated behind `docker compose --profile events` — **off in the default stack**, because nothing in the default stack publishes anything yet.
 **Costs** — a broker to operate, and "durable" only matters once there's something worth not losing. Using it for a plain request/response call would be strictly worse than just calling the function — see [D56](./DECISIONS.md).
 **Go deeper** — [D56](./DECISIONS.md), the "hot path vs durable path" card above.
+
+---
+
+### Durable stop reasons & resume
+
+**What** — an agent run that halts mid-flight persists its exit reason in message metadata and broadcasts it over SSE.
+**Why** — a stopped run with no recorded reason defaults to a false "AI Ready" on browser reload, leaving the user stranded.
+**Like** — an airplane emergency landing. The flight doesn't just vanish from the departures board; the board says "diverted: low fuel" and points you to the rebooking counter.
+**Here** — [D59](./DECISIONS.md#decision-59-stop-reasons-are-persisted-message-metadata-emitted-over-sse-with-a-resume-path-in-the-ui--active-target-v1-closes-o7). `Message.data: { stopReason }` + `publishStatus(sessionId, status, detail, reason)` powers the UI pause card and `[ ⏵ Continue Building ]`.
+**Costs** — one extra Postgres write on the exit path and UI state handling for multiple pause reasons.
+**Go deeper** — V4, where budget pauses trigger autonomous Architecture Change Requests or user budget top-ups.
+
+---
+
+### Self-describing capability registry
+
+**What** — tools and UI primitives declare their own contracts and capability hints, dynamically assembling the agent's prompt context.
+**Why** — hardcoding tool and library names into static prompt strings causes silent drift whenever tools, plugins, or primitives change.
+**Like** — a restaurant menu. The waiter doesn't memorize and recite dishes from memory; the kitchen updates the board, and the customer orders from the live list.
+**Here** — [D60](./DECISIONS.md#decision-60-capability-driven-prompt-enhancement--self-describing-tool-registry-and-ui-vocabulary-over-static-prompt-strings--active-target-v11--v4). `describeTools()` from `@repo/tools` and `uiSystemPromptSection()` from `@repo/ui-system` feed `buildDynamicEnhancerSystemPrompt()`.
+**Costs** — prompt token length scales dynamically with tool and component inventory size.
+**Go deeper** — V4/V5, where task dispatch queries the registry for tool readiness and security clearance.
+
+---
+
+### Accessibility tree as an agent interface
+
+**What** — driving or inspecting a web app through its semantic roles, names, and states rather than raw HTML or raw pixel coordinates.
+**Why** — 500KB of raw SPA HTML is full of styling noise, and raw pixels hallucinate clicks. The a11y tree gives the exact interactive surface in 5% of the tokens.
+**Like** — braille signage and elevator voice cues. It omits the paint color of the wall and tells you exactly which button goes to the 4th floor.
+**Here** — Playwright / browser agent architecture for external link inspection and post-build autonomous verification.
+**Costs** — requires a running browser process (Chromium) and misses purely visual CSS styling bugs that don't affect accessibility roles.
+**Go deeper** — V5, where the browser agent verifies rendered apps against the blueprint before handoff.
+
+---
+
+### Shared-cluster project isolation (MongoDB & Redis ACLs)
+
+**What** — running one multi-tenant database/cache cluster and partitioning projects using engine-native databases and ACL key prefixes.
+**Why** — provisioning dedicated database/cache servers per project costs $20–$50/mo and takes minutes; engine-native namespaces boot in milliseconds.
+**Like** — private storage lockers inside one shared building. Everyone shares the foundation and roof, but each tenant has their own padlock and cannot open neighboring lockers.
+**Here** — [D61](./DECISIONS.md#decision-61-multi-tenant-managed-infrastructure--shared-admin-clusters-with-project-scoped-namespaces--automated-metering-mongodb-redis-auth-gateway--active-target-v4--v6). `db_proj_${id}` + scoped users in MongoDB; `~p:${id}:*` + `-@dangerous` in Redis.
+**Costs** — noisy-neighbor risk and connection exhaustion if connection pooling isn't strictly enforced.
+**Go deeper** — V4/V6, where storage sizes and request counts are polled and billed to user credits.
+
+---
+
+### Delegated OAuth proxy gateway
+
+**What** — a centralized authentication broker holding approved OAuth credentials, exchanging tokens and signing project-scoped JWTs.
+**Why** — requiring end-users or generated apps to configure GCP/GitHub OAuth consent screens, client secrets, and redirect URIs breaks zero-setup workflows.
+**Like** — a hotel concierge who holds master credentials to the city tour, handing guests personal room-stamped entry passes without making them register at city hall.
+**Here** — [D61](./DECISIONS.md#decision-61-multi-tenant-managed-infrastructure--shared-admin-clusters-with-project-scoped-namespaces--automated-metering-mongodb-redis-auth-gateway--active-target-v4--v6). `auth.appwright.com` proxies Google OAuth and signs JWTs using each project's `AUTH_SECRET`.
+**Costs** — centralized proxy becomes a critical path for all client authentication flows.
+**Go deeper** — V6, where user accounts and permissions synchronize into the project's own database.
 
 ---
 

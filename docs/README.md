@@ -120,6 +120,18 @@ preview, review, iterate, deploy.
       it. **`packages/logger` and `packages/cache` are live**, wired into `apps/api` (request/error
       logging throughout, Redis-backed login rate limiting) — those survived because they're small,
       real, and already load-bearing, not because they were part of the same platform push
+- [x] **D59, D60 added 2026-09-15** — **Durable Stop Reasons & Reactive Pause/Resume Cards (closing O7)**:
+      Stop conditions (`budgetExceeded`, `cancelled`, `maxIterations`, `timeout`) persisted on `Message.data: { stopReason }`
+      and streamed via SSE status frame. The UI shows color-coded pause cards with an instant `[ ⏵ Continue Building ]`
+      resume button · **Dynamic Capability Registry**: removed hardcoded tool and primitive names from system prompts.
+      Tools self-describe via `capabilityHint` and `describeTools()`, and `@repo/ui-system` feeds `uiSystemPromptSection()`,
+      allowing prompt enhancement to adapt dynamically as new tools (e.g. Playwright) or UI primitives are registered.
+- [x] **D61 added 2026-09-15** — **Multi-Tenant Managed Infrastructure (MongoDB, Redis, Auth Gateway)**:
+      Single high-availability admin clusters partitioned into project-level databases (`db_proj_${id}`) with scoped users
+      in MongoDB, Redis 6+ ACLs (`~p:${id}:*`, `-@dangerous`) for key isolation, and a centralized OAuth Proxy (`auth.appwright.com`)
+      signing project JWTs with `AUTH_SECRET` for zero-friction Google/GitHub auth. Storage and request volume are metered
+      asynchronously and charged against the user's unified credit balance. Deterministically injected into preview `.env`
+      and written directly to Vercel production environment via Vercel Env API on deploy.
 - [x] **`packages/cache`/`packages/logger` integrated into `apps/api`, 2026-09-15** — every
       `console.*` call replaced with structured logs (`method`/`path`/`status`/`ms` on every
       request); `/auth/login` rate-limited via a Redis `INCR`+`EXPIRE` counter, **fails open** if
@@ -143,8 +155,7 @@ Not "todo". These are things the docs claimed were working and are not.
 
 | What                                                                                                                                                                                                                                                                                                                                                 | Where                                                  | Fix in                    |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------- |
-| `bun run check-types` covers 14 of 20 workspace members post-restructure — `apps/web`, `packages/config`, `packages/contracts`, `packages/db` still have none (`eslint-config`/`typescript-config` legitimately never will, no code to check)                                                                                                        | `package.json` × 4                                     | V0 Slice 7                |
-| `apps/web` is a 255-line UI from the deleted architecture, wired to `:4000`; nothing listens there                                                                                                                                                                                                                                                   | `apps/web/src/App.tsx`                                 | V1 — delete, don't extend |
+| `bun run check-types` covers 15 of 20 workspace members post-restructure — `packages/config`, `packages/contracts`, `packages/db` still have none (`eslint-config`/`typescript-config` legitimately never will, no code to check). **`apps/web` fixed this session** — added `check-types` to its `package.json`, now wired into `turbo run check-types` | `package.json` × 3                                     | V0 Slice 7                |
 | Preview iframe blank: dev-server port allocation had no liveness check, orphans survived API restarts, and dead processes stayed in the port map. **Fixed 2026-08-22** — `allocatePort()` probes the OS, `stopAllDevServers()` runs on exit, `exitCode` is checked before reusing a port, and both spawns use `inherit` instead of an undrained pipe | `apps/api/src/workspace/manager.ts`                    | fixed                     |
 | `MODEL_PROVIDERS` lists `llama-3.1-8b-instant`, which Groq no longer serves — picking it returns `model_not_found`. The xAI key in `.env` is also rejected. Found while verifying usage reporting; **not** fixed, because neither is about V1.1                                                                                                      | `packages/agent-core/src/providers/openai.ts` · `.env` | next session              |
 
@@ -155,6 +166,18 @@ Not "todo". These are things the docs claimed were working and are not.
   `packages/templates`, not the repo root) — fixed to `../../../../../templates`.
 - `bun test` walking `ref-ai/`'s 438 tests — fixed via explicit roots in the `test` script
   (`bun test apps packages`) plus `--path-ignore-patterns 'ref-ai/**'`.
+- `apps/web` was a 255-line UI from the deleted architecture, wired to `:4000` with nothing
+  listening — reorganized into `docs/APPWRIGHT_FRONTEND_STANDARDS.md`'s feature-owned structure
+  (`app/`, `routes/`, `features/*`, `realtime/`, `stores/`, `shared/*`), talking to the real API on
+  `:3001`. TanStack Router/Query, Zustand, React Hook Form + Zod, Monaco (self-hosted, lazy-loaded,
+  not the CDN copy `@monaco-editor/react` defaults to), error boundaries around each workspace
+  pane, and `bun:test` unit coverage for the pure agent-prompt utilities are all in place.
+  Deliberately not done: xterm/terminal (no backend PTY route exists yet — building the UI first
+  would be a dead half-feature), Playwright (the standards doc itself says E2E comes at the final
+  production-quality rung, not before the architecture works), and a full design-token migration of
+  every existing screen (tokens are defined in `index.css`, but rewriting ~30 already-working files'
+  classNames with no way to visually verify the result in this environment was judged too risky to
+  do blind — new UI should use the tokens/`shared/components/ui` primitives going forward).
 
 **Rule that caused all of this:** _"if a doc disagrees with the code, the code wins — then fix the
 doc that session."_ It was written after the first two drifts and not applied. Re-run the audit at

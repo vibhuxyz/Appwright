@@ -11,6 +11,8 @@ model User {
   id           String    @id @default(cuid()) @db.VarChar(30)
   email        String    @unique
   hashPassword String
+  // Starting credits granted on registration: 150,000 tokens (~3 full apps)
+  credits      Int       @default(150000)
   projects     Project[]
   // One Vercel account link per user, not per project. Connecting is a
   // property of the person, deploying is a property of the app.
