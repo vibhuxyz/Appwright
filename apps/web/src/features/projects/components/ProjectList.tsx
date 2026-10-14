@@ -13,9 +13,15 @@ export function ProjectList() {
   return (
     <div className="mb-8">
       <CreateProjectForm
-        onCreated={(projectId) =>
-          navigate({ to: "/p/$projectId", params: { projectId } })
-        }
+        onCreated={(projectId) => {
+          navigate({
+            to: "/p/$projectId",
+            params: { projectId },
+            search: { view: "editor" },
+          }).catch(() => {
+            window.location.href = `/p/${projectId}?view=editor`;
+          });
+        }}
       />
 
       {isLoading && <ProjectListSkeleton />}

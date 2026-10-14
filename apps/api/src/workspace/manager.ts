@@ -1,16 +1,16 @@
-import { rm } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { mkdir, rm, symlink } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 const TEMPLATES_DIR = path.join(REPO_ROOT, "templates");
-export const WORKSPACES_DIR = process.env.WORKSPACE_ROOT!;
+export const WORKSPACES_DIR = process.env.WORKSPACE_ROOT
+  ? path.resolve(REPO_ROOT, process.env.WORKSPACE_ROOT)
+  : path.resolve(REPO_ROOT, ".workspaces");
 
 const LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json"];
-// Build output too, not just node_modules. A stale `dist/` or `.next/`
-// copied into a fresh workspace is worse than slow — the dev server can
-// serve the template's prebuilt page instead of the agent's edits, and the
-// preview then lies about what was generated.
+
 const BUILD_OUTPUT = ["dist", ".next", ".turbo"];
 const RSYNC_EXCLUDES = [
   "node_modules",
@@ -23,24 +23,94 @@ export function workspacePath(projectId: string): string {
   return path.join(WORKSPACES_DIR, projectId);
 }
 
-// The two-directory model (V1_WEB_APP.md): templates/ is pristine and
-// read-only, .workspaces/<projectId> is the agent's mutable copy. Reset =
-// wipe + recopy, and it only ever happens here, on project creation — never
-// on a follow-up message.
+export function projectRepoPath(projectId: string): string {
+  return path.join(workspacePath(projectId), "repo");
+}
+
+export function sessionWorktreePath(
+  projectId: string,
+  sessionId: string,
+): string {
+  return path.join(workspacePath(projectId), `session-${sessionId}`);
+}
+
 export async function createWorkspace(
   projectId: string,
   templateId: string,
 ): Promise<string> {
   const src = path.join(TEMPLATES_DIR, templateId);
-  const dest = workspacePath(projectId);
+  const repoDir = projectRepoPath(projectId);
 
-  await rm(dest, { recursive: true, force: true });
-  await $`rsync -a ${RSYNC_EXCLUDES} ${src}/ ${dest}/`.quiet();
+  await rm(workspacePath(projectId), { recursive: true, force: true });
+  await mkdir(repoDir, { recursive: true });
+  await $`rsync -a ${RSYNC_EXCLUDES} ${src}/ ${repoDir}/`.quiet();
+  await initProjectGit(repoDir);
 
-  return dest;
+  return repoDir;
+}
+
+export async function createSessionWorktree(
+  projectId: string,
+  sessionId: string,
+): Promise<string> {
+  const repoDir = projectRepoPath(projectId);
+  const worktreeDir = sessionWorktreePath(projectId, sessionId);
+  const branchName = `agent/${sessionId}`;
+
+  if (existsSync(worktreeDir)) {
+    return worktreeDir;
+  }
+
+  const branchExists = await $`git -C ${repoDir} rev-parse --verify ${branchName}`
+    .quiet()
+    .then(() => true)
+    .catch(() => false);
+
+  if (branchExists) {
+    await $`git -C ${repoDir} worktree add ${worktreeDir} ${branchName}`.quiet();
+  } else {
+    await $`git -C ${repoDir} worktree add ${worktreeDir} -b ${branchName} main`.quiet();
+  }
+
+  // Symlink node_modules from base repo if available so dependencies resolve instantly
+  const repoModules = path.join(repoDir, "node_modules");
+  const worktreeModules = path.join(worktreeDir, "node_modules");
+  if (existsSync(repoModules) && !existsSync(worktreeModules)) {
+    try {
+      await symlink(repoModules, worktreeModules, "dir");
+    } catch {
+      // ignore if symlink cannot be created
+    }
+  }
+
+  return worktreeDir;
+}
+
+export async function removeSessionWorktree(
+  projectId: string,
+  sessionId: string,
+): Promise<void> {
+  const repoDir = projectRepoPath(projectId);
+  const worktreeDir = sessionWorktreePath(projectId, sessionId);
+  const branchName = `agent/${sessionId}`;
+
+  if (existsSync(repoDir)) {
+    await $`git -C ${repoDir} worktree remove --force ${worktreeDir}`
+      .quiet()
+      .catch(() => {});
+    await $`git -C ${repoDir} branch -D ${branchName}`.quiet().catch(() => {});
+  }
+}
+
+export async function pruneWorktrees(projectId: string): Promise<void> {
+  const repoDir = projectRepoPath(projectId);
+  if (existsSync(repoDir)) {
+    await $`git -C ${repoDir} worktree prune`.quiet().catch(() => {});
+  }
 }
 
 export async function deleteWorkspace(projectId: string): Promise<void> {
+  stopDevServer(projectId);
   await rm(workspacePath(projectId), { recursive: true, force: true });
 }
 
@@ -54,12 +124,7 @@ const servers = new Map<string, DevServer>();
 const FIRST_PORT = 5174;
 const LAST_PORT = 5274;
 
-// Ask the OS whether a port is genuinely free, rather than trusting a
-// counter. The counter was module state: an API restart reset it to 5174
-// while dev servers spawned by the PREVIOUS process were still alive and
-// still holding those ports. The manager then handed 5174 to a new project
-// and recorded it, and the preview iframe pointed at a different project's
-// app — or, when that orphan was wedged, at nothing at all.
+
 async function isPortFree(port: number): Promise<boolean> {
   try {
     const probe = Bun.listen({
@@ -104,8 +169,7 @@ async function waitForServer(
 
 const starting = new Map<string, Promise<number>>();
 
-// Next's CLI has no --strictPort — passing it crashes the dev process
-// outright, so the port flags have to match the template's dev script.
+
 async function devServerArgs(cwd: string, port: number): Promise<string[]> {
   const pkg = await Bun.file(path.join(cwd, "package.json")).json();
   const devScript: string = pkg.scripts?.dev ?? "";
@@ -115,13 +179,26 @@ async function devServerArgs(cwd: string, port: number): Promise<string[]> {
   return ["bun", "run", "dev", "--", "--port", String(port), "--strictPort"];
 }
 
-// bun install + dev server, on an allocated port, tracked in memory (V1 —
-// this moves to the DB once more than one API process exists, at V3).
-export async function startDevServer(projectId: string): Promise<number> {
+
+export function startDevServer(projectId: string): Promise<number> {
+  return startServerAt(projectId, projectRepoPath(projectId));
+}
+
+export async function startSessionDevServer(
+  projectId: string,
+  sessionId: string,
+): Promise<number> {
+  const cwd = await createSessionWorktree(projectId, sessionId);
+  return startServerAt(sessionServerKey(sessionId), cwd);
+}
+
+export function sessionServerKey(sessionId: string): string {
+  return `session:${sessionId}`;
+}
+
+async function startServerAt(projectId: string, cwd: string): Promise<number> {
   const existing = servers.get(projectId);
-  // `killed` alone is not enough — a process that exited on its own (a
-  // crash, an OOM) was never killed by us. Returning its port hands the
-  // UI an address nothing is listening on.
+ 
   if (existing && existing.proc.exitCode === null && !existing.proc.killed) {
     return existing.port;
   }
@@ -131,11 +208,6 @@ export async function startDevServer(projectId: string): Promise<number> {
   if (!promise) {
     promise = (async () => {
       try {
-        const cwd = workspacePath(projectId);
-        // Same undrained-pipe hazard as the dev server below, and worse here:
-        // `bun install` is chatty, and if its buffer fills with nobody reading,
-        // the child blocks mid-write and `.exited` never resolves — project
-        // creation hangs forever with no error to show for it.
         const install = Bun.spawn(["bun", "install"], {
           cwd,
           stdout: "inherit",
@@ -151,11 +223,7 @@ export async function startDevServer(projectId: string): Promise<number> {
         const port = await allocatePort();
         const proc = Bun.spawn(
           await devServerArgs(cwd, port),
-          // "inherit", not "pipe". A piped stream nobody reads fills its buffer
-          // and then blocks the child mid-write — a dev server that accepts TCP
-          // connections and never answers them, which looks exactly like a blank
-          // preview. Inheriting sends the output to the API's own log, where it
-          // is both drained by the OS and readable when a preview fails.
+          
           { cwd, stdout: "inherit", stderr: "inherit" },
         );
         servers.set(projectId, { port, proc });
@@ -190,14 +258,20 @@ export function stopDevServer(projectId: string): void {
   servers.delete(projectId);
 }
 
-// Children are not killed when their parent dies — they get reparented and
-// keep running, holding their ports. One API restart left a dev server from
-// a deleted session pegged at 100% CPU for half an hour, squatting :5174,
-// so the next project's preview pointed at a stranger's app.
+
 export function stopAllDevServers(): void {
   for (const projectId of [...servers.keys()]) stopDevServer(projectId);
 }
 
 for (const signal of ["SIGINT", "SIGTERM", "exit"] as const) {
   process.on(signal, () => stopAllDevServers());
+}
+
+
+export async function initProjectGit(repoDir: string): Promise<void> {
+  await $`git -C ${repoDir} init -b main`.quiet();
+  await $`git -C ${repoDir} config user.name "Appwright"`.quiet();
+  await $`git -C ${repoDir} config user.email "agent@appwright.local"`.quiet();
+  await $`git -C ${repoDir} add .`.quiet();
+  await $`git -C ${repoDir} commit -m "initial template"`.quiet();
 }

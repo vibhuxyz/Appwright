@@ -6,12 +6,27 @@ preview, review, iterate, deploy.
 
 **Type `/start` to begin a session. Type `/wrap` to end one.** The docs are the memory.
 
+**Identity ([D71](./DECISIONS.md), 2026-09-30):** an *AI developer execution/runtime laboratory*,
+not a feature factory. The product is the vehicle; the subject is **how to safely execute
+unreliable AI-generated plans** — isolate, recover, verify. A feature earns its place by enabling
+an engineering experiment. Standard and definition-of-done: [ENGINEERING_STANDARD.md](./ENGINEERING_STANDARD.md);
+what must always hold: [INVARIANTS.md](./INVARIANTS.md).
+
 ---
 
 ## Status
 
-**Now:** V1.1 — done. Two templates, one prompt, one look; V1's acceptance test re-run and still green.
-**Next:** V2 — isolation & control (git worktrees, approvals, diffs, verification).
+**Now:** V1.2 — done 2026-09-23, all 7 slices ([D64](./DECISIONS.md)–[D70](./DECISIONS.md)).
+`POST /conversation` classifies every request into a `Decision` (intent/changeType/risk/route/
+component/complexity/ambiguity) and actually branches on the resulting five-mode policy —
+`"blocked"` never reaches the model, `"direct"` skips `planTasks()`. A live eval suite
+(`bun run eval` in `packages/decision-engine`) reports 15/15 policy accuracy, 0 under-cautious,
+against the real provider. Full history, including every deliberately-skipped piece and why
+(cache, decision trace, provider health/fallback, a component family taxonomy, a Tier 2
+requirement checker, the question-type union), is in
+[versions/V1_2_DECISION_ENGINE.md](./versions/V1_2_DECISION_ENGINE.md) and D64–D70.
+**Now:** V2 — isolation & control is implemented; acceptance run pending (see [V2 status](./versions/V2_ISOLATION_AND_CONTROL.md#implementation-status)). V2's approval
+gate is the first real consumer of the `"review"` policy V1.2 built but never enforced.
 
 - [x] **V0 — done.** Both acceptance tests pass against `templates/vite-react` with a real OpenAI provider.
 - [x] **V1 — done 2026-08-16.** Postgres schema (Project/Session/Message), CRUD + conversation
@@ -126,6 +141,12 @@ preview, review, iterate, deploy.
       resume button · **Dynamic Capability Registry**: removed hardcoded tool and primitive names from system prompts.
       Tools self-describe via `capabilityHint` and `describeTools()`, and `@repo/ui-system` feeds `uiSystemPromptSection()`,
       allowing prompt enhancement to adapt dynamically as new tools (e.g. Playwright) or UI primitives are registered.
+- [x] **D62 added 2026-09-15** — **Multi-Stage Modal Authentication with Unified Root Routing (`/`) & Interactive Template Showcase**:
+      Replaced standalone auth routes with an integrated modal dialog supporting three views (`welcome`, `email-signup`, `email-login`),
+      developer OAuth providers (GitHub, Google, Microsoft), and work email credit bonus banner. Left column features an auto-cycling
+      showcase of 4 real Appwright applications (AI SaaS Studio, FinTech Terminal, 3D Ecommerce, Food Delivery) with active progress bars.
+      Unified application routing by intercepting `/dashboard` and cleanly redirecting to root `http://localhost:3000/`. Integrated user
+      credit provisioning ($10.00 / 10M tokens) and responsive Upgrade modal.
 - [x] **D61 added 2026-09-15** — **Multi-Tenant Managed Infrastructure (MongoDB, Redis, Auth Gateway)**:
       Single high-availability admin clusters partitioned into project-level databases (`db_proj_${id}`) with scoped users
       in MongoDB, Redis 6+ ACLs (`~p:${id}:*`, `-@dangerous`) for key isolation, and a centralized OAuth Proxy (`auth.appwright.com`)
@@ -136,6 +157,21 @@ preview, review, iterate, deploy.
       `console.*` call replaced with structured logs (`method`/`path`/`status`/`ms` on every
       request); `/auth/login` rate-limited via a Redis `INCR`+`EXPIRE` counter, **fails open** if
       Redis is unreachable rather than locking out login over an auxiliary dependency
+- [x] **New rung: [V1.2 Decision Engine](./versions/V1_2_DECISION_ENGINE.md)** (2026-09-22),
+      scoped down from a much larger user-requested platform — see [D63](./DECISIONS.md). A new
+      `packages/decision-engine` classifies each request's intent/changeType/risk and resolves a
+      two-mode policy (`direct`/`review`), wired into `POST /conversation` as a logged observation
+      only — `runAgentLoop` itself is untouched. Falls open to a fixed `medium`-risk decision on any
+      classification failure, same shape as the Redis rate limiter above. Everything else from the
+      original request (multi-provider routing, `Jev`, caching, telemetry, an evaluation harness, a
+      debug UI, real enforcement) is named and deferred in the version doc, not dropped silently —
+      V2's approval gate is the first real consumer of the risk field once it exists. **Live-provider
+      run closed 2026-09-22** — both acceptance-test prompts classified correctly against the real
+      Gemini provider (`status: "accepted"`, matching intent/changeType/risk/policy), not just the
+      scripted `FakeProvider` cases. ~~V1.2 has no remaining open items.~~ **Reopened 2026-09-23,
+      [D64](./DECISIONS.md)** — the user asked for the full platform this entry describes as
+      deferred, in the 7 ordered slices now tracked in the version doc. Slice 1 (the
+      `"low_confidence"` status) is done; see the version doc for the rest.
 - [x] Slice 1 — `Message`, `AgentEvent` (with `seq`), `StopReason`, `Budget`, `AgentEventSink` in `packages/agent-core/src/types.ts`
 - [x] Slice 2 — provider abstraction (`providers/types.ts`), `FakeProvider`, `OpenAiProvider` (real, streaming, fetch-based, no SDK dep)
 - [x] Slice 3 — tools (`list_files`, `read_file`, `write_file`, `edit_file`, `grep`, `bash`), path fence + deny-list, `wrapUntrusted`, `deps.allow.json` guard
@@ -196,6 +232,7 @@ Detail: [versions/V0_AGENT_LOOP.md](./versions/V0_AGENT_LOOP.md)
  V0  AGENT LOOP           while-not-if · tools · streaming · providers
  V1  WEB APP + MEMORY     Projects/Sessions/Messages · SSE · 3-pane UI · preview
 V1.1 UI SYSTEM           shadcn · Radix · Lucide · design tokens · component registry
+V1.2 DECISION ENGINE     full classification · five-mode policy · POST /conversation branches on it
  V2  ISOLATION & CONTROL  git worktrees · approvals · diffs · verification
  V3  CLOUD SANDBOX        queue · orchestrator · sandbox · auth · multi-tenant   ◄ the wall
  V4  APP BUILDER          planner · blueprint · task DAG · full-stack generation ◄ Emergent parity
@@ -219,6 +256,8 @@ Every version has **one** acceptance test. No partial credit. Never skip a rung.
 | **[VERSIONS.md](./VERSIONS.md)**             | The ladder: eight rungs, ship criteria, estimates, sequencing rules                   |
 | **[versions/](./versions/)**                 | The actual TODO list per version, with traps and definition of done                   |
 | **[DECISIONS.md](./DECISIONS.md)**           | 53 decisions with trade-offs, plus 14 open questions that block work when reached     |
+| **[ENGINEERING_STANDARD.md](./ENGINEERING_STANDARD.md)** | Lab identity, the four engineering questions, benchmark/failure/invariant rules, engineering gate (D71) |
+| **[INVARIANTS.md](./INVARIANTS.md)**         | What must always be true, what enforces it, and whether it's actually tested          |
 | **[CODE_QUALITY.md](./CODE_QUALITY.md)**     | How we write code here — patterns from `ref-ai/packages`. Keep it open while coding   |
 | **[CRASH_COURSE.md](./CRASH_COURSE.md)**     | Every concept explained so far, six lines each, dated. Written the moment it's taught |
 | **[LEARNING.md](./LEARNING.md)**             | What to learn at each version, and what's actually been mastered                      |
@@ -231,8 +270,12 @@ Every version has **one** acceptance test. No partial credit. Never skip a rung.
 
 - **Write the acceptance test first.** It's the definition of done.
 - **Every version ends in a demo, not a refactor.**
-- **Never optimise before feeling the limitation.** No queue until one process is visibly the
-  bottleneck. No multi-stage Docker build until push times annoy you.
+- **Never optimise before feeling the limitation** — and since D71, *measure* it. No queue until one
+  process is visibly the bottleneck (with a number). No multi-stage Docker build until push times
+  annoy you.
+- **Invariants before code.** State what must hold in `INVARIANTS.md`, then build what enforces it.
+- **Evidence over adjectives.** Never write "scalable"/"robust"; write the measurement or nothing.
+- **Version done = acceptance test passes *and* the engineering gate is answered** (ENGINEERING_STANDARD).
 - **Record trade-offs, not just choices.** A decision without a recorded cost is a preference.
 - **If a doc disagrees with the code, the code wins** — then fix the doc that session. This repo has
   drifted twice.

@@ -62,6 +62,9 @@ Six lines. If a card grows past that, the concept deserved a real session and be
 | [Durable stop reasons & resume](#durable-stop-reasons--resume)                             | 2026-09-15 | V1 (D59, closes O7)                | ✅ shipped             |
 | [Self-describing capability registry](#self-describing-capability-registry)                 | 2026-09-15 | V1.1 / V4 (D60)                    | ✅ shipped             |
 | [Accessibility tree as an agent interface](#accessibility-tree-as-an-agent-interface)       | 2026-09-15 | V5                                 | 🟡 taught, not shipped |
+| [Single-route state reconciliation](#single-route-state-reconciliation)                      | 2026-09-15 | V1 (D62)                           | ✅ shipped             |
+| [Ambient trace propagation via AsyncLocalStorage](#ambient-trace-propagation-via-asynclocalstorage) | 2026-09-21 | V1 / Core                          | ✅ shipped             |
+| [LLM-as-classifier](#llm-as-classifier)                                                    | 2026-09-22 | V1.2                               | ✅ shipped             |
 
 **Mentioned but not yet taught** — these got a sentence, not a card. They are owed one when the
 version reaches them: backpressure (V1) · DAG scheduling & topological sort (V4) · warm pools & cold start (V3) · circuit breakers (V6).
@@ -422,6 +425,17 @@ version reaches them: backpressure (V1) · DAG scheduling & topological sort (V4
 
 ---
 
+### Single-route state reconciliation
+
+**What** — intercepting path fragmentation (e.g. `/dashboard` vs `/`) so the client app preserves a single canonical root URL.
+**Why** — users bookmarking or redirecting to alternative route aliases desynchronize browser history and cause empty router view matching.
+**Like** — airport concourse signs. Whether you follow the terminal signs from baggage claim or the parking garage, they all funneled you to the single main departure hall.
+**Here** — [D62](./DECISIONS.md#decision-62-multi-stage-modal-authentication-with-unified-root-routing--and-showcase-previews--active-target-v1--ui). `dashboardRedirectRoute` in TanStack Router throws `redirect({ to: "/" })` and `RootLayout` replaces history on login.
+**Costs** — requires explicit router beforeLoad gates and layout history replacement handlers.
+**Go deeper** — V4/V4.5, where project-specific editor tabs preserve search params (`?view=editor|console`) without losing project context.
+
+---
+
 ### Delegated OAuth proxy gateway
 
 **What** — a centralized authentication broker holding approved OAuth credentials, exchanging tokens and signing project-scoped JWTs.
@@ -430,6 +444,28 @@ version reaches them: backpressure (V1) · DAG scheduling & topological sort (V4
 **Here** — [D61](./DECISIONS.md#decision-61-multi-tenant-managed-infrastructure--shared-admin-clusters-with-project-scoped-namespaces--automated-metering-mongodb-redis-auth-gateway--active-target-v4--v6). `auth.appwright.com` proxies Google OAuth and signs JWTs using each project's `AUTH_SECRET`.
 **Costs** — centralized proxy becomes a critical path for all client authentication flows.
 **Go deeper** — V6, where user accounts and permissions synchronize into the project's own database.
+
+---
+
+### Ambient trace propagation via AsyncLocalStorage
+
+**What** — attaching correlation identifiers (`requestId`, `traceId`) to an asynchronous execution context so every downstream log inherits them without argument drilling.
+**Why** — without it, concurrent requests interleave unidentifiable log lines, making distributed debugging a nightmare.
+**Like** — a colored wristband at a festival. Every ride or tent you visit sees your wristband without you having to introduce yourself every time.
+**Here** — `@repo/logger`'s `runWithTrace()` and `setTraceContext()` in `apps/api/src/index.ts` binding HTTP requests to their logs.
+**Costs** — small V8 promise-context bookkeeping overhead across async boundaries.
+**Go deeper** — V3, when traces cross process boundaries from API to queue to sandbox workers.
+
+---
+
+### LLM-as-classifier
+
+**What** — asking a model to reply with strict JSON matching a fixed schema, instead of free text, so the output is a typed value the rest of the code can branch on.
+**Why** — without a schema to parse against, "is this risky?" stays a sentence a human has to read, not a value a policy function can check.
+**Like** — a multiple-choice form instead of an essay question. Both ask the same thing, but only one can be graded by a machine.
+**Here** — `packages/decision-engine`'s `classify()`, which asks for `{intent, changeType, risk, confidence}` and falls open to a fixed `"unknown"`/`medium`-risk value if the reply doesn't parse — see [D63](./DECISIONS.md#decision-63-v12-decision-engine-scoped-to-intentchangetyperisk-classification-plus-a-two-mode-policy-resolver-observation-only--active-target-v12).
+**Costs** — one extra model call per request, and a schema mismatch always degrades to the fallback rather than retrying — cheap, but means a bad classification is silent unless something logs it.
+**Go deeper** — V2, once `resolvePolicy()`'s `"review"` label actually gates something instead of just being logged.
 
 ---
 

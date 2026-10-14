@@ -1,4 +1,4 @@
-import { ArrowRight, Paperclip, Sparkles, Square } from "lucide-react";
+import { AudioLines, Play, Plus, Sparkles, Square } from "lucide-react";
 import { ModelSelect } from "@/features/workspace/components/ModelSelect";
 import {
   PROMPT_QUALITY_LABEL,
@@ -6,19 +6,7 @@ import {
   type PromptQuality,
 } from "../utils/evaluatePrompt";
 import { Badge } from "@/shared/components/ui/Badge";
-
-// Cold-start prompts: the empty chat should never be a blank box.
-const STARTERS = [
-  { label: "Add dark mode", prompt: "Add a dark mode toggle that persists the user's choice." },
-  {
-    label: "Add authentication",
-    prompt: "Add email and password authentication with protected routes and a sign-out action.",
-  },
-  {
-    label: "Connect database",
-    prompt: "Connect the app to a database and persist the main entity with full CRUD.",
-  },
-];
+import { ChatTipsHeader } from "./ChatTipsHeader";
 
 function SubmitButton({
   running,
@@ -36,10 +24,11 @@ function SubmitButton({
       <button
         type="button"
         onClick={onStop}
-        title="Stop the current AI run"
-        className="ml-auto grid size-9 cursor-pointer place-items-center rounded-xl bg-danger text-white transition-all hover:brightness-110"
+        title="Stop AI execution"
+        className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#E3FC18] px-3.5 py-1.5 text-xs font-semibold text-background transition-all hover:brightness-105 active:scale-95"
       >
-        <Square className="size-3.5 fill-current" />
+        <Square className="size-3 fill-current" />
+        <span>Stop</span>
       </button>
     );
   }
@@ -50,9 +39,10 @@ function SubmitButton({
       onClick={onSubmit}
       disabled={disabled}
       title="Send — Enter"
-      className="ml-auto grid size-9 cursor-pointer place-items-center rounded-xl bg-lime text-background-deep transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-30"
+      className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-[#C16848] px-3.5 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-[#D27655] disabled:cursor-not-allowed disabled:opacity-40"
     >
-      <ArrowRight className="size-4" />
+      <Play className="size-3 fill-current" />
+      <span>Send</span>
     </button>
   );
 }
@@ -88,79 +78,89 @@ export function ChatInput({
 
   return (
     <div className="shrink-0 border-t border-border-soft p-3">
-      <div className="rounded-2xl border border-border bg-surface-2 p-3 transition-colors focus-within:border-surface-3">
-        <textarea
-          rows={Math.min(6, Math.max(2, input.split("\n").length))}
-          className="w-full resize-none bg-transparent text-[13px] leading-relaxed text-foreground placeholder-muted outline-none"
-          placeholder={
-            running
-              ? "AI is working on your app… stop it anytime."
-              : "Ask me to build, edit, or add a feature…"
-          }
-          value={input}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              onSubmit();
-            }
-          }}
+      <div className="flex flex-col gap-2.5 rounded-2xl border border-border bg-surface-2 p-3 transition-colors focus-within:border-surface-3">
+        {/* Top header row: Tips with highlighted colors & Enhance icon (no popover) */}
+        <ChatTipsHeader
+          onEnhanceSpec={onEnhance}
+          isEnhancing={isEnhancing}
+          hasInput={Boolean(trimmed)}
+          quality={quality}
         />
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          {/* The model is part of the message you are about to send, so it
-              belongs in the composer — not in a header two panes away. */}
-          {model && <ModelSelect value={model} disabled={running} onChange={onModelChange} />}
-
-          <button
-            type="button"
-            disabled
-            title="Attachments land with the visual editor (V4.5)"
-            className="flex cursor-not-allowed items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-foreground-secondary opacity-60"
-          >
-            <Paperclip className="size-3.5" /> Attach
-          </button>
-
-          <button
-            type="button"
-            onClick={onEnhance}
-            disabled={!trimmed || isEnhancing || running}
-            title="Expand this prompt into a full spec — data models, views, interactions"
-            className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-foreground-secondary transition-colors hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Sparkles className={`size-3.5 ${isEnhancing ? "animate-pulse text-lime" : ""}`} />
-            {isEnhancing ? "Enhancing…" : "Enhance Prompt"}
-          </button>
-
-          {quality && !running && (
-            <Badge tone={PROMPT_QUALITY_TONE[quality]}>{PROMPT_QUALITY_LABEL[quality]}</Badge>
-          )}
-          {enhancedSuccess && !quality && <Badge tone="success">Enhanced</Badge>}
-          {enhanceError && <span className="truncate text-[11px] text-danger">{enhanceError}</span>}
-
-          <SubmitButton
-            running={running}
-            disabled={!trimmed || isEnhancing}
-            onSubmit={onSubmit}
-            onStop={onStop}
+        {/* Textarea or Animated Enhancing Prompt Display */}
+        {isEnhancing ? (
+          <div className="relative max-h-56 min-h-18 w-full overflow-y-auto rounded-xl border border-lime/30 bg-lime/5 p-2.5 select-none">
+            <div className="pointer-events-none absolute -inset-1 rounded-xl bg-linear-to-r from-lime/15 via-purple-500/10 to-cyan-500/15 blur-sm" />
+            <div className="relative z-10 animate-text-shimmer bg-[linear-gradient(90deg,#e3fc18,#f59e0b,#ec4899,#06b6d4,#e3fc18)] bg-size-[250%_auto] bg-clip-text text-[13px] leading-relaxed font-medium text-transparent select-text">
+              {input}
+            </div>
+            <div className="relative z-10 mt-2 flex items-center gap-2 text-[11px] font-medium text-lime">
+              <Sparkles className="size-3.5 animate-spin" />
+              <span className="animate-pulse">Synthesizing full specification with AI…</span>
+            </div>
+          </div>
+        ) : (
+          <textarea
+            rows={Math.min(9, Math.max(3, input.split("\n").length))}
+            className="max-h-56 min-h-18 w-full resize-none overflow-y-auto bg-transparent text-[13px] leading-relaxed text-foreground placeholder-muted outline-none"
+            placeholder={
+              running
+                ? "AI is working on your app… stop it anytime."
+                : "Describe what you want to create…"
+            }
+            value={input}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                onSubmit();
+              }
+            }}
           />
+        )}
+
+        {/* Bottom controls row */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-soft/40 pt-2">
+          {/* Left tools */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled
+              title="Add attachment (coming in next update)"
+              className="grid size-7 cursor-not-allowed place-items-center rounded-lg border border-border-soft bg-surface text-muted opacity-60"
+            >
+              <Plus className="size-3.5" />
+            </button>
+
+            <button
+              type="button"
+              disabled
+              title="Voice prompt"
+              className="grid size-7 cursor-not-allowed place-items-center rounded-lg border border-border-soft bg-surface text-muted opacity-60"
+            >
+              <AudioLines className="size-3.5" />
+            </button>
+
+            {quality && !running && (
+              <Badge tone={PROMPT_QUALITY_TONE[quality]}>{PROMPT_QUALITY_LABEL[quality]}</Badge>
+            )}
+            {enhancedSuccess && !quality && <Badge tone="success">Enhanced</Badge>}
+            {enhanceError && <span className="truncate text-[11px] text-danger">{enhanceError}</span>}
+          </div>
+
+          {/* Right model selector & Send button */}
+          <div className="flex items-center gap-2">
+            {model && <ModelSelect value={model} disabled={running} onChange={onModelChange} />}
+
+            <SubmitButton
+              running={running}
+              disabled={!trimmed || isEnhancing}
+              onSubmit={onSubmit}
+              onStop={onStop}
+            />
+          </div>
         </div>
       </div>
-
-      {!trimmed && !running && (
-        <div className="mt-2.5 flex flex-wrap gap-2">
-          {STARTERS.map((s) => (
-            <button
-              key={s.label}
-              type="button"
-              onClick={() => onChange(s.prompt)}
-              className="cursor-pointer rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-xs text-foreground-secondary transition-colors hover:bg-surface-3 hover:text-foreground"
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

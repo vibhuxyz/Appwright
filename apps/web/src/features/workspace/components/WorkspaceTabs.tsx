@@ -4,6 +4,7 @@ import { cn } from "@/shared/lib/cn";
 const LABEL: Record<WorkspaceTab, string> = {
   code: "Code",
   preview: "Preview",
+  diff: "Diff",
   database: "Database",
   logs: "Logs",
   analytics: "Analytics",

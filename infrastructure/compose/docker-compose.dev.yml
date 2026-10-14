@@ -1,19 +1,4 @@
-# Dev stack — infra only. Postgres/Redis/Kafka are annoying to install and
-# manage on a laptop, so they're containerized. apps/api and apps/web are
-# not: they're `bun run dev:api` / `bun run dev:web` (or `bun --filter
-# worker-<name> dev` for a worker) — instant `--watch` reload, no image to
-# build or rebuild. Building them into a container here would be strictly
-# slower for zero benefit, since `bun` is already a required local
-# toolchain for this repo (bun.lock, bunfig.toml — there's no "just Docker,
-# no bun installed" path anywhere else in the docs either).
-#
-# Run from the repo root:
-#   docker compose -f infrastructure/compose/docker-compose.dev.yml up
-#   bun run dev              # apps/api :3001 + apps/web :3000, host-native
-#
-# Ports are published to the host (not just container-internal), so the
-# host-native processes above connect the same way `.env.example` already
-# documents: DATABASE_URL=...@localhost:5432/..., REDIS_URL=...@localhost:6379.
+name: Appwright
 
 services:
   postgres:

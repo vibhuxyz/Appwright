@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { agentApi } from "../api/agentApi";
+import type { PermissionMode, Session } from "../schemas/agentSchemas";
 
 // TanStack Query dedupes concurrent calls with the same key on its own, so
 // this replaces a hand-rolled in-flight-request map that existed only to
@@ -32,6 +33,33 @@ export function useCreateSession(projectId: string) {
     mutationFn: () => agentApi.createSession(projectId),
     onSuccess: (session) => {
       queryClient.setQueryData(["session", projectId], session);
+      void queryClient.invalidateQueries({ queryKey: ["sessions", projectId] });
+    },
+  });
+}
+
+export function useSessions(projectId: string) {
+  return useQuery({
+    queryKey: ["sessions", projectId],
+    queryFn: () => agentApi.listSessions(projectId),
+    staleTime: 5_000,
+  });
+}
+
+export function useSwitchSession(projectId: string) {
+  const queryClient = useQueryClient();
+  return (session: Session) =>
+    queryClient.setQueryData(["session", projectId], session);
+}
+
+export function useUpdateSessionMode(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, mode }: { sessionId: string; mode: PermissionMode }) =>
+      agentApi.updateSessionMode(sessionId, mode),
+    onSuccess: (session) => {
+      queryClient.setQueryData(["session", projectId], session);
+      void queryClient.invalidateQueries({ queryKey: ["sessions", projectId] });
     },
   });
 }

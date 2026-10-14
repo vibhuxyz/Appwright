@@ -10,7 +10,6 @@ import { getPromptSuggestions } from "../utils/promptSuggestions";
 import { Panel } from "@/shared/components/ui/Panel";
 import { Badge } from "@/shared/components/ui/Badge";
 import { MessageList } from "./MessageList";
-import { RunStatusBar } from "./RunStatusBar";
 import { StopNoticeCard } from "./StopNoticeCard";
 import { PromptSuggestionBar } from "./PromptSuggestionBar";
 import { ChatInput } from "./ChatInput";
@@ -48,6 +47,7 @@ export function ChatPane({
   const trimmed = input.trim();
   const { quality, tip } = evaluatePrompt(trimmed, enhancedSuccess);
   const suggestions = useMemo(() => getPromptSuggestions(trimmed), [trimmed]);
+
   const activeStopNotice = useMemo(
     () => deriveActiveStopNotice(liveStopNotice, messages, userCredits),
     [liveStopNotice, messages, userCredits],
@@ -91,7 +91,7 @@ export function ChatPane({
   };
 
   return (
-    <Panel className="flex-1">
+    <Panel className="flex flex-1 flex-col overflow-hidden bg-background">
       <header className="shrink-0 border-b border-border-soft px-4 pt-4 pb-3.5">
         <div className="flex items-center gap-2.5">
           <Sparkles className="size-5 text-pink-light" />
@@ -111,21 +111,12 @@ export function ChatPane({
         </p>
       </header>
 
-      <RunStatusBar
-        running={running}
-        statusDetail={statusDetail}
-        activeStopNotice={activeStopNotice}
-        userCredits={userCredits}
-        onStop={() => stopConversation.mutate()}
-        onResume={() => submit(RESUME_PROMPT)}
-        onAddCredits={onAddCredits}
-      />
-
       <MessageList
         messages={messages}
         delta={delta}
         running={running}
         statusDetail={statusDetail}
+        sessionId={sessionId}
         onStop={() => stopConversation.mutate()}
       />
 
@@ -165,7 +156,10 @@ export function ChatPane({
         onModelChange={(model) => {
           if (session) updateModel.mutate({ sessionId: session.id, model });
         }}
-        onChange={setInput}
+        onChange={(val) => {
+          setInput(val);
+          setEnhancedSuccess(false);
+        }}
         onSubmit={send}
         onEnhance={handleEnhance}
         onStop={() => stopConversation.mutate()}

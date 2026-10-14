@@ -3,6 +3,8 @@ import "./env"; // must be the first import — sets WORKSPACE_ROOT before @repo
 import { requireAuth } from "@repo/auth";
 import cors from "cors";
 import express from "express";
+import { randomUUID } from "node:crypto";
+import { runWithTrace, setTraceContext } from "@repo/logger";
 import { log } from "./log";
 import { authRouter } from "./routes/auth";
 import { conversationRouter, streamRouter } from "./routes/conversation";
@@ -11,6 +13,9 @@ import { projectRouter } from "./routes/project";
 import { promptRouter } from "./routes/prompt";
 import { sessionRouter } from "./routes/session";
 import { vercelCallbackRouter, vercelRouter } from "./routes/vercel";
+import { gitRouter } from "./routes/git";
+import { approvalRouter } from "./routes/approval";
+import { pruneAllWorktrees } from "./workspace/prune";
 
 const PORT = Number(process.env.PORT ?? 3001);
 
@@ -19,21 +24,40 @@ app.use(cors());
 app.use(express.json());
 app.disable("x-powered-by");
 
-// One line per request, once it's actually finished — `res.on("finish")`
-// fires after the status code is set, `app.use` at the top would only know
-// the method and path. Skips /health so uptime pings don't fill the log.
+// ── Trace Context & Request Logging ──────────────────────────────────────────
+// Attaches requestId and traceId, scopes all downstream async operations within
+// an AsyncLocalStorage trace context, and emits one structured log per request.
+// Skips /health so uptime pings don't fill the log.
 app.use((req, res, next) => {
-  if (req.path === "/health") return next();
-  const start = performance.now();
-  res.on("finish", () => {
-    log.info("request", {
-      method: req.method,
-      path: req.path,
-      status: res.statusCode,
-      ms: Math.round(performance.now() - start),
+  const reqIdHeader = req.headers["x-request-id"];
+  const traceIdHeader = req.headers["x-trace-id"];
+  const requestId =
+    typeof reqIdHeader === "string" && reqIdHeader.trim()
+      ? reqIdHeader.trim()
+      : randomUUID();
+  const traceId =
+    typeof traceIdHeader === "string" && traceIdHeader.trim()
+      ? traceIdHeader.trim()
+      : undefined;
+
+  res.setHeader("x-request-id", requestId);
+  if (traceId) {
+    res.setHeader("x-trace-id", traceId);
+  }
+
+  runWithTrace({ requestId, ...(traceId ? { traceId } : {}) }, () => {
+    if (req.path === "/health") return next();
+    const start = performance.now();
+    res.on("finish", () => {
+      log.info("request", {
+        method: req.method,
+        path: req.path,
+        status: res.statusCode,
+        ms: Math.round(performance.now() - start),
+      });
     });
+    next();
   });
-  next();
 });
 
 app.get("/health", (_req, res) => {
@@ -58,6 +82,12 @@ app.use(streamRouter);
 // every public route mounted after it unreachable. Stating the wall once,
 // here, is what makes it impossible to reintroduce by reordering.
 app.use(requireAuth);
+app.use((req, _res, next) => {
+  if (req.userId) {
+    setTraceContext({ userId: req.userId });
+  }
+  next();
+});
 
 // ── Authenticated ────────────────────────────────────────────────────────────
 app.use(projectRouter);
@@ -66,6 +96,8 @@ app.use(conversationRouter);
 app.use(filesRouter);
 app.use(vercelRouter);
 app.use(promptRouter);
+app.use(gitRouter);
+app.use(approvalRouter);
 
 app.use(
   (
@@ -85,5 +117,9 @@ app.use(
       .json({ error: err instanceof Error ? err.message : String(err) });
   },
 );
+
+pruneAllWorktrees()
+  .then((projects) => log.info("worktrees pruned", { projects }))
+  .catch((err) => log.error("worktree prune failed", { err: String(err) }));
 
 app.listen(PORT, () => log.info("api listening", { port: PORT }));

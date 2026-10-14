@@ -1,96 +1,163 @@
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
-import { ChevronDown, Coins, LogOut } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
+import { CreditsBadge } from "@/features/billing/components/CreditsBadge";
+import { UpgradeButton } from "@/features/billing/components/UpgradeButton";
+import { AddCreditsModal } from "@/features/billing/components/AddCreditsModal";
+import { UpgradeModal } from "@/features/billing/components/UpgradeModal";
+import { SpecialOfferModal } from "@/features/billing/components/SpecialOfferModal";
+import { SessionStats } from "@/features/workspace/components/SessionStats";
+import { useBillingModalStore } from "@/features/billing/store/billingModalStore";
+import type { Session } from "@/features/agent/schemas/agentSchemas";
+import { ProfileMenu } from "./ProfileMenu";
 
 function Wordmark() {
   return (
-    <Link to="/" className="flex shrink-0 items-center gap-2.5">
-      <span className="grid size-8 place-items-center rounded-full bg-linear-to-br from-pink to-pink-light">
-        <span className="size-3 rounded-full border-[2.5px] border-white" />
+    <Link
+      to="/"
+      className="flex shrink-0 items-center gap-2 text-foreground transition-opacity hover:opacity-80"
+    >
+      <div className="grid size-7 place-items-center rounded-lg bg-lime font-mono text-xs font-black text-background">
+        A
+      </div>
+      <span className="font-mono text-sm font-bold tracking-tight text-foreground">
+        appwright
       </span>
-      <span className="text-[19px] font-semibold tracking-tight text-foreground">appwright</span>
     </Link>
   );
 }
 
-function ProfileMenu({ onAddCredits }: { onAddCredits?: () => void }) {
-  const user = useAuthStore((s) => s.user);
-  const signOut = useAuthStore((s) => s.signOut);
-  const [open, setOpen] = useState(false);
-  const credits = user?.credits ?? 0;
-
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex cursor-pointer items-center gap-2 rounded-full py-1 pr-2 pl-1 transition-colors hover:bg-surface"
-      >
-        <span className="grid size-8 place-items-center rounded-full border border-border bg-surface-2 text-sm font-semibold text-foreground">
-          {(user?.email ?? "?").charAt(0).toUpperCase()}
-        </span>
-        <span className="hidden text-sm text-foreground sm:block">
-          {user?.email?.split("@")[0] ?? "Account"}
-        </span>
-        <ChevronDown className="size-4 text-muted" />
-      </button>
-
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-2 w-60 rounded-xl border border-border bg-surface p-1.5 shadow-2xl shadow-black/60">
-            <div className="truncate px-2.5 py-2 text-xs text-muted">{user?.email}</div>
-            {/* Credits live here rather than in the bar — the header stays
-                project · deploy · you, and nothing else. */}
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                onAddCredits?.();
-              }}
-              disabled={!onAddCredits}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-foreground-secondary transition-colors hover:bg-surface-3 hover:text-foreground disabled:cursor-default disabled:hover:bg-transparent"
-            >
-              <Coins className="size-4" />
-              <span>{credits.toLocaleString()} credits</span>
-              {onAddCredits && <span className="ml-auto text-xs font-semibold text-lime">+ Add</span>}
-            </button>
-            <button
-              type="button"
-              onClick={signOut}
-              className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-foreground-secondary transition-colors hover:bg-surface-3 hover:text-foreground"
-            >
-              <LogOut className="size-4" /> Sign out
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/**
- * The one and only header. Pages hand it whatever project context they have —
- * there is never a second bar underneath it.
- */
 export function AppHeader({
   project,
+  session,
   actions,
+  searchQuery,
+  onSearchChange,
+  onNewProject,
   onAddCredits,
+  onUpgrade,
 }: {
   project?: ReactNode;
+  session?: Session;
   actions?: ReactNode;
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  onNewProject?: () => void;
   onAddCredits?: () => void;
+  onUpgrade?: () => void;
 }) {
+  const user = useAuthStore((s) => s.user);
+  const updateCredits = useAuthStore((s) => s.updateCredits);
+  const credits = user?.credits ?? 0;
+  const isUpgraded = Boolean(user?.isUpgraded || (user?.plan && user.plan !== "free"));
+
+  const {
+    isAddCreditsOpen,
+    isUpgradeOpen,
+    isSpecialOfferOpen,
+    openAddCredits,
+    closeAddCredits,
+    openUpgrade,
+    closeUpgrade,
+    closeSpecialOffer,
+  } = useBillingModalStore();
+
+  const handleOpenAddCredits = () => {
+    if (onAddCredits) {
+      onAddCredits();
+    } else {
+      openAddCredits();
+    }
+  };
+
+  const handleOpenUpgrade = () => {
+    if (onUpgrade) {
+      onUpgrade();
+    } else {
+      openUpgrade();
+    }
+  };
+
   return (
-    <header className="flex h-16 shrink-0 items-center gap-4 border-b border-border-soft bg-background px-4">
-      <Wordmark />
-      {project}
-      <div className="ml-auto flex shrink-0 items-center gap-3">
-        {actions}
-        <ProfileMenu onAddCredits={onAddCredits} />
-      </div>
-    </header>
+    <>
+      <header className="relative flex h-16 shrink-0 items-center justify-between border-b border-border-soft bg-background px-4">
+        {/* Left: Wordmark & optional project context */}
+        <div className="flex items-center gap-3">
+          <Wordmark />
+          {project}
+        </div>
+
+        {/* Center: Search box dead-center in the middle */}
+        {!project && (
+          <div className="absolute left-1/2 hidden w-full max-w-sm -translate-x-1/2 items-center justify-between rounded-xl border border-border/80 bg-surface/90 px-3.5 py-2 text-xs text-muted shadow-xs transition-colors focus-within:border-border sm:flex md:max-w-md">
+            <div className="flex flex-1 items-center gap-2.5">
+              <Search className="size-4 shrink-0 text-muted" />
+              <input
+                type="text"
+                value={searchQuery ?? ""}
+                onChange={(e) => onSearchChange?.(e.target.value)}
+                placeholder="Search projects, templates, docs…"
+                className="w-full bg-transparent text-xs text-foreground placeholder-muted outline-none"
+              />
+            </div>
+            <kbd className="rounded border border-border/80 bg-surface-2 px-1.5 py-0.5 font-mono text-[10px] text-muted">
+              ⌘K
+            </kbd>
+          </div>
+        )}
+
+        {/* Right: Actions, Credits, Upgrade, Profile */}
+        <div className="flex shrink-0 items-center gap-2.5 md:gap-3">
+          {/* Session spend & token stats */}
+          {session && <SessionStats session={session} />}
+
+          {/* Credits balance badge with quick +Add */}
+          <CreditsBadge credits={credits} onClick={handleOpenAddCredits} />
+
+          {/* Upgrade button shown only when not upgraded */}
+          {!isUpgraded && <UpgradeButton onClick={handleOpenUpgrade} />}
+
+          {/* New Project CTA for dashboard */}
+          {onNewProject && (
+            <button
+              type="button"
+              onClick={onNewProject}
+              className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-lime px-3.5 py-2 text-xs font-bold text-black shadow-xs transition-all hover:bg-lime/90"
+            >
+              <Plus className="size-3.5 stroke-2" />
+              <span>New Project</span>
+            </button>
+          )}
+
+          {actions}
+
+          <ProfileMenu onAddCredits={handleOpenAddCredits} />
+        </div>
+      </header>
+
+      <AddCreditsModal
+        isOpen={isAddCreditsOpen}
+        currentCredits={credits}
+        onClose={closeAddCredits}
+        onSuccess={updateCredits}
+        onOpenUpgrade={openUpgrade}
+      />
+
+      <UpgradeModal
+        isOpen={isUpgradeOpen}
+        onClose={closeUpgrade}
+        onOpenAddCredits={openAddCredits}
+      />
+
+      <SpecialOfferModal
+        isOpen={isSpecialOfferOpen}
+        onClose={closeSpecialOffer}
+        onClaim={() => {
+          updateCredits(credits + 50000);
+          closeSpecialOffer();
+        }}
+      />
+    </>
   );
 }

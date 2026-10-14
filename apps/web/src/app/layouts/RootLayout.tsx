@@ -32,6 +32,13 @@ export function RootLayout() {
     return () => window.removeEventListener("appwright:unauthorized", signOut);
   }, [signOut]);
 
+  // Ensure /dashboard redirects to root "/" after login or direct navigation
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.pathname === "/dashboard") {
+      window.history.replaceState(null, "", "/");
+    }
+  }, [user]);
+
   if (checking) return null;
   if (!user) return <AuthScreen />;
 

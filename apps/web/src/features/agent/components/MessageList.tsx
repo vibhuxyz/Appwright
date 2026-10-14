@@ -1,7 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Loader2, Sparkles, Square } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { Msg } from "../schemas/agentSchemas";
-import { ToolCallRow } from "./ToolCallRow";
+import { agentApi } from "../api/agentApi";
+import { ApprovalCard } from "./ApprovalCard";
+import { ToolCallGroup } from "./ToolCallGroup";
+import { UserMessageItem } from "./UserMessageItem";
+import { AgentMessageItem } from "./AgentMessageItem";
 
 function EmptyState() {
   return (
@@ -15,64 +20,102 @@ function EmptyState() {
   );
 }
 
+type RenderItem =
+  | { kind: "msg"; msg: Msg }
+  | { kind: "toolGroup"; calls: Msg[]; id: string };
+
+function groupItems(visible: Msg[]): RenderItem[] {
+  const items: RenderItem[] = [];
+  let currentCalls: Msg[] = [];
+
+  for (const m of visible) {
+    if (m.type === "toolCall") {
+      currentCalls.push(m);
+    } else {
+      if (currentCalls.length > 0) {
+        items.push({ kind: "toolGroup", calls: currentCalls, id: `group-${currentCalls[0].id}` });
+        currentCalls = [];
+      }
+      items.push({ kind: "msg", msg: m });
+    }
+  }
+
+  if (currentCalls.length > 0) {
+    items.push({ kind: "toolGroup", calls: currentCalls, id: `group-${currentCalls[0].id}` });
+  }
+
+  return items;
+}
+
 export function MessageList({
   messages,
   delta,
   running,
   statusDetail,
+  sessionId,
   onStop,
 }: {
   messages: Msg[];
   delta: string;
   running: boolean;
   statusDetail: string;
+  sessionId?: string;
   onStop: () => void;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const { data: approvals = [] } = useQuery({
+    queryKey: ["approvals", sessionId],
+    queryFn: () => (sessionId ? agentApi.listApprovals(sessionId) : Promise.resolve([])),
+    enabled: Boolean(sessionId),
+    refetchInterval: (query) => {
+      const hasPending = query.state.data?.some((a) => a.status === "PENDING");
+      return hasPending ? 1000 : false;
+    },
+  });
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, delta, running]);
+  }, [messages, delta, running, approvals]);
 
   const responsesByCallId = new Map(
     messages.filter((m) => m.type === "toolResponse").map((m) => [m.data?.toolCallId, m]),
   );
   const visible = messages.filter((m) => m.type !== "toolResponse");
+  const grouped = groupItems(visible);
 
   return (
-    <div className="flex flex-1 flex-col gap-3 overflow-auto p-4">
+    <div className="flex flex-1 flex-col gap-4 overflow-auto p-4">
       {visible.length === 0 && !delta && !running && <EmptyState />}
 
-      {visible.map((m) =>
-        m.type === "toolCall" ? (
-          <ToolCallRow
-            key={m.id}
-            call={m}
-            response={responsesByCallId.get(m.data?.toolCallId)}
+      {grouped.map((item) =>
+        item.kind === "toolGroup" ? (
+          <ToolCallGroup
+            key={item.id}
+            calls={item.calls}
+            responsesByCallId={responsesByCallId}
+            isAgentRunning={running}
           />
-        ) : m.role === "user" ? (
-          // The user's own words get a card; the agent's replies are plain
-          // text, so the transcript reads as one voice answering a brief.
-          <div
-            key={m.id}
-            className="rounded-2xl border border-border bg-surface-2 px-3.5 py-3 text-[13px] leading-relaxed whitespace-pre-wrap text-foreground"
-          >
-            {m.content}
-          </div>
+        ) : item.msg.role === "user" ? (
+          <UserMessageItem key={item.msg.id} msg={item.msg} />
         ) : (
-          <div
-            key={m.id}
-            className="text-[13px] leading-relaxed whitespace-pre-wrap text-foreground-secondary"
-          >
-            {m.content}
-          </div>
+          <AgentMessageItem key={item.msg.id} msg={item.msg} />
         ),
       )}
 
       {delta && (
-        <div className="text-[13px] leading-relaxed whitespace-pre-wrap text-foreground-secondary">
-          {delta}
-        </div>
+        <AgentMessageItem
+          msg={{
+            id: "streaming",
+            seq: 0,
+            role: "assistant",
+            type: "text",
+            content: delta,
+            data: null,
+            createdAt: "",
+          }}
+          isStreaming={true}
+        />
       )}
 
       {running && (
@@ -96,6 +139,13 @@ export function MessageList({
           </button>
         </div>
       )}
+
+      {sessionId &&
+        approvals
+          .filter((a) => a.status === "PENDING")
+          .map((a) => (
+            <ApprovalCard key={a.id} approval={a} sessionId={sessionId} />
+          ))}
 
       <div ref={bottomRef} />
     </div>

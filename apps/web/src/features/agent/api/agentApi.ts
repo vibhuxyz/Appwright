@@ -1,8 +1,20 @@
 import { httpClient } from "@/shared/lib/httpClient";
-import { msgSchema, sessionSchema } from "../schemas/agentSchemas";
+import {
+  availableModelSchema,
+  msgSchema,
+  sessionSchema,
+  type Approval,
+  type DiffFile,
+  type MergeResult,
+  type PermissionMode,
+} from "../schemas/agentSchemas";
 import { z } from "zod";
 
 export const agentApi = {
+  getAvailableModels: () =>
+    httpClient
+      .get("/models")
+      .then((r) => z.array(availableModelSchema).parse(r)),
   listSessions: (projectId: string) =>
     httpClient
       .get(`/project/${projectId}/sessions`)
@@ -13,6 +25,8 @@ export const agentApi = {
       .then(sessionSchema.parse),
   updateSessionModel: (id: string, model: string) =>
     httpClient.put(`/session/${id}`, { model }).then(sessionSchema.parse),
+  updateSessionMode: (id: string, mode: PermissionMode) =>
+    httpClient.put(`/session/${id}`, { mode }).then(sessionSchema.parse),
 
   getConversation: (sessionId: string, afterSeq = -1) =>
     httpClient
@@ -26,6 +40,25 @@ export const agentApi = {
     ),
   enhancePrompt: (prompt: string) =>
     httpClient.post<{ enhancedPrompt: string }>("/prompt/enhance", { prompt }),
+
+  getDiff: (sessionId: string) =>
+    httpClient.get<DiffFile[]>(`/session/${sessionId}/diff`),
+  mergeSession: (sessionId: string) =>
+    httpClient.post<MergeResult>(`/session/${sessionId}/merge`, {}),
+  revertSession: (sessionId: string) =>
+    httpClient.post<{ ok: boolean }>(`/session/${sessionId}/revert`, {}),
+
+  listApprovals: (sessionId: string) =>
+    httpClient.get<Approval[]>(`/approvals/${sessionId}`),
+  resolveApproval: (
+    approvalId: string,
+    status: "APPROVED" | "DENIED",
+    alwaysAllowTool?: boolean,
+  ) =>
+    httpClient.post<Approval>(`/approval/${approvalId}`, {
+      status,
+      alwaysAllowTool,
+    }),
 
   streamUrl: (sessionId: string, afterSeq: number) =>
     httpClient.streamUrl(`/stream/${sessionId}?afterSeq=${afterSeq}`),

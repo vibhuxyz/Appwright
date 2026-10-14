@@ -10,12 +10,18 @@ const CodeEditor = lazy(() =>
   import("./CodeEditor").then((m) => ({ default: m.CodeEditor })),
 );
 
-export function EditorPane({ projectId }: { projectId: string }) {
+export function EditorPane({
+  projectId,
+  sessionId,
+}: {
+  projectId: string;
+  sessionId?: string;
+}) {
   const selected = useWorkspaceStore((s) => s.selectedFile);
   const openFiles = useWorkspaceStore((s) => s.openFiles);
   const selectFile = useWorkspaceStore((s) => s.selectFile);
   const closeFile = useWorkspaceStore((s) => s.closeFile);
-  const { data: content = "" } = useFileContent(projectId, selected);
+  const { data: content = "" } = useFileContent(projectId, selected, sessionId);
 
   return (
     <Panel className="flex-1">

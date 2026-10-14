@@ -1,11 +1,10 @@
-import { useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
+import { useBillingModalStore } from "@/features/billing/store/billingModalStore";
 import { useProject } from "@/features/projects/hooks/useProject";
 import { useSession } from "@/features/agent/hooks/useSession";
 import { useConversationStream } from "@/features/agent/hooks/useConversationStream";
 import { ChatPane } from "@/features/agent/components/ChatPane";
 import { PreviewPane } from "@/features/preview/components/PreviewPane";
-import { AddCreditsModal } from "@/features/billing/components/AddCreditsModal";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { SplitPane } from "@/shared/components/ui/SplitPane";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -13,16 +12,24 @@ import { ProjectHeader } from "./ProjectHeader";
 import { WorkspaceTabs } from "./WorkspaceTabs";
 import { FilesPane } from "./FilesPane";
 import { EditorPane } from "./EditorPane";
+import { DiffPane } from "./DiffPane";
 import { PlaceholderPane } from "./PlaceholderPane";
 import { useTouchedFiles } from "../hooks/useTouchedFiles";
 
-export function ProjectWorkspace({ projectId }: { projectId: string }) {
+export function ProjectWorkspace({
+  projectId,
+  onOpenConsole,
+}: {
+  projectId: string;
+  onOpenConsole?: () => void;
+}) {
   const { data: project } = useProject(projectId);
   const { data: session } = useSession(projectId);
   const user = useAuthStore((s) => s.user);
   const updateCredits = useAuthStore((s) => s.updateCredits);
   const activeTab = useWorkspaceStore((s) => s.activeTab);
-  const [showAddCredits, setShowAddCredits] = useState(false);
+  const openAddCredits = useBillingModalStore((s) => s.openAddCredits);
+  const openUpgrade = useBillingModalStore((s) => s.openUpgrade);
 
   useConversationStream(session?.id, session?.status, (usage) => {
     if (usage.creditsRemaining !== undefined) updateCredits(usage.creditsRemaining);
@@ -38,12 +45,18 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
       case "code":
         return (
           <div className="flex min-h-0 min-w-0 flex-1 gap-3">
-            <FilesPane projectId={projectId} touched={touched} />
-            <EditorPane projectId={projectId} />
+            <FilesPane
+              projectId={projectId}
+              sessionId={session?.id}
+              touched={touched}
+            />
+            <EditorPane projectId={projectId} sessionId={session?.id} />
           </div>
         );
       case "preview":
-        return <PreviewPane project={project} />;
+        return <PreviewPane project={project} session={session} />;
+      case "diff":
+        return <DiffPane sessionId={session?.id ?? ""} />;
       case "database":
         return (
           <PlaceholderPane
@@ -85,7 +98,9 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
         projectId={projectId}
         project={project}
         session={session}
-        onAddCredits={() => setShowAddCredits(true)}
+        onAddCredits={openAddCredits}
+        onUpgrade={openUpgrade}
+        onOpenConsole={onOpenConsole}
       />
 
       <div className="flex min-h-0 flex-1 p-4">
@@ -100,25 +115,18 @@ export function ProjectWorkspace({ projectId }: { projectId: string }) {
                 projectId={projectId}
                 session={session}
                 userCredits={userCredits}
-                onAddCredits={() => setShowAddCredits(true)}
+                onAddCredits={openAddCredits}
               />
             </ErrorBoundary>
           }
           right={
-            <div className="flex min-h-0 flex-1 flex-col gap-3">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
               <WorkspaceTabs />
-              <ErrorBoundary>{rightPane()}</ErrorBoundary>
+              {rightPane()}
             </div>
           }
         />
       </div>
-
-      <AddCreditsModal
-        isOpen={showAddCredits}
-        currentCredits={userCredits}
-        onClose={() => setShowAddCredits(false)}
-        onSuccess={(newCredits) => updateCredits(newCredits)}
-      />
     </div>
   );
 }

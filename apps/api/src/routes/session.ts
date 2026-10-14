@@ -1,14 +1,98 @@
 import {
   CreateSessionRequest,
   UpdateSessionRequest,
+  type AvailableModel,
   type SessionResponse,
 } from "@repo/contracts";
 import { DEFAULT_MODEL } from "@repo/agent-core";
 import { prisma } from "@repo/db";
 import { Router } from "express";
 import { ownedProjectId, ownedSessionProjectId } from "../ownership";
+import {
+  createSessionWorktree,
+  removeSessionWorktree,
+  sessionServerKey,
+  startSessionDevServer,
+  stopDevServer,
+} from "../workspace/manager";
 
 export const sessionRouter = Router();
+
+const AVAILABLE_MODELS: AvailableModel[] = [
+  {
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
+    provider: "Google",
+    description: "Hybrid reasoning & ultra-fast generation",
+    badge: "Recommended",
+    isDefault: true,
+  },
+  {
+    id: "gemini-3.1-pro-preview",
+    name: "Gemini 3.1 Pro",
+    provider: "Google",
+    description: "Advanced reasoning for complex codebase tasks",
+  },
+  {
+    id: "gpt-5.4",
+    name: "GPT-5.4",
+    provider: "OpenAI",
+    description: "Flagship frontier intelligence for deep challenges",
+    badge: "Usage credits",
+  },
+  {
+    id: "gpt-5.4-mini",
+    name: "GPT-5.4 Mini",
+    provider: "OpenAI",
+    description: "Fast, cost-efficient model for everyday coding",
+  },
+  {
+    id: "gpt-5.2-codex",
+    name: "GPT-5.2 Codex",
+    provider: "OpenAI",
+    description: "High-precision code synthesis & refactoring",
+  },
+  {
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
+    provider: "OpenAI",
+    description: "Lightweight fast completions",
+  },
+  {
+    id: "llama-3.3-70b-versatile",
+    name: "Llama 3.3 70B",
+    provider: "Groq",
+    description: "High-throughput open-weights model via Groq",
+  },
+  {
+    id: "openai/gpt-oss-120b",
+    name: "GPT-OSS 120B",
+    provider: "Groq",
+    description: "Massive open-source intelligence hosted on Groq",
+  },
+  {
+    id: "openai/gpt-oss-20b",
+    name: "GPT-OSS 20B",
+    provider: "Groq",
+    description: "Fast lightweight open model",
+  },
+  {
+    id: "qwen/qwen3.6-27b",
+    name: "Qwen 3.6 27B",
+    provider: "Groq",
+    description: "Leading multi-lingual and coding open model",
+  },
+  {
+    id: "grok-beta",
+    name: "Grok Beta",
+    provider: "xAI",
+    description: "Real-time frontier intelligence by xAI",
+  },
+];
+
+sessionRouter.get("/models", (_req, res) => {
+  res.json(AVAILABLE_MODELS);
+});
 
 function serializeSession(s: {
   id: string;
@@ -19,6 +103,11 @@ function serializeSession(s: {
   tokenIn: number;
   tokenOut: number;
   status: string;
+  branch: string | null;
+  worktreePath: string | null;
+  mode: string;
+  devPort: number | null;
+  allowedTools?: string[];
   createdAt: Date;
 }): SessionResponse {
   return {
@@ -30,6 +119,11 @@ function serializeSession(s: {
     tokenIn: s.tokenIn,
     tokenOut: s.tokenOut,
     status: s.status as SessionResponse["status"],
+    branch: s.branch,
+    worktreePath: s.worktreePath,
+    mode: s.mode,
+    devPort: s.devPort,
+    allowedTools: s.allowedTools ?? [],
     createdAt: s.createdAt.toISOString(),
   };
 }
@@ -46,7 +140,15 @@ sessionRouter.post("/project/:projectId/session", async (req, res) => {
       model: DEFAULT_MODEL,
     },
   });
-  res.status(201).json(serializeSession(session));
+  const worktreePath = await createSessionWorktree(
+    req.params.projectId,
+    session.id,
+  );
+  const withWorktree = await prisma.session.update({
+    where: { id: session.id },
+    data: { branch: `agent/${session.id}`, worktreePath },
+  });
+  res.status(201).json(serializeSession(withWorktree));
 });
 
 sessionRouter.get("/project/:projectId/sessions", async (req, res) => {
@@ -73,9 +175,44 @@ sessionRouter.put("/session/:id", async (req, res) => {
   if (!(await ownedSessionProjectId(req.params.id, req.userId!))) {
     return res.status(404).json({ error: "not found" });
   }
+  if (body.mode === "bypass") {
+    return res
+      .status(422)
+      .json({ error: "bypass mode requires a sandbox and is not available yet" });
+  }
   const session = await prisma.session.update({
     where: { id: req.params.id },
-    data: { model: body.model },
+    data: {
+      model: body.model,
+      mode: body.mode,
+      allowedTools: body.allowedTools,
+    },
   });
   res.json(serializeSession(session));
+});
+
+sessionRouter.delete("/session/:id", async (req, res) => {
+  const projectId = await ownedSessionProjectId(req.params.id, req.userId!);
+  if (!projectId) {
+    return res.status(404).json({ error: "not found" });
+  }
+  stopDevServer(sessionServerKey(req.params.id));
+  await removeSessionWorktree(projectId, req.params.id);
+  await prisma.session.delete({
+    where: { id: req.params.id },
+  });
+  res.json({ ok: true });
+});
+
+sessionRouter.post("/session/:id/preview", async (req, res) => {
+  const projectId = await ownedSessionProjectId(req.params.id, req.userId!);
+  if (!projectId) {
+    return res.status(404).json({ error: "not found" });
+  }
+  const devPort = await startSessionDevServer(projectId, req.params.id);
+  await prisma.session.update({
+    where: { id: req.params.id },
+    data: { devPort },
+  });
+  res.json({ devPort, previewUrl: `http://localhost:${devPort}` });
 });

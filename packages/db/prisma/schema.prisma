@@ -11,8 +11,8 @@ model User {
   id           String    @id @default(cuid()) @db.VarChar(30)
   email        String    @unique
   hashPassword String
-  // Starting credits granted on registration: 150,000 tokens (~3 full apps)
-  credits      Int       @default(150000)
+  // Starting credits granted on registration: .00 in AI balance (10,000,000 tokens)
+  credits      Int       @default(10000000)
   projects     Project[]
   // One Vercel account link per user, not per project. Connecting is a
   // property of the person, deploying is a property of the app.
@@ -61,21 +61,47 @@ model Project {
   // no route that deletes a session or secret on its own in V1.
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
+
+  @@index([userId])
 }
 
 model Session {
-  id        String        @id @default(cuid()) @db.VarChar(30)
-  projectId String
-  project   Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  title     String?
-  model     String        @default("gpt-5.4-mini")
-  cost      Float         @default(0)
-  tokenIn   Int           @default(0)
-  tokenOut  Int           @default(0)
-  status    SessionStatus @default(IDLE)
-  messages  Message[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @default(now()) @updatedAt
+  id           String        @id @default(cuid()) @db.VarChar(30)
+  projectId    String
+  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title        String?
+  model        String        @default("gpt-5.4-mini")
+  cost         Float         @default(0)
+  tokenIn      Int           @default(0)
+  tokenOut     Int           @default(0)
+  status       SessionStatus @default(IDLE)
+  branch       String?
+  worktreePath String?
+  mode         String        @default("default")
+  devPort      Int?
+  allowedTools String[]      @default([])
+  messages     Message[]
+  approvals    Approval[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now()) @updatedAt
+
+  @@index([projectId])
+}
+
+model Approval {
+  id         String         @id @default(cuid()) @db.VarChar(30)
+  sessionId  String
+  session    Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  messageId  String?
+  toolCallId String?
+  toolName   String
+  args       Json
+  status     ApprovalStatus @default(PENDING)
+  createdAt  DateTime       @default(now())
+  resolvedAt DateTime?
+
+  @@index([sessionId])
+  @@index([sessionId, status])
 }
 
 model Message {
@@ -117,5 +143,12 @@ enum ProjectStatus {
 enum SessionStatus {
   IDLE
   RUNNING
+  AWAITING_APPROVAL
   ERROR
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  DENIED
 }

@@ -11,8 +11,8 @@ export const customAmountFormSchema = z.object({
   amount: z
     .string()
     .refine(
-      (v) => Number.isInteger(Number(v)) && Number(v) > 0,
-      "Enter a positive number of credits",
+      (v) => !Number.isNaN(Number(v)) && Number(v) > 0,
+      "Enter a positive dollar amount (e.g. 10)",
     ),
 });
 export type CustomAmountForm = z.infer<typeof customAmountFormSchema>;
@@ -20,36 +20,52 @@ export type CustomAmountForm = z.infer<typeof customAmountFormSchema>;
 export interface CreditPackage {
   id: string;
   title: string;
+  priceDollars: number;
   credits: number;
+  dollarValue: string;
   appsEstimate: string;
   description: string;
   badge: string | null;
 }
 
+export function formatCreditsToDollars(credits: number): string {
+  const dollars = credits / 1_000_000;
+  if (credits > 0 && dollars < 0.01) {
+    return "< $0.01";
+  }
+  return `$${dollars.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export const CREDIT_PACKAGES: CreditPackage[] = [
   {
     id: "starter",
-    title: "Starter Pack",
-    credits: 50_000,
-    appsEstimate: "~1 Full App",
+    title: "$10 Starter Pack",
+    priceDollars: 10,
+    credits: 10_000_000,
+    dollarValue: "$10.00",
+    appsEstimate: "~5 Full Apps",
     description:
-      "Ideal for a complete Todo, Notes, or small React app with full TypeScript verification.",
+      "Ideal for quick apps, components, and small React tools with full TypeScript verification.",
     badge: null,
   },
   {
     id: "builder",
-    title: "Builder Pack",
-    credits: 150_000,
-    appsEstimate: "~3 Full Apps",
+    title: "$25 Builder Pack",
+    priceDollars: 25,
+    credits: 25_000_000,
+    dollarValue: "$25.00",
+    appsEstimate: "~15 Full Apps",
     description:
-      "Standard welcome size. Easily builds 3 complete applications or a medium multi-view project.",
+      "Most popular choice. Easily builds full-stack multi-view projects and active databases.",
     badge: "Most Popular",
   },
   {
     id: "pro",
-    title: "Pro / Scale Pack",
-    credits: 500_000,
-    appsEstimate: "~10+ Apps / Large Project",
+    title: "$50 Pro Scale Pack",
+    priceDollars: 50,
+    credits: 50_000_000,
+    dollarValue: "$50.00",
+    appsEstimate: "~35+ Apps / Scaled",
     description:
       "Heavy multi-file architecture, API integration, auth flows, and extensive iterations.",
     badge: "Best Value",

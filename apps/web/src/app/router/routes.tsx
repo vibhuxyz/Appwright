@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { RootLayout } from "@/app/layouts/RootLayout";
 import { DashboardPage } from "@/routes/DashboardPage";
 import { ProjectPage } from "@/routes/ProjectPage";
@@ -11,16 +11,36 @@ const dashboardRoute = createRoute({
   component: DashboardPage,
 });
 
-const projectRoute = createRoute({
+const dashboardRedirectRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "/p/$projectId",
-  component: () => {
-    const { projectId } = projectRoute.useParams();
-    return <ProjectPage projectId={projectId} />;
+  path: "/dashboard",
+  beforeLoad: () => {
+    throw redirect({ to: "/" });
   },
 });
 
-const routeTree = rootRoute.addChildren([dashboardRoute, projectRoute]);
+interface ProjectSearch {
+  view?: "editor" | "console";
+}
+
+const projectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/p/$projectId",
+  validateSearch: (search: Record<string, unknown>): ProjectSearch => ({
+    view: search.view === "editor" || search.view === "console" ? search.view : undefined,
+  }),
+  component: () => {
+    const { projectId } = projectRoute.useParams();
+    const search = projectRoute.useSearch();
+    return <ProjectPage projectId={projectId} initialView={search.view} />;
+  },
+});
+
+const routeTree = rootRoute.addChildren([
+  dashboardRoute,
+  dashboardRedirectRoute,
+  projectRoute,
+]);
 
 export const router = createRouter({ routeTree });
 

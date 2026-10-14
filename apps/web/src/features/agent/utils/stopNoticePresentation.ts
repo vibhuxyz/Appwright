@@ -46,7 +46,7 @@ export function stopNoticeCardClass(reason: string): string {
 export function stopNoticeShortLabel(notice: StopNotice, userCredits: number): string {
   switch (notice.reason) {
     case "outOfCredits":
-      return `Paused: Out of Credits (${userCredits.toLocaleString()} remaining)`;
+      return `Paused: Out of Balance ($${(userCredits / 1_000_000).toFixed(2)} remaining)`;
     case "budgetExceeded":
       return "Paused: Out of tokens / budget ceiling";
     case "cancelled":
@@ -63,7 +63,7 @@ export function stopNoticeShortLabel(notice: StopNotice, userCredits: number): s
 export function stopNoticeTitle(notice: StopNotice): string {
   switch (notice.reason) {
     case "outOfCredits":
-      return "Run Paused: Out of Credits";
+      return "Run Paused: Out of Balance";
     case "budgetExceeded":
       return "Run Paused: Out of Tokens / Budget Ceiling Reached";
     case "cancelled":
@@ -81,13 +81,13 @@ export function stopNoticeDescription(notice: StopNotice, userCredits: number): 
   switch (notice.reason) {
     case "outOfCredits":
       return userCredits <= 0
-        ? "You have used all available credits (~3 apps). Add credits to keep building your project."
-        : `You have ${userCredits.toLocaleString()} credits available. Click Continue Building to proceed.`;
+        ? "You have used your $10.00 free credit balance. Top up your balance in dollars or upgrade to Pro to continue building."
+        : `You have $${(userCredits / 1_000_000).toFixed(2)} balance available. Click Continue Building to proceed.`;
     case "budgetExceeded":
       return "The AI stopped because the token budget limit was reached. Click below to continue building.";
     case "cancelled":
       return "Execution was stopped. Click below to resume where the AI left off.";
     default:
-      return "Click below to continue building the remaining tasks in the checklist.";
+      return "The model run was interrupted by an unexpected error. Click below to retry.";
   }
 }

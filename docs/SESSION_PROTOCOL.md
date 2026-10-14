@@ -23,6 +23,8 @@
 4. **`docs/VERSIONS.md`** — the acceptance test for this version. The definition of done.
 5. **`docs/DECISIONS.md`** — what is locked (do not reopen) and what is open (may block us)
 6. **`docs/CODE_QUALITY.md`** — how code is written here
+7. **`docs/ENGINEERING_STANDARD.md`** + **`docs/INVARIANTS.md`** — only when the task designs or
+   changes a subsystem (isolation, recovery, verification, scheduling). Skip for UI/plumbing work.
 
 Read `docs/ARCHITECTURE.md` only if the task touches a layer you are unsure about.
 Read the newest `docs/sessions/SESSION_0N.md` for what happened last time.
@@ -101,6 +103,10 @@ Do all seven. Don't ask permission for each — do them and show the diff summar
 
 Next number in sequence, matching the existing format: goal · what we built · **what I implemented
 myself** · new concepts · decisions made · mistakes · homework · next session plan.
+
+Also record: any **invariant** added/verified (→ `INVARIANTS.md`), any **benchmark or failure
+experiment** run (→ `BENCHMARKS.md` / `FAILURES.md`, real numbers only), and whether the work was in
+the ENGINEERING_STANDARD's *hand-written* column.
 
 **"What I implemented myself" is the honest one.** If the user wrote the code, say so. If the tool
 wrote it because they said _"just give it"_, say that too. That distinction is the point of the log.

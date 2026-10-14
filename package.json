@@ -14,7 +14,7 @@
     "scripts"
   ],
   "scripts": {
-    "agent": "bun packages/agent-core/src/cli.ts",
+    "agent": "bun scripts/agent.ts",
     "ui:emit": "bun packages/ui-system/bin/emit.ts",
     "ui:check": "bun packages/ui-system/bin/emit.ts --check",
     "dev": "turbo run dev --filter=api --filter=web",

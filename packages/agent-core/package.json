@@ -15,7 +15,7 @@
     "build": "tsup src/index.ts src/types.ts --format esm --dts"
   },
   "devDependencies": {
-    "@types/bun": "latest",
+    "@types/bun": "^1.4.2",
     "tsup": "^8.3.5"
   },
   "peerDependencies": {
@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@repo/contracts": "workspace:*",
-    "@repo/tools": "workspace:*",
     "@repo/ui-system": "workspace:*",
     "zod": "^4.4.3"
   }

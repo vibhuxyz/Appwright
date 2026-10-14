@@ -3,7 +3,7 @@
 > **Goal:** the agent works in its own branch, asks permission before doing anything dangerous,
 > shows you exactly what it changed, and cannot hand you code that doesn't compile.
 >
-> **Status:** 🔴 not started · **Est.** 2 weeks · **Depends on:** [V1](./V1_WEB_APP.md)
+> **Status:** 🟡 implemented, acceptance not yet run · **Est.** 2 weeks · **Depends on:** [V1](./V1_WEB_APP.md)
 
 ---
 
@@ -15,6 +15,26 @@ infrastructure. Without them you cannot run two agents at once, you cannot let a
 
 Verification (`tsc`/build/lint) joins them here for the same reason: **never trust generated
 code.** A green checkmark that lies is worse than no checkmark.
+
+---
+
+## Engineering question ([D71](../DECISIONS.md))
+
+Moves **Q1** (safe execution) and **Q2** (concurrent isolation).
+
+> How do we run two unreliable agents against one repo so neither can corrupt the other or the
+> integration branch — and how do we know a "green" result isn't lying?
+
+- **Invariants to write first** → [INVARIANTS.md](../INVARIANTS.md) "Planned": isolation, approval
+  gate, verification gates completion.
+- **Baseline:** V1 as it is (single shared workspace). **Measure:** worktree create/merge/remove
+  latency vs. directory copy; cost of verify tier 1 per run.
+- **Alternatives to weigh in writing:** worktree vs. per-session clone vs. copy-on-write dir;
+  approval as loop suspend vs. pre-declared allowlist.
+- **Break it:** concurrent edits to the same file in two sessions; kill the API mid-approval;
+  merge conflict; injected type error. Record results in `FAILURES.md`.
+- **Hand-written:** approval policy and the suspend/resume state machine, verification gate.
+  **Generated OK:** diff view UI.
 
 ---
 
@@ -104,62 +124,62 @@ different device than the one that asked. An in-memory promise breaks both.
 
 ### Slice 1 — Git-backed workspaces
 
-- [ ] On project create: `git init` the workspace, commit the template as the initial commit on `main`.
-- [ ] On session create: `git worktree add <path> -b agent/<sessionId> main`.
-- [ ] Point the agent's workspace root at the **session's worktree**, not the project root.
+- [x] On project create: `git init` the workspace, commit the template as the initial commit on `main`.
+- [x] On session create: `git worktree add <path> -b agent/<sessionId> main`.
+- [x] Point the agent's workspace root at the **session's worktree**, not the project root.
       _(`projectFiles.ts` is already keyed per-**project** — `workspaceRoot(projectId)`. V2 widens
       that key from `projectId` to `sessionId`, since a session is now its own directory. Small
       change — **assuming V0 Slice 3 has already exported the function and repointed `PROJECTS_DIR`
       off the deleted `apps/` path.** If that is still outstanding, do it there, not here.)_
-- [ ] Auto-commit after each agent turn (`agent: <first line of prompt>`) so every turn is a
+- [x] Auto-commit after each agent turn (`agent: <first line of prompt>`) so every turn is a
       revertable checkpoint.
-- [ ] `DELETE /session/:id` → `git worktree remove` + branch cleanup.
-- [ ] Handle the ugly cases: dirty worktree on remove, branch name collisions, orphaned worktrees
+- [x] `DELETE /session/:id` → `git worktree remove` + branch cleanup.
+- [x] Handle the ugly cases: dirty worktree on remove, branch name collisions, orphaned worktrees
       after a crash (`git worktree prune` on boot).
 
 ### Slice 2 — Diff & merge
 
-- [ ] `GET /session/:id/diff` → `git diff main...agent/<id>` parsed into per-file hunks.
-- [ ] Diff pane in the UI (reuse the file pane; add an "unstaged/changed" filter).
-- [ ] `POST /session/:id/merge` → merge into `main`, return conflicts if any.
+- [x] `GET /session/:id/diff` → `git diff main...agent/<id>` parsed into per-file hunks.
+- [x] Diff pane in the UI (reuse the file pane; add an "unstaged/changed" filter).
+- [x] `POST /session/:id/merge` → merge into `main`, return conflicts if any.
 - [ ] Conflict handling: **do not** attempt an auto-resolve in V2. Surface the conflict, let the
       user pick a side. Auto-resolution is a V5 problem.
-- [ ] `POST /session/:id/revert` → reset the worktree to the last checkpoint commit.
+- [x] `POST /session/:id/revert` → reset the worktree to the last checkpoint commit.
 
 ### Slice 3 — Approvals
 
-- [ ] `Approval` table: `id, sessionId, messageId, toolName, args(Json), status, createdAt, resolvedAt`.
-- [ ] Permission policy module:
+- [x] `Approval` table: `id, sessionId, messageId, toolName, args(Json), status, createdAt, resolvedAt`.
+- [x] Permission policy module:
   - `read_file`, `list_files`, `grep` → never ask
   - `write_file`, `edit_file` → ask in `default` mode, auto in `accept-edits`
   - `bash` → always ask unless `bypass`
   - `git push`, network writes → always ask, no bypass
-- [ ] Session-level permission mode: `default` | `accept-edits` | `bypass` | `plan` (read-only).
-- [ ] Loop suspension: when a tool needs approval, persist, emit, and **await** resolution
+- [x] Session-level permission mode: `default` | `accept-edits` | `bypass` | `plan` (read-only).
+- [x] Loop suspension: when a tool needs approval, persist, emit, and **await** resolution
       (poll the row or use Postgres `LISTEN/NOTIFY`).
-- [ ] `POST /approval/:id` — approve/deny, resumes the parked loop.
+- [x] `POST /approval/:id` — approve/deny, resumes the parked loop.
 - [ ] UI: an inline approval card in the chat stream — tool name, full args, Approve / Deny /
       "Always allow this tool in this session".
-- [ ] Timeout policy: park indefinitely, but mark the session `awaiting-approval` so the UI can
+- [x] Timeout policy: park indefinitely, but mark the session `awaiting-approval` so the UI can
       show it in the project list. _(Decide: does a 24h-old approval expire? — open question.)_
 
 ### Slice 4 — Verification
 
-- [ ] `packages/verify`: run a command in the workspace, capture structured output.
-- [ ] Checks: `tsc --noEmit` → `bun run build` → `lint`. Each returns `{ ok, errors[] }` with
+- [x] `packages/verify`: run a command in the workspace, capture structured output.
+- [x] Checks: `tsc --noEmit` → `bun run build` → `lint`. Each returns `{ ok, errors[] }` with
       file/line/message parsed out — not a raw log dump.
-- [ ] Run after each agent turn; emit `verification_start` / `verification_result` events.
-- [ ] UI: a red/green status bar per turn, expandable to the error list, each error clickable to
+- [x] Run after each agent turn; emit `verification_start` / `verification_result` events.
+- [x] UI: a red/green status bar per turn, expandable to the error list, each error clickable to
       the file:line.
-- [ ] Store the result on the `Message` row so history shows which turns were green.
+- [x] Store the result on the `Message` row so history shows which turns were green.
 
 ### Slice 5 — Parallel sessions
 
-- [ ] Allow N concurrent runs per project (each in its own worktree).
-- [ ] Per-project run limit to stop a user starting 20 at once.
-- [ ] Preview: which session does the iframe show? **Decision: one dev server per session**, on
+- [x] Allow N concurrent runs per project (each in its own worktree).
+- [x] Per-project run limit to stop a user starting 20 at once.
+- [x] Preview: which session does the iframe show? **Decision: one dev server per session**, on
       its own port, so each session previews its own branch. Record the port on `Session`.
-- [ ] UI: a session switcher; show which sessions are running / awaiting approval / done.
+- [x] UI: a session switcher; show which sessions are running / awaiting approval / done.
 
 ### Slice 6 — Prove it
 
@@ -168,6 +188,26 @@ different device than the one that asked. An in-memory promise breaks both.
       resolvable. _(This is the test that proves approvals aren't in-memory.)_
 - [ ] Two sessions edit the **same file** → merge one → merge the second → conflict is surfaced
       cleanly rather than silently clobbering.
+
+---
+
+## Implementation status
+
+Built and covered by `bun test` (typecheck green):
+
+- Worktree per session, pruned on API boot; branch and worktree path stored on `Session`.
+- Approvals are DB rows polled by the parked loop; session shows `AWAITING_APPROVAL`.
+- Modes: `default`, `accept-edits`, `plan` (denies every non-read tool). `bypass` is rejected with 422 until V3.
+- Verification runs after each turn; the result is streamed and saved on the last assistant message.
+- Max 3 concurrent runs per project (HTTP 429 beyond that).
+- `POST /session/:id/preview` starts a per-session dev server and saves `devPort`.
+
+Known gaps:
+
+- Files, editor and preview panes still read the project's `main` workspace, not the session worktree.
+- "Always allow this tool in this session" needs a new column (migration).
+- Conflicts are reported and the merge aborted; there is no pick-a-side UI.
+- Slice 6 is not run: the five acceptance steps, kill-API-while-approval-pending, and two sessions editing the same file.
 
 ---
 

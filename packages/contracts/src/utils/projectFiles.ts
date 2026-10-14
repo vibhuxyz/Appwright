@@ -1,4 +1,5 @@
 import type { ProjectFile } from "@repo/contracts";
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,15 +7,14 @@ import { fileURLToPath } from "node:url";
 const currentFile = fileURLToPath(import.meta.url);
 const currentDirectory = path.dirname(currentFile);
 
-// D28 — /workspace is the only root, presented identically by every runtime
-// (local, Docker, E2B). Locally that constant maps onto wherever the actual
-// project template lives; that mapping is this one line, not one per tool.
-// `apps/projects` was deleted 2026-08-10 — do not repoint at another
-// relative path, it will rot the same way.
-const PROJECTS_DIR =
-  process.env.WORKSPACE_ROOT ??
-  // currentDirectory: libs/ts/contracts/src/utils — five levels up is the repo root.
-  path.resolve(currentDirectory, "../../../../../templates");
+const REPO_ROOT = path.resolve(currentDirectory, "../../../..");
+const TEMPLATES_DIR = path.join(REPO_ROOT, "templates");
+
+function getProjectsDir(): string {
+  return process.env.WORKSPACE_ROOT
+    ? path.resolve(REPO_ROOT, process.env.WORKSPACE_ROOT)
+    : path.resolve(REPO_ROOT, ".workspaces");
+}
 
 const editableExtensions = new Set([
   ".css",
@@ -34,12 +34,30 @@ const ignoredDirectories = new Set([
   ".next",
 ]);
 
-export function workspaceRoot(projectId: string): string {
+export function workspaceRoot(projectId: string, sessionId?: string): string {
   if (!/^[a-z0-9-]+$/.test(projectId)) {
     throw new Error(`Invalid project id: ${projectId}`);
   }
 
-  return path.join(PROJECTS_DIR, projectId);
+  const workspaceBase = path.join(getProjectsDir(), projectId);
+  const templateBase = path.join(TEMPLATES_DIR, projectId);
+  const base = existsSync(workspaceBase)
+    ? workspaceBase
+    : existsSync(templateBase)
+      ? templateBase
+      : workspaceBase;
+
+  if (sessionId) {
+    const sessionDir = path.join(base, `session-${sessionId}`);
+    if (existsSync(sessionDir)) {
+      return sessionDir;
+    }
+  }
+  const repoPath = path.join(base, "repo");
+  if (existsSync(repoPath)) {
+    return repoPath;
+  }
+  return base;
 }
 
 async function walkProject(directory: string): Promise<string[]> {
@@ -66,8 +84,8 @@ async function walkProject(directory: string): Promise<string[]> {
     }
 
     return files;
-  } catch (err: any) {
-    if (err.code === "ENOENT") {
+  } catch (err: unknown) {
+    if (err && typeof err === "object" && "code" in err && err.code === "ENOENT") {
       return [];
     }
 
@@ -75,15 +93,23 @@ async function walkProject(directory: string): Promise<string[]> {
   }
 }
 
-function toProjectPath(projectId: string, filePath: string): string {
+function toProjectPath(
+  projectId: string,
+  filePath: string,
+  sessionId?: string,
+): string {
   return path
-    .relative(workspaceRoot(projectId), filePath)
+    .relative(workspaceRoot(projectId, sessionId), filePath)
     .split(path.sep)
     .join("/");
 }
 
-export function safeResolve(projectId: string, relPath: string): string {
-  const root = workspaceRoot(projectId);
+export function safeResolve(
+  projectId: string,
+  relPath: string,
+  sessionId?: string,
+): string {
+  const root = workspaceRoot(projectId, sessionId);
   const full = path.resolve(root, relPath);
 
   if (full !== root && !full.startsWith(root + path.sep)) {
@@ -95,13 +121,14 @@ export function safeResolve(projectId: string, relPath: string): string {
 
 export async function listProjectFiles(
   projectId: string,
+  sessionId?: string,
 ): Promise<ProjectFile[]> {
-  const root = workspaceRoot(projectId);
+  const root = workspaceRoot(projectId, sessionId);
   const paths = await walkProject(root);
 
   const files = await Promise.all(
     paths.map(async (filePath) => ({
-      path: toProjectPath(projectId, filePath),
+      path: toProjectPath(projectId, filePath, sessionId),
       content: await readFile(filePath, "utf8"),
     })),
   );
@@ -109,26 +136,31 @@ export async function listProjectFiles(
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
-export async function listProjectPaths(projectId: string): Promise<string[]> {
-  const root = workspaceRoot(projectId);
+export async function listProjectPaths(
+  projectId: string,
+  sessionId?: string,
+): Promise<string[]> {
+  const root = workspaceRoot(projectId, sessionId);
   const paths = await walkProject(root);
 
-  return paths.map((filePath) => toProjectPath(projectId, filePath));
+  return paths.map((filePath) => toProjectPath(projectId, filePath, sessionId));
 }
 
 export async function readProjectFile(
   projectId: string,
   relPath: string,
+  sessionId?: string,
 ): Promise<string> {
-  return readFile(safeResolve(projectId, relPath), "utf8");
+  return readFile(safeResolve(projectId, relPath, sessionId), "utf8");
 }
 
 export async function writeProjectFile(
   projectId: string,
   relPath: string,
   content: string,
+  sessionId?: string,
 ): Promise<void> {
-  const full = safeResolve(projectId, relPath);
+  const full = safeResolve(projectId, relPath, sessionId);
 
   await mkdir(path.dirname(full), {
     recursive: true,

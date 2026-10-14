@@ -4,6 +4,8 @@ export const userSchema = z.object({
   id: z.string(),
   email: z.string(),
   credits: z.number(),
+  isUpgraded: z.boolean().optional(),
+  plan: z.enum(["free", "pro", "max"]).optional(),
 });
 export type User = z.infer<typeof userSchema>;
 

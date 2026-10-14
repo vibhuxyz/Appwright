@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { ChevronDown, ExternalLink, Link2, Rocket } from "lucide-react";
+import { ChevronDown, ExternalLink, Link2, Rocket, LayoutDashboard } from "lucide-react";
 import type { Project } from "@/features/projects/schemas/projectSchemas";
 import type { Session } from "@/features/agent/schemas/agentSchemas";
 import { DeployButton } from "@/features/deployments/components/DeployButton";
 import { AppHeader } from "@/app/layouts/AppHeader";
+import { PermissionModeSelect } from "./PermissionModeSelect";
+import { SessionSwitcher } from "./SessionSwitcher";
 
 const STATUS: Record<Project["status"], { label: string; dot: string; text: string }> = {
   READY: { label: "Production", dot: "bg-success", text: "text-success" },
@@ -20,12 +22,16 @@ function host(url: string) {
   return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
 }
 
-// The project identity is a chip, not a second row: name, live status, and a
-// menu holding the things that used to be their own header buttons.
-function ProjectChip({ project, projectId, session }: {
+function ProjectChip({
+  project,
+  projectId,
+  session,
+  onOpenConsole,
+}: {
   project: Project | undefined;
   projectId: string;
   session: Session | undefined;
+  onOpenConsole?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const name = project?.name ?? projectId;
@@ -40,7 +46,7 @@ function ProjectChip({ project, projectId, session }: {
         className="flex min-w-0 cursor-pointer items-center gap-2 rounded-full py-0.5 pr-2 pl-0.5"
       >
         <span className="grid size-7 shrink-0 place-items-center rounded-full bg-linear-to-br from-pink-light to-pink text-xs font-semibold text-white">
-          {name.charAt(0).toUpperCase()}
+          {name.charAt(0).toLowerCase()}
         </span>
         <span className="max-w-45 truncate text-sm text-foreground">{name}</span>
         <ChevronDown className="size-4 shrink-0 text-muted" />
@@ -60,6 +66,18 @@ function ProjectChip({ project, projectId, session }: {
             <div className="truncate px-2.5 py-2 text-xs text-muted">
               {url ? host(url) : "preview starting…"}
             </div>
+            {onOpenConsole && (
+              <button
+                type="button"
+                onClick={() => {
+                  onOpenConsole();
+                  setOpen(false);
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-foreground-secondary transition-colors hover:bg-surface-3 hover:text-foreground"
+              >
+                <LayoutDashboard className="size-4" /> Project Console
+              </button>
+            )}
             <a
               href={url ?? undefined}
               target="_blank"
@@ -82,6 +100,10 @@ function ProjectChip({ project, projectId, session }: {
               <Link2 className="size-4" /> Copy share link
             </button>
             {session && (
+              <PermissionModeSelect projectId={projectId} session={session} />
+            )}
+            <SessionSwitcher projectId={projectId} activeSessionId={session?.id} />
+            {session && (
               <div className="border-t border-border-soft px-2.5 pt-2 pb-1 text-[11px] text-muted">
                 ${session.cost.toFixed(4)} · {session.tokenIn}↑ {session.tokenOut}↓ this session
               </div>
@@ -98,17 +120,30 @@ export function ProjectHeader({
   project,
   session,
   onAddCredits,
+  onUpgrade,
+  onOpenConsole,
 }: {
   projectId: string;
   project: Project | undefined;
-  session: Session | undefined;
-  onAddCredits: () => void;
+  session?: Session | undefined;
+  onAddCredits?: () => void;
+  onUpgrade?: () => void;
+  onOpenConsole?: () => void;
 }) {
   return (
     <AppHeader
+      session={session}
       onAddCredits={onAddCredits}
-      project={<ProjectChip project={project} projectId={projectId} session={session} />}
-      actions={<DeployButton projectId={projectId} icon={<Rocket className="size-4" />} />}
+      onUpgrade={onUpgrade}
+      project={
+        <ProjectChip
+          project={project}
+          projectId={projectId}
+          session={session}
+          onOpenConsole={onOpenConsole}
+        />
+      }
+      actions={<DeployButton projectId={projectId} icon={<Rocket className="size-4 text-lime" />} />}
     />
   );
 }

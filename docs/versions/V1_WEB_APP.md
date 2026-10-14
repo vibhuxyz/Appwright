@@ -154,6 +154,7 @@ Track B's handoff, obtained for free._
 - [x] Model picker wired to `PUT /session/:id`.
 - [x] Token/cost display in the header — you will want it constantly.
 - [x] Stop notice card & 1-click continuation button for paused runs (out of tokens / stop button / timeout) — added 2026-09-15 (D59).
+- [x] Multimodal auth dialog (`AuthModal`) with 4-template showcase carousel, developer OAuth & root (`/`) route normalization — added 2026-09-15 (D62).
 
 ### Slice 6 — Dev-server management
 

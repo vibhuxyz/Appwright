@@ -6,14 +6,16 @@ import { FileTree } from "./FileTree";
 
 export function FilesPane({
   projectId,
+  sessionId,
   touched,
 }: {
   projectId: string;
+  sessionId?: string;
   touched: Set<string>;
 }) {
   const selected = useWorkspaceStore((s) => s.selectedFile);
   const selectFile = useWorkspaceStore((s) => s.selectFile);
-  const { data: paths = [] } = useFileTree(projectId, touched.size);
+  const { data: paths = [] } = useFileTree(projectId, touched.size, sessionId);
 
   return (
     <Panel className="w-[230px] shrink-0">

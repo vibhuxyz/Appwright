@@ -1,6 +1,7 @@
 import { z } from "zod";
+import { collectTurn, type PendingToolCall } from "./collect-turn";
 import { costUsd } from "./providers/pricing";
-import type { Provider, ProviderChunk, ToolSpec } from "./providers/types";
+import type { Provider, ToolSpec } from "./providers/types";
 import type { Runtime } from "./runtime";
 import type { AgentEventSink, Budget, Message, StopReason } from "./types";
 
@@ -10,11 +11,14 @@ export interface Tool {
   args: z.ZodType;
   executionMode: "parallel" | "sequential";
   capabilityHint?: string;
-  // Tools are responsible for wrapping their own result in wrapUntrusted()
-  // before returning it (@repo/tools) — the loop never re-wraps, and never
-  // imports @repo/tools, which would cycle back into agent-core.
   execute(args: unknown, ctx: { runtime: Runtime }): Promise<string>;
 }
+
+export type ApprovalHook = (call: {
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+}) => Promise<{ approved: boolean; reason?: string }>;
 
 export interface RunAgentLoopParams {
   messages: Message[];
@@ -25,6 +29,7 @@ export interface RunAgentLoopParams {
   budget: Budget;
   signal: AbortSignal;
   sessionId: string;
+  onApprovalRequired?: ApprovalHook;
 }
 
 function toToolSpecs(tools: Tool[]): ToolSpec[] {
@@ -35,73 +40,12 @@ function toToolSpecs(tools: Tool[]): ToolSpec[] {
   }));
 }
 
-interface PendingToolCall {
-  toolCallId: string;
-  toolName: string;
-  args: unknown;
-  providerMeta?: unknown;
-}
-
-// One provider.stream() turn, collected into an assistant Message (or
-// Messages, for tool calls) plus whatever the loop needs to decide next.
-async function collectTurn(
-  provider: Provider,
-  messages: Message[],
-  toolSpecs: ToolSpec[],
-  signal: AbortSignal,
-  emit: AgentEventSink,
-  sessionId: string,
-  nextSeq: () => number,
-): Promise<{
-  text: string;
-  toolCalls: PendingToolCall[];
-  stopReason: ProviderChunk & { type: "stop" };
-  usage?: { inputTokens: number; outputTokens: number };
-}> {
-  let text = "";
-  const toolCalls: PendingToolCall[] = [];
-  let stop: (ProviderChunk & { type: "stop" }) | undefined;
-  let usage: { inputTokens: number; outputTokens: number } | undefined;
-
-  for await (const chunk of provider.stream(messages, toolSpecs, { signal })) {
-    if (chunk.type === "text_delta") {
-      text += chunk.delta;
-      await emit({
-        type: "text_delta",
-        seq: nextSeq(),
-        sessionId,
-        delta: chunk.delta,
-      });
-    } else if (chunk.type === "tool_call") {
-      toolCalls.push({
-        toolCallId: chunk.toolCallId,
-        toolName: chunk.toolName,
-        args: chunk.args,
-        providerMeta: chunk.providerMeta,
-      });
-    } else if (chunk.type === "usage") {
-      usage = {
-        inputTokens: chunk.inputTokens,
-        outputTokens: chunk.outputTokens,
-      };
-    } else if (chunk.type === "stop") {
-      stop = chunk;
-    }
-  }
-
-  if (!stop) {
-    throw new Error("provider.stream() ended without a stop chunk");
-  }
-
-  return { text, toolCalls, stopReason: stop, usage };
-}
-
 // runAgentLoop — THE loop. Pure function of its params: no printing, no HTTP,
 // no node:fs. Returns a StopReason, never void (D26).
 export async function runAgentLoop(
   params: RunAgentLoopParams,
 ): Promise<StopReason> {
-  const { tools, provider, runtime, emit, budget, signal, sessionId } = params;
+  const { tools, provider, runtime, emit, budget, signal, sessionId, onApprovalRequired } = params;
   const messages = [...params.messages];
   const toolSpecs = toToolSpecs(tools);
   const toolsByName = new Map(tools.map((t) => [t.name, t]));
@@ -236,18 +180,32 @@ export async function runAgentLoop(
         });
 
         const tool = toolsByName.get(call.toolName);
-        let resultText: string;
+        let resultText = "";
         let failed = false;
 
-        if (!tool) {
-          resultText = `Error: unknown tool "${call.toolName}"`;
-          failed = true;
-        } else {
-          try {
-            resultText = await tool.execute(call.args, { runtime });
-          } catch (err) {
-            resultText = `Error: ${err instanceof Error ? err.message : String(err)}`;
+        if (onApprovalRequired) {
+          const approval = await onApprovalRequired({
+            toolCallId: call.toolCallId,
+            toolName: call.toolName,
+            args: (call.args as Record<string, unknown>) ?? {},
+          });
+          if (!approval.approved) {
+            resultText = approval.reason ?? "User denied permission for this action";
             failed = true;
+          }
+        }
+
+        if (!failed) {
+          if (!tool) {
+            resultText = `Error: unknown tool "${call.toolName}"`;
+            failed = true;
+          } else {
+            try {
+              resultText = await tool.execute(call.args, { runtime });
+            } catch (err) {
+              resultText = `Error: ${err instanceof Error ? err.message : String(err)}`;
+              failed = true;
+            }
           }
         }
 

@@ -9,6 +9,10 @@
  * The mistake this palette is built to prevent is lime/pink everywhere.
  */
 @theme {
+  /* Marketing landing page typeface — kept off the app shell's font-family */
+  --font-geist: "Geist", system-ui, sans-serif;
+  --font-geist-mono: "Geist Mono", ui-monospace, monospace;
+
   /* Background */
   --color-background: #0f1113;
   --color-background-deep: #080809;
@@ -49,38 +53,52 @@
   --color-danger: #ff4d67;
   --color-accent: var(--color-lime);
   --color-accent-foreground: #080809;
+
+  /* Auto-scroll animations */
+  --animate-auto-scroll-frame: auto-scroll-frame 14s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  --animate-auto-scroll-card: auto-scroll-card 9s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  --animate-text-shimmer: text-shimmer 2.5s ease-in-out infinite;
+
+  /* Landing page: status dot pulse + terminal-line sweep */
+  --animate-pulse-dot: pulse-dot 2s ease-in-out infinite;
+  --animate-sweep: sweep 3.2s linear infinite;
 }
 
 html,
 body,
 #root {
   height: 100%;
-}
-
-body {
-  background: var(--color-background);
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-background);
   color: var(--color-foreground);
-  -webkit-font-smoothing: antialiased;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    sans-serif;
+  overflow: hidden;
 }
 
-/* Scrollbars have to recede too — a bright scrollbar is a bright border. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: #303234 transparent;
+/* Custom scrollbars that match the dark charcoal background */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-*::-webkit-scrollbar-track {
+::-webkit-scrollbar-track {
   background: transparent;
 }
-*::-webkit-scrollbar-thumb {
-  background: #2a2b2d;
-  border-radius: 999px;
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border-radius: 3px;
 }
-*::-webkit-scrollbar-thumb:hover {
-  background: #3a3c3e;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border);
 }
 
 /* While a split handle is being dragged the pointer must not flicker back
@@ -91,4 +109,69 @@ body[data-resizing="true"] {
 }
 body[data-resizing="true"] iframe {
   pointer-events: none;
+}
+
+/* Auto-scroll keyframes */
+@keyframes auto-scroll-frame {
+  0%, 15% {
+    transform: translateY(0);
+  }
+  50%, 65% {
+    transform: translateY(calc(-100% + var(--scroll-viewport, 280px)));
+  }
+  90%, 100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes auto-scroll-card {
+  0%, 20% {
+    transform: translateY(0);
+  }
+  50%, 70% {
+    transform: translateY(-45%);
+  }
+  90%, 100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes text-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes growWidth {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
 }

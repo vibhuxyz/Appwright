@@ -270,6 +270,8 @@ _(Move items here from "Currently Learning" once both conditions above are met. 
 - [ ] **Shared-cluster multi-tenancy & access control** — scoping databases per project (`db_proj_${id}`) via admin privileges in MongoDB and key prefixes (`~p:${id}:*`) with blocked dangerous commands (`-@dangerous`) via Redis 6+ ACLs (D61)
 - [ ] **Delegated OAuth proxy architecture** — centralized proxy holding verified provider credentials, signing project-scoped JWTs with per-project secrets to eliminate developer setup friction (D61)
 - [ ] **Usage metering & unified credit accounting** — asynchronous polling of storage volume (MB) and request counters with credit decrementing (D61)
+- [x] **Single-Route Normalization & Client Redirects (TanStack Router)** — avoiding URL fragmentation and normalizing `/dashboard` to `/` (2026-09-15)
+- [x] **Split-Surface Modal Authentication** — combining live visual product proof with developer credentials (2026-09-15) — asynchronous polling of storage volume (MB) and request counters with credit decrementing (D61)
 
 ---
 
@@ -343,3 +345,5 @@ Understood in principle, not yet shipped:
 | [01](./sessions/SESSION_01.md) | 2026-07-14 | Product roadmap, MVP architecture, scaffolding the (Python) engine               |
 | [02](./sessions/SESSION_02.md) | 2026-07-22 | Analysing `ref-ai/packages`; the TS-vs-Python question raised                    |
 | [03](./sessions/SESSION_03.md) | 2026-08-10 | _Coding Agents + Cloud_ deck → full architecture, V0–V5 ladder, decisions closed |
+| [04](./sessions/SESSION_04.md) | 2026-09-15 | Durable stop reasons & SSE resume cards (O7), dynamic capability prompt enhancer (D60) |
+| [05](./sessions/SESSION_05.md) | 2026-09-15 | Multimodal auth dialog, 4K template showcase, $10 credit grants & root routing (D62) |

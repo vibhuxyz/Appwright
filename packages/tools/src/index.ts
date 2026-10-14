@@ -17,6 +17,7 @@ export * from "./untrusted";
 export * from "./fs";
 export * from "./shell";
 export * from "./search";
+export * from "./git";
 
 export const TOOLS_VERSION = "0.0.0";
 

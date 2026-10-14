@@ -7,6 +7,27 @@
 
 ---
 
+## Engineering question ([D71](../DECISIONS.md))
+
+Moves **Q1**, **Q3** (recovery from partial execution).
+
+> How many concurrent agent runs can one orchestrator hold, what happens when 10% of workers die
+> mid-task, and how do we guarantee no task executes twice or is lost?
+
+- **Baseline first (hand-built):** in-process queue → worker with lease + heartbeat + bounded retry,
+  *before* adopting BullMQ/pg-boss (O3). Measure throughput, p50/p95/p99 dispatch latency, and at
+  1×/2×/5×/10× concurrent runs.
+- **Then compare** against the chosen production queue: what guarantee did it add, what did it cost.
+- **Failure experiments** (→ `FAILURES.md`): kill worker mid-tool-call · stop heartbeats · expire
+  lease · network partition to sandbox · partial artifact. Record detection time, recovery time,
+  duplicate executions, lost work.
+- **Invariants:** single owner per task, expired lease recoverable, checkpoint restore invalidates
+  later transcript (D44), budget seat-hold (D45) — see [INVARIANTS.md](../INVARIANTS.md).
+- **Hand-written:** lease manager, heartbeat, retry/idempotency, dispatch gates.
+  **Hybrid:** E2B adapter, Redis/Postgres plumbing.
+
+---
+
 ## Why this version exists
 
 This is **the** architectural pivot — the difference between "a coding agent" and "a product".

@@ -1,13 +1,11 @@
-import { useState } from "react";
 import { useAuthStore } from "@/stores/authStore";
+import { useBillingModalStore } from "@/features/billing/store/billingModalStore";
 import { CreditsBadge } from "@/features/billing/components/CreditsBadge";
-import { AddCreditsModal } from "@/features/billing/components/AddCreditsModal";
 import { ProjectList } from "./ProjectList";
 
 export function ProjectsDashboard() {
   const user = useAuthStore((s) => s.user)!;
-  const updateCredits = useAuthStore((s) => s.updateCredits);
-  const [showAddCredits, setShowAddCredits] = useState(false);
+  const openAddCredits = useBillingModalStore((s) => s.openAddCredits);
 
   return (
     <div className="flex-1 overflow-auto">
@@ -19,15 +17,8 @@ export function ProjectsDashboard() {
               One sentence in, a running app out. Pick up where you left off.
             </p>
           </div>
-          <CreditsBadge credits={user.credits ?? 0} onClick={() => setShowAddCredits(true)} />
+          <CreditsBadge credits={user.credits ?? 0} onClick={openAddCredits} />
         </div>
-
-        <AddCreditsModal
-          isOpen={showAddCredits}
-          currentCredits={user.credits ?? 0}
-          onClose={() => setShowAddCredits(false)}
-          onSuccess={updateCredits}
-        />
 
         <ProjectList />
       </div>

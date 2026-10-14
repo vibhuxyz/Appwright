@@ -23,12 +23,14 @@
     "@repo/cache": "workspace:*",
     "@repo/contracts": "workspace:*",
     "@repo/db": "workspace:*",
+    "@repo/decision-engine": "workspace:*",
     "@repo/logger": "workspace:*",
     "@repo/tools": "workspace:*",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "helmet": "^8.2.0",
-    "@repo/ui-system": "workspace:*"
+    "@repo/ui-system": "workspace:*",
+    "@repo/verify": "workspace:*"
   }
 }

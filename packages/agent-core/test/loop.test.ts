@@ -145,4 +145,39 @@ describe("runAgentLoop — the six exits", () => {
     const stopReason = await runAgentLoop(baseParams({ provider }));
     expect(stopReason).toBe("completed");
   });
+
+  test("onApprovalRequired denies tool execution when unapproved", async () => {
+    let executed = false;
+    const tools = [
+      {
+        name: "test_tool",
+        description: "test tool",
+        args: z.object({}),
+        executionMode: "sequential" as const,
+        execute: async () => {
+          executed = true;
+          return "ok";
+        },
+      },
+    ];
+    const provider = new FakeProvider([
+      {
+        kind: "toolCall",
+        toolCallId: "call_1",
+        toolName: "test_tool",
+        args: {},
+      },
+      { kind: "text", text: "handled denial" },
+    ]);
+    const onApprovalRequired = async () => ({
+      approved: false,
+      reason: "User denied permission",
+    });
+    const stopReason = await runAgentLoop({
+      ...baseParams({ provider, tools }),
+      onApprovalRequired,
+    });
+    expect(stopReason).toBe("completed");
+    expect(executed).toBe(false);
+  });
 });

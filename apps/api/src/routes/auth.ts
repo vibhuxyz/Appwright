@@ -15,17 +15,13 @@ export const authRouter = Router();
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MIN_PASSWORD = 8;
 
-// Initial free credits granted on first signup: 150,000 tokens (~3 full todo apps)
-export const INITIAL_USER_CREDITS = 150_000;
+// Initial free credits granted on first signup: .00 in AI balance (10,000,000 tokens)
+export const INITIAL_USER_CREDITS = 10_000_000;
 
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 10;
 
-// Keyed by email, not IP — a botnet distributes across IPs but not across
-// the one account it's guessing. Fails *open*: if Redis is unreachable,
-// login still works unrate-limited rather than locking everyone out because
-// an auxiliary dependency is down. A brute-force window is a smaller risk
-// than an availability outage on the login route.
+
 async function loginRateLimitOk(email: string): Promise<boolean> {
   try {
     const attempts = await increment(
@@ -103,9 +99,6 @@ authRouter.post("/auth/login", async (req, res) => {
 
   const user = await prisma.user.findUnique({ where: { email: creds.email } });
 
-  // Same message and roughly the same work whether the email exists or the
-  // password is wrong. Distinguishing them tells an attacker which half they
-  // got right, which turns a password guess into a free account enumerator.
   const ok = user
     ? await verifyPassword(user.hashPassword, creds.password)
     : false;

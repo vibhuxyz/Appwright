@@ -12,11 +12,6 @@ import {
 
 export const projectRouter = Router();
 
-// Auth is applied once, app-wide, in index.ts. What is local to these routes
-// is *ownership*: `userId` sits in the where-clause rather than in an
-// if-statement after the lookup, so "not yours" and "not there" are the same
-// 404 — and a route cannot forget the check.
-
 function serializeProject(p: {
   id: string;
   name: string;
@@ -58,8 +53,7 @@ projectRouter.post("/project", async (req, res) => {
     data: { workspacePath, status: "READY" },
   });
 
-  // Don't block project creation on `bun install` + Vite boot — the preview
-  // pane polls until it's healthy.
+
   startDevServer(project.id).catch((err) => {
     log.error("dev server failed to start", {
       projectId: project.id,
@@ -85,7 +79,7 @@ projectRouter.get("/project/:id", async (req, res) => {
   if (!project) return res.status(404).json({ error: "not found" });
 
   if (!getDevServerPort(project.id) && project.status === "READY") {
-    // Fire and forget, the frontend polls until previewUrl is populated
+
     startDevServer(project.id).catch((err) => {
       log.error("dev server failed to restart", {
         projectId: project.id,

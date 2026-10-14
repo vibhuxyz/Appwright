@@ -40,16 +40,36 @@ export interface SseUsageFrame {
 
 export interface SseStatusFrame {
   kind: "status";
-  status: "IDLE" | "RUNNING" | "ERROR";
+  status: "IDLE" | "RUNNING" | "AWAITING_APPROVAL" | "ERROR";
   detail?: string;
   reason?: string;
+}
+
+export interface SseApprovalFrame {
+  kind: "approval";
+  approval: {
+    id: string;
+    sessionId: string;
+    toolCallId: string | null;
+    toolName: string;
+    args: unknown;
+    status: string;
+    createdAt: string;
+  };
+}
+
+export interface SseVerificationFrame {
+  kind: "verification";
+  results: unknown;
 }
 
 export type SseFrame =
   | SseMessageFrame
   | SseDeltaFrame
   | SseUsageFrame
-  | SseStatusFrame;
+  | SseStatusFrame
+  | SseApprovalFrame
+  | SseVerificationFrame;
 
 const MAX_BUFFER = 200;
 const buffers = new Map<string, SseMessageFrame[]>();
@@ -115,13 +135,33 @@ export function publishUsage(sessionId: string, frame: SseUsageFrame): void {
 
 export function publishStatus(
   sessionId: string,
-  status: "IDLE" | "RUNNING" | "ERROR",
+  status: "IDLE" | "RUNNING" | "AWAITING_APPROVAL" | "ERROR",
   detail?: string,
   reason?: string,
 ): void {
   const set = listeners.get(sessionId);
   if (!set) return;
   const frame: SseStatusFrame = { kind: "status", status, detail, reason };
+  for (const res of [...set]) write(res, sessionId, frame);
+}
+
+export function publishApproval(
+  sessionId: string,
+  approval: SseApprovalFrame["approval"],
+): void {
+  const set = listeners.get(sessionId);
+  if (!set) return;
+  const frame: SseApprovalFrame = { kind: "approval", approval };
+  for (const res of [...set]) write(res, sessionId, frame);
+}
+
+export function publishVerification(
+  sessionId: string,
+  results: unknown,
+): void {
+  const set = listeners.get(sessionId);
+  if (!set) return;
+  const frame: SseVerificationFrame = { kind: "verification", results };
   for (const res of [...set]) write(res, sessionId, frame);
 }
 

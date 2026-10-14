@@ -1,0 +1,73 @@
+import { $ } from "bun";
+import type { VerificationResult } from "@repo/contracts";
+import { parseBuildErrors, parseLintErrors, parseTscErrors } from "./parser";
+
+export async function runTsc(cwd: string): Promise<VerificationResult> {
+  try {
+    const output = await $`git -C ${cwd} rev-parse --is-inside-work-tree`
+      .quiet()
+      .then(async () => {
+        return await $`bun x tsc --noEmit`
+          .cwd(cwd)
+          .text();
+      });
+    return { ok: true, check: "tsc", errors: parseTscErrors(output) };
+  } catch (err: unknown) {
+    const errorText = err instanceof Error && "stdout" in err
+      ? String((err as { stdout: Buffer | string }).stdout)
+      : String(err);
+    const errors = parseTscErrors(errorText);
+    return {
+      ok: false,
+      check: "tsc",
+      errors: errors.length > 0 ? errors : [{ message: errorText.trim() }],
+    };
+  }
+}
+
+export async function runBuild(cwd: string): Promise<VerificationResult> {
+  try {
+    const output = await $`bun run build`.cwd(cwd).text();
+    return { ok: true, check: "build", errors: parseBuildErrors(output) };
+  } catch (err: unknown) {
+    const errorText = err instanceof Error && "stdout" in err
+      ? String((err as { stdout: Buffer | string }).stdout)
+      : String(err);
+    const errors = parseBuildErrors(errorText);
+    return {
+      ok: false,
+      check: "build",
+      errors: errors.length > 0 ? errors : [{ message: errorText.trim() }],
+    };
+  }
+}
+
+export async function runLint(cwd: string): Promise<VerificationResult> {
+  try {
+    const output = await $`bun run lint`.cwd(cwd).text();
+    return { ok: true, check: "lint", errors: parseLintErrors(output) };
+  } catch (err: unknown) {
+    const errorText = err instanceof Error && "stdout" in err
+      ? String((err as { stdout: Buffer | string }).stdout)
+      : String(err);
+    const errors = parseLintErrors(errorText);
+    return {
+      ok: false,
+      check: "lint",
+      errors: errors.length > 0 ? errors : [{ message: errorText.trim() }],
+    };
+  }
+}
+
+export async function verifyWorkspace(cwd: string): Promise<VerificationResult[]> {
+  const tscResult = await runTsc(cwd);
+  if (!tscResult.ok) {
+    return [tscResult];
+  }
+  const buildResult = await runBuild(cwd);
+  if (!buildResult.ok) {
+    return [tscResult, buildResult];
+  }
+  const lintResult = await runLint(cwd);
+  return [tscResult, buildResult, lintResult];
+}

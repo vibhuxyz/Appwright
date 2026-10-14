@@ -9,7 +9,7 @@ export type { Runtime } from "./runtime";
 export { LocalRuntime } from "./runtime";
 export type { Provider, ProviderChunk, ToolSpec } from "./providers/types";
 export { FakeProvider, type ScriptedTurn } from "./providers/fake";
-export type { Tool, RunAgentLoopParams } from "./loop";
+export type { Tool, RunAgentLoopParams, ApprovalHook } from "./loop";
 export { runAgentLoop } from "./loop";
 export { truncate } from "./engine/truncate";
 export { consoleSink } from "./engine/sink";

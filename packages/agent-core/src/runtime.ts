@@ -25,10 +25,13 @@ export interface Runtime {
 // root via safeResolve() (@repo/contracts) — the same fence the API uses, so
 // the agent and the file-tree UI never disagree about where a workspace is.
 export class LocalRuntime implements Runtime {
-  constructor(private readonly projectId: string) {}
+  constructor(
+    private readonly projectId: string,
+    private readonly sessionId?: string,
+  ) {}
 
   private resolve(workspacePath: string): string {
-    return safeResolve(this.projectId, workspacePath);
+    return safeResolve(this.projectId, workspacePath, this.sessionId);
   }
 
   async readFile(workspacePath: string): Promise<string> {
