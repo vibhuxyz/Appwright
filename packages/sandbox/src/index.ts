@@ -46,7 +46,11 @@ export type {
 export { SandboxClient } from "./client";
 export type { Sandbox } from "./client";
 
-export { LocalSandboxProvider } from "./providers";
+export {
+  LocalSandboxProvider,
+  E2BSandboxProvider,
+  createSandboxProviderFromEnv,
+} from "./providers";
 export type { CreateSandboxOptions, SandboxProvider } from "./providers";
 
 export { startSupervisor, FenceViolationError, resolveSafePath } from "./supervisor";
