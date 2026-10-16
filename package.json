@@ -9,6 +9,7 @@
     "apps/web",
     "apps/api",
     "apps/orchestrator",
+    "apps/agent",
     "packages/*",
     "workers/*",
     "scripts"

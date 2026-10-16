@@ -1,3 +1,13 @@
 export * from "./lib/prisma";
 export * from "./lib/crypto";
-export type { Prisma } from "../generated/prisma/client";
+export * from "./lib/job-store";
+export { Prisma, JobStatus } from "../generated/prisma/client";
+export type {
+  User,
+  Project,
+  Session,
+  Approval,
+  Message,
+  Job,
+  Secret,
+} from "../generated/prisma/client";

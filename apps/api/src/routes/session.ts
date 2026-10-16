@@ -7,6 +7,7 @@ import {
 import { DEFAULT_MODEL } from "@repo/agent-core";
 import { prisma } from "@repo/db";
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { ownedProjectId, ownedSessionProjectId } from "../ownership";
 import {
   createSessionWorktree,
@@ -210,9 +211,13 @@ sessionRouter.post("/session/:id/preview", async (req, res) => {
     return res.status(404).json({ error: "not found" });
   }
   const devPort = await startSessionDevServer(projectId, req.params.id);
+  // Rotated on every call: a new dev server means a new capability, and an
+  // old link stops working instead of pointing at whatever starts next on
+  // the same port.
+  const previewToken = randomUUID();
   await prisma.session.update({
     where: { id: req.params.id },
-    data: { devPort },
+    data: { devPort, previewToken },
   });
-  res.json({ devPort, previewUrl: `http://localhost:${devPort}` });
+  res.json({ devPort, previewUrl: `/preview/${previewToken}` });
 });

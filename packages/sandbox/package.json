@@ -1,0 +1,24 @@
+{
+  "name": "@repo/sandbox",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": "./src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "build": "tsup src/index.ts --format esm --dts",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "tsup": "^8.3.5"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@repo/agent-core": "workspace:*",
+    "e2b": "^2.56.0",
+    "zod": "^4.6.7"
+  }
+}

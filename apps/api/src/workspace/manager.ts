@@ -2,12 +2,17 @@ import { existsSync } from "node:fs";
 import { mkdir, rm, symlink } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
+import {
+  projectRepoPath,
+  sessionWorktreePath,
+  workspacePath,
+  WORKSPACES_DIR,
+} from "@repo/workspace";
+
+export { projectRepoPath, sessionWorktreePath, workspacePath, WORKSPACES_DIR };
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 const TEMPLATES_DIR = path.join(REPO_ROOT, "templates");
-export const WORKSPACES_DIR = process.env.WORKSPACE_ROOT
-  ? path.resolve(REPO_ROOT, process.env.WORKSPACE_ROOT)
-  : path.resolve(REPO_ROOT, ".workspaces");
 
 const LOCKFILES = ["bun.lock", "bun.lockb", "package-lock.json"];
 
@@ -18,21 +23,6 @@ const RSYNC_EXCLUDES = [
   ...LOCKFILES,
   ...BUILD_OUTPUT,
 ].flatMap((f) => ["--exclude", f]);
-
-export function workspacePath(projectId: string): string {
-  return path.join(WORKSPACES_DIR, projectId);
-}
-
-export function projectRepoPath(projectId: string): string {
-  return path.join(workspacePath(projectId), "repo");
-}
-
-export function sessionWorktreePath(
-  projectId: string,
-  sessionId: string,
-): string {
-  return path.join(workspacePath(projectId), `session-${sessionId}`);
-}
 
 export async function createWorkspace(
   projectId: string,

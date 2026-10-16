@@ -143,6 +143,8 @@ A sandbox is a box that serves a fixed API. `SandboxProvider` is the **client** 
 
 - [ ] `packages/sandbox/contract.ts` — write the wire contract **first**, in Zod, versioned
       (`/v1/...`) from its first commit. This is the only file that defines what a sandbox is.
+      **(Reverted 2026-10-14: an earlier pass built this whole slice as unreviewed skeleton.
+      Removed, stashed at `git stash list` for reference. Rebuild for real once auth exists.)**
 
 ```ts
 // the box serves these. Nothing else may cross the boundary.
@@ -189,7 +191,8 @@ interface Sandbox {
 
 ### Slice 2 — Move the agent into the sandbox
 
-- [ ] Decide the split (**recommended:** worker outside, tools execute inside):
+- [x] Decide the split (**recommended:** worker outside, tools execute inside) — decision stands,
+      not yet re-implemented:
 
 | Option           | Agent runs         | Tools run            | Trade-off                                   |
 | ---------------- | ------------------ | -------------------- | ------------------------------------------- |
@@ -199,19 +202,17 @@ interface Sandbox {
 **Take A for V3.** Latency per tool call is tens of milliseconds and irrelevant next to LLM
 latency; keeping API keys out of an environment that runs LLM-authored code is worth far more.
 
-- [ ] Every filesystem/bash tool routes through `Sandbox.exec` / `readFile` / `writeFile`.
+- [ ] Every filesystem/bash tool routes through `Sandbox.exec` / `readFile` / `writeFile` via `SandboxRuntime`.
 - [ ] Git worktrees (V2) now live **inside** the sandbox. Same commands, different host.
 
 ### Slice 3 — Queue + Orchestrator
 
-- [ ] Pick a queue. **Recommended: BullMQ on Redis** — you almost certainly need Redis anyway for
-      pub/sub and the sandbox registry. (Postgres-backed `pgboss` is a fine alternative that
-      avoids a new dependency.)
-- [ ] `apps/orchestrator` (currently an empty file) owns the job state machine above.
-- [ ] `apps/agent` (currently an empty file) consumes jobs and drives the agent loop.
-- [ ] Job payload is an **id, not a blob** — `{ jobId, sessionId }`. The worker reads state from
+- [x] Pick a queue. Hand-built `MemoryQueue` baseline first ([D71](../DECISIONS.md)) with lease + heartbeat + bounded retry; ready for BullMQ on Redis.
+- [x] `apps/orchestrator` owns the job state machine (`job-machine.ts`), lease manager (`lease-manager.ts`), and dispatcher (`dispatcher.ts`).
+- [ ] `apps/agent` consumes jobs from orchestrator and drives the agent loop via `executeAgentJob` inside isolated sandboxes.
+- [x] Job payload is an **id, not a blob** — `{ jobId, sessionId }`. The worker reads state from
       Postgres. Fat payloads go stale the moment anything else writes.
-- [ ] Heartbeats: a worker renews a lease every N seconds; a missed lease requeues the job.
+- [x] Heartbeats: a worker renews a lease every N seconds; a missed lease requeues the job.
 - [ ] Idempotency: a requeued job must not duplicate messages. Key writes on
       `(sessionId, seq)` and make the write idempotent.
 - [ ] Cancellation: `POST /session/:id/cancel` → flag in Redis → the loop checks it between
@@ -227,11 +228,11 @@ latency; keeping API keys out of an environment that runs LLM-authored code is w
 
 ### Slice 4 — Streaming across process boundaries
 
-- [ ] Worker publishes agent events to Redis pub/sub, channel per session.
-- [ ] API subscribes and forwards to connected SSE clients.
-- [ ] Worker **also** batches writes into Postgres (durable path) — hot path and durable path
+- [x] Worker publishes agent events to Redis pub/sub (`session:<id>`) via `@repo/cache`.
+- [x] API subscribes and forwards to connected SSE clients.
+- [x] Worker **also** batches writes into Postgres (durable path) — hot path and durable path
       stay separate.
-- [ ] Reconnect still works via `?afterSeq=N` from V1, now reading from Postgres.
+- [x] Reconnect still works via `?afterSeq=N` from V1, now reading from Postgres.
 
 ```
 sandbox ─events─► worker ─┬─pub/sub──► API ──SSE──► browser     (hot, lossy, fast)
@@ -242,10 +243,10 @@ sandbox ─events─► worker ─┬─pub/sub──► API ──SSE──► 
 
 - [ ] Real auth. **Recommended:** a hosted provider (Clerk/Auth0/WorkOS) or Lucia if self-hosting.
       Do not hand-roll session management in the version where strangers first arrive.
-- [ ] `User` already exists in `packages/db`. Make `Project.userId` **non-null**.
-- [ ] **Every** query filters by `userId`. Add a repository layer so the filter cannot be forgotten
-      — an ownership check missed in one route is the whole tenancy model gone.
-- [ ] Ownership check on: project, session, message, approval, sandbox, preview URL.
+- [x] `User` already exists in `packages/db`. Make `Project.userId` **non-null** (enforced in Prisma schema).
+- [x] **Every** query filters by `userId`. Add a repository layer so the filter cannot be forgotten
+      — `apps/api/src/repo` (`TenantRepository`).
+- [x] Ownership check on: project, session, message, approval, sandbox, preview URL.
 - [ ] Preview URLs must be unguessable (a random id, not `preview-1`) and ideally auth-gated.
 - [ ] Rate limits per user: requests/min, concurrent sandboxes, tokens/day.
 

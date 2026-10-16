@@ -31,6 +31,7 @@
     "express": "^5.2.1",
     "helmet": "^8.2.0",
     "@repo/ui-system": "workspace:*",
-    "@repo/verify": "workspace:*"
+    "@repo/verify": "workspace:*",
+    "@repo/workspace": "workspace:*"
   }
 }

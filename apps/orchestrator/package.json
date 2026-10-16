@@ -1,8 +1,9 @@
 {
   "name": "orchestrator",
-  "module": "index.ts",
+  "version": "0.0.0",
   "type": "module",
   "private": true,
+  "exports": "./src/index.ts",
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",

@@ -15,6 +15,7 @@ import { sessionRouter } from "./routes/session";
 import { vercelCallbackRouter, vercelRouter } from "./routes/vercel";
 import { gitRouter } from "./routes/git";
 import { approvalRouter } from "./routes/approval";
+import { previewRouter } from "./routes/preview";
 import { pruneAllWorktrees } from "./workspace/prune";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -73,6 +74,10 @@ app.use(vercelCallbackRouter);
 // SSE sits between the two: authenticated, but EventSource cannot send an
 // Authorization header, so it verifies the same JWT from a query param.
 app.use(streamRouter);
+
+// Also public: a plain <iframe src> can't attach an Authorization header
+// either. The random previewToken (not a JWT) is what gates this one.
+app.use(previewRouter);
 
 // ── The auth wall ────────────────────────────────────────────────────────────
 // One line, one place. Previously each router applied requireAuth with its

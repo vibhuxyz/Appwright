@@ -74,14 +74,24 @@ model Session {
   cost         Float         @default(0)
   tokenIn      Int           @default(0)
   tokenOut     Int           @default(0)
+  // Wall-clock seconds a sandbox existed for this session, summed across
+  // every job. D25's first reopen trigger ("should we move off E2B?") needs
+  // a number, not a feeling — this is that number's other half, alongside
+  // tokens.
+  sandboxSeconds Int         @default(0)
   status       SessionStatus @default(IDLE)
   branch       String?
   worktreePath String?
   mode         String        @default("default")
   devPort      Int?
+  // Random, unguessable — the actual access credential for the preview
+  // proxy. Rotated every time /session/:id/preview is called, so an old
+  // link stops working once the dev server it pointed at is gone.
+  previewToken String?       @unique
   allowedTools String[]      @default([])
   messages     Message[]
   approvals    Approval[]
+  jobs         Job[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @default(now()) @updatedAt
 
@@ -121,6 +131,31 @@ model Message {
   @@index([sessionId, seq])
 }
 
+// V3: one row per agent run, durable across worker crashes. The payload is
+// an id, not a blob (doc: "the worker reads state from Postgres") — the
+// prompt and history live on Message, this just tracks dispatch state.
+model Job {
+  id         String    @id @default(cuid()) @db.VarChar(30)
+  sessionId  String
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  projectId  String
+  status     JobStatus @default(QUEUED)
+  retryCount Int       @default(0)
+  maxRetries Int       @default(3)
+  workerId   String?
+  // Null while queued. Set on claim, renewed on heartbeat. A worker that
+  // crashes stops renewing it — any other live worker's poll tick finds it
+  // past due and requeues the job. This is the cross-process lease: the
+  // in-memory LeaseManager only protects against a stall inside one process.
+  leaseExpiresAt DateTime?
+  error      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  @@index([status])
+  @@index([sessionId])
+}
+
 model Secret {
   id             Int      @id @default(autoincrement())
   key            String
@@ -151,4 +186,15 @@ enum ApprovalStatus {
   PENDING
   APPROVED
   DENIED
+}
+
+enum JobStatus {
+  QUEUED
+  PROVISIONING
+  RUNNING
+  AWAITING_APPROVAL
+  VERIFYING
+  SUCCEEDED
+  FAILED
+  CANCELLED
 }

@@ -1,86 +1,33 @@
 import type { Response } from "express";
+import {
+  publishChannel,
+  sessionChannel,
+  subscribeChannel,
+  type SseApprovalFrame,
+  type SseDeltaFrame,
+  type SseFrame,
+  type SseMessageFrame,
+  type SseStatusFrame,
+  type SseUsageFrame,
+  type SseVerificationFrame,
+  type Subscription,
+} from "@repo/cache";
 
-// Three frame kinds go over the wire:
-//   "delta"   ephemeral text streaming, never buffered — a refresh loses the
-//             mid-word animation, which is fine, the final text is a message.
-//   "message" a persisted DB row (Project's Message). Buffered per session so
-//             a reconnect within a few seconds (Slice 4) replays without a
-//             DB round-trip, ordered by Message.seq.
-//   "status"  session state notifications (e.g. RUNNING, IDLE, ERROR) with details and reason.
-export interface SseMessageFrame {
-  kind: "message";
-  seq: number;
-  message: {
-    id: string;
-    seq: number;
-    role: string;
-    type: string;
-    content: string;
-    data: unknown;
-    createdAt: string;
-  };
-}
-
-export interface SseDeltaFrame {
-  kind: "delta";
-  delta: string;
-}
-
-// Running session totals, pushed after each model turn. Not buffered and
-// not persisted as a Message: the numbers already live on the Session row,
-// so a reconnect re-reads them from there rather than replaying a history
-// of increments that would double-count.
-export interface SseUsageFrame {
-  kind: "usage";
-  cost: number;
-  tokenIn: number;
-  tokenOut: number;
-  creditsRemaining?: number;
-}
-
-export interface SseStatusFrame {
-  kind: "status";
-  status: "IDLE" | "RUNNING" | "AWAITING_APPROVAL" | "ERROR";
-  detail?: string;
-  reason?: string;
-}
-
-export interface SseApprovalFrame {
-  kind: "approval";
-  approval: {
-    id: string;
-    sessionId: string;
-    toolCallId: string | null;
-    toolName: string;
-    args: unknown;
-    status: string;
-    createdAt: string;
-  };
-}
-
-export interface SseVerificationFrame {
-  kind: "verification";
-  results: unknown;
-}
-
-export type SseFrame =
-  | SseMessageFrame
-  | SseDeltaFrame
-  | SseUsageFrame
-  | SseStatusFrame
-  | SseApprovalFrame
-  | SseVerificationFrame;
+export type {
+  SseApprovalFrame,
+  SseDeltaFrame,
+  SseFrame,
+  SseMessageFrame,
+  SseStatusFrame,
+  SseUsageFrame,
+  SseVerificationFrame,
+} from "@repo/cache";
 
 const MAX_BUFFER = 200;
 const buffers = new Map<string, SseMessageFrame[]>();
 const listeners = new Map<string, Set<Response>>();
+const subscriptions = new Map<string, Subscription>();
 
-// A dead listener must never take the run down with it — the run is a
-// background job that happens to have a listener, not a request that
-// happens to be slow (V1 trap table). If a write to one client's socket
-// fails (they closed the tab, we re-navigated, whatever), drop that
-// listener and keep publishing to everyone else; never let it bubble up
-// into the agent loop's emit() as a fatalError.
 function write(res: Response, sessionId: string, frame: SseFrame): void {
   try {
     const id = frame.kind === "message" ? frame.seq : undefined;
@@ -90,6 +37,12 @@ function write(res: Response, sessionId: string, frame: SseFrame): void {
   } catch {
     listeners.get(sessionId)?.delete(res);
   }
+}
+
+function broadcastLocal(sessionId: string, frame: SseFrame): void {
+  const set = listeners.get(sessionId);
+  if (!set) return;
+  for (const res of [...set]) write(res, sessionId, frame);
 }
 
 export function attachSseClient(
@@ -117,20 +70,38 @@ export function attachSseClient(
   }
   set.add(res);
 
-  res.on("close", () => set?.delete(res));
+  if (!subscriptions.has(sessionId)) {
+    subscribeChannel<SseFrame>(sessionChannel(sessionId), (frame) => {
+      broadcastLocal(sessionId, frame);
+    })
+      .then((sub) => {
+        subscriptions.set(sessionId, sub);
+      })
+      .catch(() => {});
+  }
+
+  res.on("close", () => {
+    set?.delete(res);
+    if (set?.size === 0) {
+      listeners.delete(sessionId);
+      const sub = subscriptions.get(sessionId);
+      if (sub) {
+        sub.unsubscribe().catch(() => {});
+        subscriptions.delete(sessionId);
+      }
+    }
+  });
 }
 
 export function publishDelta(sessionId: string, delta: string): void {
-  const set = listeners.get(sessionId);
-  if (!set) return;
   const frame: SseDeltaFrame = { kind: "delta", delta };
-  for (const res of [...set]) write(res, sessionId, frame);
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
 
 export function publishUsage(sessionId: string, frame: SseUsageFrame): void {
-  const set = listeners.get(sessionId);
-  if (!set) return;
-  for (const res of [...set]) write(res, sessionId, frame);
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
 
 export function publishStatus(
@@ -139,30 +110,27 @@ export function publishStatus(
   detail?: string,
   reason?: string,
 ): void {
-  const set = listeners.get(sessionId);
-  if (!set) return;
   const frame: SseStatusFrame = { kind: "status", status, detail, reason };
-  for (const res of [...set]) write(res, sessionId, frame);
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
 
 export function publishApproval(
   sessionId: string,
   approval: SseApprovalFrame["approval"],
 ): void {
-  const set = listeners.get(sessionId);
-  if (!set) return;
   const frame: SseApprovalFrame = { kind: "approval", approval };
-  for (const res of [...set]) write(res, sessionId, frame);
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
 
 export function publishVerification(
   sessionId: string,
   results: unknown,
 ): void {
-  const set = listeners.get(sessionId);
-  if (!set) return;
   const frame: SseVerificationFrame = { kind: "verification", results };
-  for (const res of [...set]) write(res, sessionId, frame);
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
 
 export function publishMessage(
@@ -177,7 +145,7 @@ export function publishMessage(
   buf.push(frame);
   if (buf.length > MAX_BUFFER) buf.shift();
 
-  const set = listeners.get(sessionId);
-  if (!set) return;
-  for (const res of [...set]) write(res, sessionId, frame);
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
+

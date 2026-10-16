@@ -90,3 +90,18 @@ export async function withLock<T>(
     await getClient().del(`lock:${key}`);
   }
 }
+
+export { publishChannel, sessionChannel, subscribeChannel } from "./pubsub";
+export { CANCEL_FLAG_TTL_SECONDS, cancelFlagKey } from "./cancel-flag";
+export type {
+  MessageHandler,
+  Subscription,
+  SseApprovalFrame,
+  SseDeltaFrame,
+  SseFrame,
+  SseMessageFrame,
+  SseStatusFrame,
+  SseUsageFrame,
+  SseVerificationFrame,
+} from "./pubsub";
+

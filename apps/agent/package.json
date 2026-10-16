@@ -1,0 +1,28 @@
+{
+  "name": "agent-worker",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": "./src/index.ts",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "dev": "bun run --watch src/index.ts",
+    "check-types": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@repo/agent-core": "workspace:*",
+    "@repo/cache": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/logger": "workspace:*",
+    "@repo/sandbox": "workspace:*",
+    "@repo/tools": "workspace:*",
+    "@repo/workspace": "workspace:*"
+  }
+}

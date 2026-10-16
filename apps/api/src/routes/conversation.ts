@@ -1,3 +1,4 @@
+import { cancelFlagKey, CANCEL_FLAG_TTL_SECONDS, set as cacheSet } from "@repo/cache";
 import { SendMessageRequest } from "@repo/contracts";
 import { prisma } from "@repo/db";
 import { Router } from "express";
@@ -10,7 +11,15 @@ import {
   activeControllers,
   runConversation,
 } from "../workflow/conversation-runner";
+import { enqueueConversation } from "../workflow/enqueue-conversation";
 import { serializeRow } from "../workflow/message-mapper";
+import { conversationRateLimitOk, hasUserSandboxCapacity } from "../workflow/rate-limit";
+
+// Additive V3 path, off by default. The synchronous in-process path
+// (runConversation) stays the default so existing behavior doesn't change
+// underfoot; flip this once apps/web opens /stream before posting here in
+// sandboxed mode (not done yet — see the V3 doc's open items).
+const EXECUTION_MODE_SANDBOXED = process.env.EXECUTION_MODE === "sandboxed";
 
 export { activeControllers };
 
@@ -50,6 +59,9 @@ conversationRouter.post("/conversation/:sessionId/stop", async (req, res) => {
     controller.abort();
     activeControllers.delete(req.params.sessionId);
   }
+  // Harmless when the in-process path handled it above; load-bearing when
+  // a sandboxed worker in another process owns this run instead.
+  await cacheSet(cancelFlagKey(req.params.sessionId), true, CANCEL_FLAG_TTL_SECONDS).catch(() => {});
   await prisma.session.update({
     where: { id: req.params.sessionId },
     data: { status: "IDLE" },
@@ -79,6 +91,15 @@ conversationRouter.post("/conversation", async (req, res) => {
     });
   }
 
+  if (!(await conversationRateLimitOk(req.userId!))) {
+    return res.status(429).json({
+      error: {
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many requests. Slow down and try again shortly.",
+      },
+    });
+  }
+
   if (!(await hasRunCapacity(session.projectId, session.id))) {
     return res.status(429).json({
       error: {
@@ -86,6 +107,25 @@ conversationRouter.post("/conversation", async (req, res) => {
         message: "Too many sessions running on this project. Wait for one to finish.",
       },
     });
+  }
+
+  if (!(await hasUserSandboxCapacity(req.userId!))) {
+    return res.status(429).json({
+      error: {
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many sandboxes running across your projects. Wait for one to finish.",
+      },
+    });
+  }
+
+  if (EXECUTION_MODE_SANDBOXED) {
+    const job = await enqueueConversation({
+      sessionId: session.id,
+      projectId: session.projectId,
+      prompt: body.prompt,
+    });
+    res.status(202).json({ jobId: job.id, sessionId: session.id });
+    return;
   }
 
   await runConversation({

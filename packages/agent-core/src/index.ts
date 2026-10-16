@@ -23,3 +23,5 @@ export { costUsd, priceFor } from "./providers/pricing";
 export { buildSystemPrompt } from "./prompt";
 export { planTasks, formatPlanForAgent } from "./planner";
 export { verifyTypeScript, type VerifyResult } from "./verify";
+export { serializeRow, toCoreMessage, type MessageRow } from "./transcript";
+export { resolveStopNotice, type StopNotice } from "./notices";
