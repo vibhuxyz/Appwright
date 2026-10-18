@@ -19,3 +19,13 @@ export function sessionWorktreePath(
 ): string {
   return path.join(workspacePath(projectId), `session-${sessionId}`);
 }
+
+export {
+  planComposition,
+  withThemeImport,
+  GLOBALS_CSS_PATH,
+  type ComposeInput,
+  type ComposePlan,
+  type FileWrite,
+  type SkippedInput,
+} from "./compose";

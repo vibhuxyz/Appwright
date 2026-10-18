@@ -11,16 +11,6 @@ import path from "node:path";
 // falls through to its default (or, for DATABASE_URL downstream in
 // @repo/db, becomes the literal string "undefined"). Explicit path fixes
 // that regardless of cwd — same problem, same fix as packages/db/prisma.config.ts.
-//
-// Env vars loaded from the repo-root `.env` (see `.env.example`):
-//   DATABASE_URL, REDIS_URL, AUTH_SECRET, SECRETS_ENCRYPTION_KEY,
-//   provider keys (OPENAI_API_KEY / GEMINI_API_KEY / …), DEFAULT_MODEL,
-//   PUBLIC_API_URL, WEB_APP_URL, PORT, WORKSPACE_ROOT,
-//   EXECUTION_MODE ("sandboxed" enqueues to the agent worker; unset/other
-//   keeps the in-process conversation runner), SANDBOX_PROVIDER, E2B_API_KEY.
-// Cancel (/conversation/:id/stop), rate-limit, and preview routes do not
-// change shape based on EXECUTION_MODE — only POST /conversation's 202 vs
-// streaming path does.
 config({ path: path.resolve(import.meta.dir, "../../../.env") });
 
 // V0's CLI leaves WORKSPACE_ROOT unset and gets templates/ (pristine, for

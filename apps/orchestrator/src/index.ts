@@ -29,6 +29,31 @@ export {
   type WorkerHandler,
 } from "./dispatcher";
 
+export {
+  selectNextTasks,
+  describeWait,
+  type SchedulableTask,
+  type SchedulerCapacity,
+  type SchedulerDecision,
+  type WaitingTask,
+  type WaitReason,
+} from "./scheduler";
+
+export {
+  executeRun,
+  DEFAULT_MAX_ATTEMPTS_PER_TASK,
+  DEFAULT_MAX_CONCURRENT_TASKS,
+  type AttemptInput,
+  type AttemptOutcome,
+  type AttemptRecord,
+  type ExecutableTask,
+  type ExecutorOptions,
+  type ExecutorPorts,
+  type RunOutcome,
+  type RunSummary,
+  type VerifyOutcome,
+} from "./executor";
+
 export interface OrchestratorOptions {
   queue?: QueueOptions;
   lease?: LeaseManagerOptions;

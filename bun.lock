@@ -62,7 +62,9 @@
       "name": "orchestrator",
       "version": "0.0.0",
       "dependencies": {
+        "@repo/contracts": "workspace:*",
         "@repo/logger": "workspace:*",
+        "@repo/planner": "workspace:*",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -254,6 +256,21 @@
     "packages/logger": {
       "name": "@repo/logger",
       "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "latest",
+        "tsup": "^8.3.5",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "packages/planner": {
+      "name": "@repo/planner",
+      "version": "0.0.0",
+      "dependencies": {
+        "@repo/contracts": "workspace:*",
+        "zod": "^4.4.3",
+      },
       "devDependencies": {
         "@types/bun": "latest",
         "tsup": "^8.3.5",
@@ -628,6 +645,8 @@
     "@repo/events": ["@repo/events@workspace:packages/events"],
 
     "@repo/logger": ["@repo/logger@workspace:packages/logger"],
+
+    "@repo/planner": ["@repo/planner@workspace:packages/planner"],
 
     "@repo/sandbox": ["@repo/sandbox@workspace:packages/sandbox"],
 

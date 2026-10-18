@@ -108,6 +108,8 @@ requeues and the user sees a reconnect, not a crash.
 One sentence in → a working multi-page app out, with a visible plan that ticked off task by task,
 and every task verified green before the next started.
 
+**Status (2026-10-18): in progress.** Contracts, DB tables, the deterministic planner core and the requirement + architecture engines (`packages/planner`) are built; the LLM intent classifier, the executor and the UI are not. See [the V4 status table](./versions/V4_APP_BUILDER.md#implementation-status--2026-10-18).
+
 ### V4.5 — [details →](./versions/V4_5_VISUAL_EDITOR.md)
 
 Four properties changed across two components by dragging and typing, submitted once, applied in

@@ -92,6 +92,8 @@ model Session {
   messages     Message[]
   approvals    Approval[]
   jobs         Job[]
+  blueprints   Blueprint[]
+  runs         Run[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @default(now()) @updatedAt
 
@@ -129,6 +131,196 @@ model Message {
 
   @@unique([sessionId, seq])
   @@index([sessionId, seq])
+}
+
+
+model Blueprint {
+  id               String         @id @default(cuid()) @db.VarChar(30)
+  sessionId        String
+  session          Session        @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  blueprintVersion Int
+  intent           Json
+  stack            Json
+  entities         Json
+  pages            Json
+  features         Json
+  theme            Json
+  tasks            Task[]
+  changeRequests   ChangeRequest[]
+  createdAt        DateTime       @default(now())
+
+  @@unique([sessionId, blueprintVersion])
+  @@index([sessionId])
+}
+
+enum TaskType {
+  SCAFFOLD
+  SCHEMA
+  AUTH
+  PAYMENT
+  MIGRATION
+  API
+  SEED
+  PAGE
+  COMPONENT
+  THEME
+}
+
+enum RiskTier {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum Capability {
+  STRONG_REASONING
+  STRONG_CODING
+  FAST_CODING
+  CHEAP
+}
+
+enum TaskStatus {
+  PENDING
+  READY
+  RUNNING
+  BLOCKED
+  FAILED
+  DONE
+}
+
+// D30: owns/reads is the graph — dependency edges, write-fence scope,
+// context scope, and parallel eligibility all read from the same two
+// fields. dependsOn is stored, not recomputed, so the executor never
+// re-derives the graph mid-run (ARCHITECTURE §11).
+model Task {
+  id           String        @id @default(cuid()) @db.VarChar(30)
+  blueprintId  String
+  blueprint    Blueprint     @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+  type         TaskType
+  title        String
+  status       TaskStatus    @default(PENDING)
+  dependsOn    Json
+  owns         Json
+  reads        Json
+  riskTier     RiskTier
+  capability   Capability
+  verification Json
+  attempts     TaskAttempt[]
+  changeRequests ChangeRequest[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @default(now()) @updatedAt
+
+  @@index([blueprintId])
+  @@index([blueprintId, status])
+}
+
+enum RunTrigger {
+  INITIAL
+  FOLLOWUP
+  RETRY
+  HEAL
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// What the UI shows progress for, what Stop cancels, what a budget is
+// enforced against (D38). A Task is deliberately NOT owned by a Run — a
+// retry run re-executes a task an earlier run created.
+model Run {
+  id               String        @id @default(cuid()) @db.VarChar(30)
+  sessionId        String
+  session          Session       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  blueprintVersion Int
+  trigger          RunTrigger
+  status           RunStatus     @default(QUEUED)
+  budgetUsd        Float
+  totalCostUsd     Float         @default(0)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  error            String?
+  attempts         TaskAttempt[]
+  events           RunEvent[]
+  createdAt        DateTime      @default(now())
+
+  @@index([sessionId])
+}
+
+enum TaskAttemptStatus {
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+// Telemetry lives here, never on Task — overwriting it onto the task keeps
+// only the last try, and then D31's routing can't be evaluated and V6's
+// loop detection has nothing to compare (D35).
+model TaskAttempt {
+  id            String            @id @default(cuid()) @db.VarChar(30)
+  taskId        String
+  task          Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  runId         String
+  run           Run               @relation(fields: [runId], references: [id], onDelete: Cascade)
+  attemptNumber Int
+  status        TaskAttemptStatus @default(RUNNING)
+  model         String
+  costUsd       Float             @default(0)
+  tokenIn       Int               @default(0)
+  tokenOut      Int               @default(0)
+  durationMs    Int?
+  commitSha     String?
+  error         String?
+  verification  Json?
+  createdAt     DateTime          @default(now())
+
+  @@unique([taskId, attemptNumber])
+  @@index([taskId])
+  @@index([runId])
+}
+
+// The execution timeline, separate from Message (the conversation) — D40.
+model RunEvent {
+  id        String   @id @default(cuid()) @db.VarChar(30)
+  runId     String
+  run       Run      @relation(fields: [runId], references: [id], onDelete: Cascade)
+  type      String
+  data      Json
+  seq       Int
+  createdAt DateTime @default(now())
+
+  @@unique([runId, seq])
+  @@index([runId, seq])
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// D34: a generation agent that believes the frozen architecture is wrong
+// raises this; it does not act. Approval bumps blueprintVersion and
+// recomputes only the affected part of the DAG.
+model ChangeRequest {
+  id          String               @id @default(cuid()) @db.VarChar(30)
+  blueprintId String
+  blueprint   Blueprint            @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+  taskId      String
+  task        Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  wanted      String
+  why         String
+  status      ChangeRequestStatus  @default(PENDING)
+  createdAt   DateTime             @default(now())
+  resolvedAt  DateTime?
+
+  @@index([blueprintId])
+  @@index([taskId])
 }
 
 // V3: one row per agent run, durable across worker crashes. The payload is

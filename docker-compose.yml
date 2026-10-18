@@ -66,6 +66,35 @@ services:
       - ./apps/web:/app/apps/web
       - ./packages:/app/packages
 
+  # V3 agent worker: claims Jobs from Postgres, runs tools in a sandbox.
+  #   docker compose --profile v3 up
+  # Needs EXECUTION_MODE=sandboxed on the API and matching SANDBOX_PROVIDER.
+  agent:
+    profiles: ["v3"]
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api/Dockerfile
+    command: ["bun", "--filter", "agent-worker", "start"]
+    environment:
+      DATABASE_URL: postgresql://appwright:appwright@postgres:5432/appwright
+      REDIS_URL: redis://redis:6379
+      SANDBOX_PROVIDER: ${SANDBOX_PROVIDER:-local}
+      E2B_API_KEY: ${E2B_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-5.4-mini}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-only-change-me}
+      WORKSPACE_ROOT: /workspaces
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./apps/agent:/app/apps/agent
+      - ./packages:/app/packages
+      - workspaces:/workspaces
+
   # ── Everything below: `docker compose --profile events up` ──────────────
   # Off by default. Nothing in the default stack (api, web) publishes or
   # consumes an event yet, so a broker with nothing using it would just be

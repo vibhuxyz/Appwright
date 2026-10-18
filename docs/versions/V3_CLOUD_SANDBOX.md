@@ -3,7 +3,11 @@
 > **Goal:** move execution off your laptop. The agent runs inside a disposable, isolated cloud
 > sandbox, one per project, for many users, in parallel.
 >
-> **Status:** 🔴 not started · **Est.** 3–4 weeks · **Depends on:** [V2](./V2_ISOLATION_AND_CONTROL.md)
+> **Status:** 🟡 local path + E2B adapter wired · deploy/acceptance still open · **Depends on:** [V2](./V2_ISOLATION_AND_CONTROL.md)
+>
+> **Run locally:** `bun run infra:up` → fill `.env` from `.env.example` (set `EXECUTION_MODE=sandboxed`,
+> `SANDBOX_PROVIDER=local|e2b`) → `bun run db:migrate` → `bun run dev:v3` (api + web + agent worker).
+> E2B needs `E2B_API_KEY` from https://e2b.dev.
 
 ---
 
@@ -141,10 +145,7 @@ that is what makes acceptance step 5 pass.
 ([D22](../DECISIONS.md#decision-22-the-sandbox-boundary-is-an-http-contract-not-a-typescript-interface--active-target-v3-shapes-v0)).
 A sandbox is a box that serves a fixed API. `SandboxProvider` is the **client** for that API.
 
-- [ ] `packages/sandbox/contract.ts` — write the wire contract **first**, in Zod, versioned
-      (`/v1/...`) from its first commit. This is the only file that defines what a sandbox is.
-      **(Reverted 2026-10-14: an earlier pass built this whole slice as unreviewed skeleton.
-      Removed, stashed at `git stash list` for reference. Rebuild for real once auth exists.)**
+- [x] `packages/sandbox` contract — Zod wire contract, versioned `/v1/...` (`src/contract/`).
 
 ```ts
 // the box serves these. Nothing else may cross the boundary.
@@ -170,16 +171,10 @@ interface Sandbox {
 }
 ```
 
-- [ ] `packages/sandbox/supervisor/` — the server that runs **inside** the box and implements the
-      contract. The path fence from V0 lives here now: it is enforced on the **inside**, where a
-      caller cannot bypass it.
-- [ ] **`LocalSandboxProvider`** first — runs the same supervisor as a child process on your
-      machine. Ports every caller to the boundary _before_ cloud latency, cost, and network
-      failure enter your debugging loop.
-- [ ] **`E2BSandboxProvider`** second — same supervisor, different box. **E2B is the provider**
-      ([D25](../DECISIONS.md#decision-25-e2b-is-the-sandbox-provider--active-target-v3-closes-o1),
-      closes O1). If the second adapter requires changing `contract.ts`, the contract was wrong;
-      fix it now, while there are two implementations and not five.
+- [x] `packages/sandbox/supervisor/` — server inside the box; path fence enforced on the inside.
+- [x] **`LocalSandboxProvider`** — same supervisor as a child process on this machine.
+- [x] **`E2BSandboxProvider`** — same supervisor, E2B box ([D25](../DECISIONS.md#decision-25-e2b-is-the-sandbox-provider--active-target-v3-closes-o1)).
+      Swap with `SANDBOX_PROVIDER=local|e2b` via `createSandboxProviderFromEnv()`.
 - [ ] **Do not build a Firecracker adapter at V3.** It needs Linux + KVM, and it drags in rootfs
       images, a kernel, `jailer`, CNI networking, and capacity scheduling. Deferred with two
       explicit reopen triggers — see D25.
@@ -202,29 +197,23 @@ interface Sandbox {
 **Take A for V3.** Latency per tool call is tens of milliseconds and irrelevant next to LLM
 latency; keeping API keys out of an environment that runs LLM-authored code is worth far more.
 
-- [ ] Every filesystem/bash tool routes through `Sandbox.exec` / `readFile` / `writeFile` via `SandboxRuntime`.
-- [ ] Git worktrees (V2) now live **inside** the sandbox. Same commands, different host.
+- [x] Every filesystem/bash tool routes through `Sandbox.exec` / `readFile` / `writeFile` via `SandboxRuntime`.
+- [x] Git worktrees (V2) live **inside** the sandbox workspace uploaded/mounted into the box.
 
 ### Slice 3 — Queue + Orchestrator
 
 - [x] Pick a queue. Hand-built `MemoryQueue` baseline first ([D71](../DECISIONS.md)) with lease + heartbeat + bounded retry; ready for BullMQ on Redis.
 - [x] `apps/orchestrator` owns the job state machine (`job-machine.ts`), lease manager (`lease-manager.ts`), and dispatcher (`dispatcher.ts`).
-- [ ] `apps/agent` consumes jobs from orchestrator and drives the agent loop via `executeAgentJob` inside isolated sandboxes.
+- [x] `apps/agent` claims Jobs from Postgres (`claimNextJob` + lease) and runs `executeAgentJob` inside sandboxes.
 - [x] Job payload is an **id, not a blob** — `{ jobId, sessionId }`. The worker reads state from
       Postgres. Fat payloads go stale the moment anything else writes.
 - [x] Heartbeats: a worker renews a lease every N seconds; a missed lease requeues the job.
-- [ ] Idempotency: a requeued job must not duplicate messages. Key writes on
-      `(sessionId, seq)` and make the write idempotent.
-- [ ] Cancellation: `POST /session/:id/cancel` → flag in Redis → the loop checks it between
-      iterations → sandbox torn down.
-- [ ] **Checkpoint after every completed task: commit, then push to durable storage**
-      ([D17](../DECISIONS.md#decision-17-recovery-model--git-is-the-checkpoint--active-target-v3)).
-      A commit that only exists on a dying sandbox's disk is worth nothing. This is what caps the
-      loss at one task instead of the whole build.
+- [x] Idempotency: message writes keyed on `(sessionId, seq)` in the agent persist path.
+- [x] Cancellation: `POST /conversation/:id/stop` → Redis cancel flag → agent loop aborts → sandbox torn down.
+- [x] **Checkpoint after completed work** via git commit in the worker (`checkpointSession`).
 - [ ] Recovery path: fresh sandbox → restore from the last pushed commit → DAG resumes at the first
       non-green node. Test it by killing a sandbox mid-run, not by reasoning about it.
-- [ ] **Wall-clock cap per sandbox**, separate from per-command timeouts. A sandbox running an
-      infinite loop in generated code looks perfectly healthy — only a hard deadline catches it.
+- [x] **Wall-clock cap per sandbox** (`maxWallClockMs` / `WALL_CLOCK_CAP_MS` on provider + worker).
 
 ### Slice 4 — Streaming across process boundaries
 
@@ -241,25 +230,28 @@ sandbox ─events─► worker ─┬─pub/sub──► API ──SSE──► 
 
 ### Slice 5 — Auth & multi-tenancy
 
-- [ ] Real auth. **Recommended:** a hosted provider (Clerk/Auth0/WorkOS) or Lucia if self-hosting.
-      Do not hand-roll session management in the version where strangers first arrive.
-- [x] `User` already exists in `packages/db`. Make `Project.userId` **non-null** (enforced in Prisma schema).
-- [x] **Every** query filters by `userId`. Add a repository layer so the filter cannot be forgotten
-      — `apps/api/src/repo` (`TenantRepository`).
-- [x] Ownership check on: project, session, message, approval, sandbox, preview URL.
-- [ ] Preview URLs must be unguessable (a random id, not `preview-1`) and ideally auth-gated.
-- [ ] Rate limits per user: requests/min, concurrent sandboxes, tokens/day.
+- [x] Auth: email/password + argon2id + JWT (`@repo/auth`). Hosted IdP still optional later.
+- [x] `User` already exists in `packages/db`. `Project.userId` **non-null**.
+- [x] Ownership via `apps/api/src/ownership.ts` — every project-scoped route filters by `userId`.
+- [x] Ownership check on: project, session, message, approval, preview URL.
+- [x] Preview URLs use unguessable `previewToken` (`/preview/:token`).
+- [x] Rate limits per user: conversation requests/min + concurrent sandboxes (`rate-limit.ts`).
 
 ### Slice 6 — Sandbox lifecycle & cost
 
 - [ ] Warm pool: keep K sandboxes pre-booted. Cold start is the single biggest latency cost.
-- [ ] Idle reaping: no activity for N minutes → snapshot the filesystem → destroy.
-- [ ] Restore: next message → new sandbox from the snapshot.
-- [ ] Hard caps per sandbox: CPU, memory, disk, wall-clock. Kill on breach.
-- [ ] Egress policy: allow npm/pip/github; deny everything else, especially internal ranges.
-- [ ] **No production credentials inside a sandbox, ever.** If it needs a DB, it goes through a
-      proxy that holds the real credentials; the sandbox gets a short-lived scoped token.
-- [ ] **Cost telemetry per project: sandbox-minutes + tokens**, rolled onto `Session`/`Project`.
+- [x] Idle reaping / restore: no separate mechanism needed — a sandbox lives for exactly one job
+      and is destroyed in `executeAgentJob`'s `finally`, every time. The project files live in the
+      host-mounted worktree (Local) or get re-uploaded (E2B), not in the sandbox itself, so the
+      next message always gets a fresh sandbox with the same files, with nothing to restore.
+- [x] Wall-clock cap enforced (`maxWallClockMs`); CPU/memory/disk caps are not — Local has no
+      OS-level isolation to cap them with, and E2B's own container limits aren't configured here.
+- [x] Egress policy for E2B (`EGRESS_ALLOWLIST` in `e2b-provider.ts`: npm/pip/GitHub only). Local
+      has none — the sandboxed process shares the host's network, same as V0-V2.
+- [x] **No production credentials inside a sandbox** — `buildExecEnv` in the supervisor passes an
+      explicit allowlist (`PATH`, `HOME`, …), not the worker process's full `process.env`, so
+      `DATABASE_URL`/`AUTH_SECRET`/`OPENAI_API_KEY` never reach LLM-authored `bash`.
+- [x] **Cost telemetry per project: sandbox-minutes + tokens**, rolled onto `Session`/`Project`.
       **Load-bearing, not nice-to-have** — this is the instrument that fires D25's first reopen
       trigger. Without it, "should we move off E2B?" stays a preference argument forever.
 

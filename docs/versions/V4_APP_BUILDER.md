@@ -3,7 +3,41 @@
 > **Goal:** one sentence in, a whole working application out — via a visible plan that executes
 > task by task, each verified before the next begins.
 >
-> **Status:** 🔴 not started · **Est.** 4–6 weeks · **Depends on:** [V3](./V3_CLOUD_SANDBOX.md)
+> **Status:** 🟡 in progress — deterministic planner core built (2026-10-16); LLM stages, executor, UI not built · **Est.** 4–6 weeks · **Depends on:** [V3](./V3_CLOUD_SANDBOX.md)
+
+---
+
+## Implementation status — 2026-10-18
+
+**Answer to "is V4 built?": partly. The deterministic planning core is built and tested; the LLM
+stages, the executor and the UI are not.**
+
+| Piece                                                           | State | Where                                                              |
+| --------------------------------------------------------------- | ----- | ------------------------------------------------------------------ |
+| Blueprint + Task Zod contracts                                  | done  | `packages/contracts/src/{blueprint,task}.schema.ts`                |
+| `Blueprint · Task · Run · TaskAttempt · RunEvent · ChangeRequest` tables | done  | `packages/db/prisma/migrations/20261016135401_add_v4_blueprint_tasks` |
+| Ownership canonicalise / overlap / breadth warning (D37)        | done  | `packages/planner/src/ownership`                                   |
+| Computed edges + ownership conflicts + topological levels (D30) | done  | `packages/planner/src/task-graph`                                  |
+| Risk tier, capability, verification floor by task type (D32)    | done  | `packages/planner/src/task-policy`                                 |
+| BlueprintValidator (schema, duplicate/dangling entities, routes) | done  | `packages/planner/src/blueprint`                                   |
+| TaskCompiler (blueprint → tasks with `owns`/`reads`)            | done  | `packages/planner/src/compile`                                     |
+| TaskGraphValidator (cycles, duplicate ids, bad ownership, task cap) | done  | `packages/planner/src/validate`                                    |
+| `planBlueprint()` — validate → compile → validate, never repairs (D39) | done  | `packages/planner/src/plan`                                        |
+| Requirement engine, confidence scoring, ≤3 adaptive questions (Slice 2, deterministic half) | done  | `packages/planner/src/requirements`        |
+| Intent classifier (LLM, structured output) (Slice 2)            | not built | —                                                              |
+| Architecture decision engine: rules + frozen result (Slice 3)   | done  | `packages/planner/src/architecture`                                |
+| Plan persistence (write `Plan` to Postgres), ACR flow (Slice 4b) | not built | —                                                              |
+| Scheduler: 5 dispatch gates + wait reasons (Slice 4)            | done  | `apps/orchestrator/src/scheduler`                                  |
+| Run executor: retry ≤N, block dependents, resume, cancel, budget (ports injected, not yet wired to Postgres/agent) | done  | `apps/orchestrator/src/executor` |
+| Write fence per task (pure path check against `owns`) (Slice 4) | done  | `packages/planner/src/write-fence`                                 |
+| Postgres-backed executor ports (Slice 4)                        | not built | —                                                              |
+| Context assembler: deterministic sections, byte budget, drop order (Slice 6, assembly half) | done  | `packages/planner/src/context`             |
+| Workspace composer, context builder, per-task verify, telemetry (Slices 5–7b) | not built | —                                                  |
+| Incremental re-plan, plan/blueprint UI, acceptance runs (Slices 8–10) | not built | —                                                         |
+
+Not yet checked off in the TODO below because they need more than the planner core: the
+`PlanValidator`'s cost-under-budget and allowlisted-package checks, the `Run/TaskAttempt` failure
+path, and the blueprint viewer.
 
 ---
 
@@ -206,10 +240,10 @@ duration estimates that do not exist** — without them it degrades into longest
 
 ### Slice 1 — Blueprint schema
 
-- [ ] Define it in `packages/contracts` as a Zod schema. **This is the most important artifact in
+- [x] Define it in `packages/contracts` as a Zod schema. **This is the most important artifact in
       V4** — everything else consumes it, so design it before writing any planner code.
-- [ ] Version the schema (`blueprintVersion`) from day one; it will change.
-- [ ] Persist blueprints (`Blueprint` table, one per session, immutable + revisions).
+- [x] Version the schema (`blueprintVersion`) from day one; it will change.
+- [x] Persist blueprints (`Blueprint` table, one per session, immutable + revisions).
 - [ ] A blueprint viewer in the UI — a user should be able to read the plan before code exists.
 
 ### Slice 1b — The UI system: enforcement and the design block
@@ -256,41 +290,45 @@ duration estimates that do not exist** — without them it degrades into longest
 
 - [ ] Intent classifier: prompt → structured JSON. **Use structured output / tool-calling, never
       "return JSON" in prose.**
-- [ ] Requirement engine (deterministic): map intent + feature keywords → concrete needs
-      (auth, payments, realtime, admin, search, file upload).
-- [ ] Confidence scoring: mark low-confidence inferences as question candidates.
-- [ ] Adaptive questions: ask **at most 3**, only about low-confidence, high-impact items.
-      Every extra question is a user who leaves.
-- [ ] Sensible defaults for everything unasked — and show them, so the user can correct them.
+- [x] Requirement engine (deterministic): map intent + feature keywords → concrete needs
+      (auth, payments, realtime, admin, search, file upload). `detectNeeds()`.
+- [x] Confidence scoring: mark low-confidence inferences as question candidates
+      (explicit 0.95 · default 0.8 · inferred 0.6; question threshold 0.7).
+- [x] Adaptive questions: ask **at most 3**, only about low-confidence, high-impact items.
+      Every extra question is a user who leaves. `selectQuestions()`, ordered by impact.
+- [x] Sensible defaults for everything unasked — and show them, so the user can correct them.
+      Each question carries `defaultAnswer`; `applyAnswers()` returns new needs, never mutates.
 
 ### Slice 3 — Architecture decision engine
 
-- [ ] Deterministic rules: `needs.realtime → websockets`; `needs.payments → stripe`;
-      `entities > 3 → postgres + prisma`. Rules, not vibes.
-- [ ] Once decided, the stack is **frozen** and injected into every downstream prompt.
+- [x] Deterministic rules: `needs.realtime → websockets`; `needs.payments → stripe`;
+      `needs.fileUpload → local-uploads`; `needs.search → postgres-fulltext`. Rules, not vibes.
+      `entities > 3 → postgres + prisma` is moot while the stack is one literal.
+- [x] Once decided, the stack is **frozen** (`Object.freeze`, `decideArchitecture()`).
+      Injecting it into downstream prompts waits for the generation agent (Slice 6).
 - [ ] Start with **one** stack (Next.js + Prisma + Postgres + Tailwind). One stack done well
       beats five done badly, and it makes the templates tractable.
 
 ### Slice 4 — Task graph builder
 
-- [ ] Blueprint → tasks. Deterministic mapping: entities → a schema task; pages → page tasks;
+- [x] Blueprint → tasks. Deterministic mapping: entities → a schema task; pages → page tasks;
       features → feature tasks.
-- [ ] **Each task declares `owns` and `reads`** ([D30](../DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)).
+- [x] **Each task declares `owns` and `reads`** ([D30](../DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)).
       This is the planner's job — and a far more checkable one than "list the dependencies in prose".
-- [ ] **Compute the edges: `reads` ∩ another task's `owns` ⇒ `dependsOn`.** The DAG is derived, not
+- [x] **Compute the edges: `reads` ∩ another task's `owns` ⇒ `dependsOn`.** The DAG is derived, not
       authored. A cycle then points at the exact two declarations that caused it.
-- [ ] **Three tables, not one** ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)):
+- [x] **Three tables, not one** ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)):
       `Task` is the plan · `TaskAttempt` is one execution · `Run` is one pass of the executor.
       All telemetry — model, cost, tokens, duration, error, `commitSha` — lives on the **attempt**.
       `Task.status` is a roll-up written in the same transaction; the attempt is the source of truth.
       This absorbs V6's `HealAttempt` — a heal is an attempt, not a second table.
-- [ ] `Task` table: `status` · `dependsOn` · `owns` · `reads` · **`riskTier`**
+- [x] `Task` table: `status` · `dependsOn` · `owns` · `reads` · **`riskTier`**
       ([D32](../DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)) ·
       **`capability`** ([D31](../DECISIONS.md#decision-31-tasks-request-a-capability-never-a-model-name--active-target-v4)) ·
       **`blueprintVersion`** ([D34](../DECISIONS.md#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6)).
       `capability` and `riskTier` ship in the schema even while unused — adding them later means
       migrating every persisted task, the `seq` argument in a different costume.
-- [ ] **Canonicalise `owns`/`reads` before accepting the graph**
+- [x] **Canonicalise `owns`/`reads` before accepting the graph**
       ([D37](../DECISIONS.md#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9)):
       `normalise → expand → canonicalise → overlap`. `src/**` and `src/auth/**` are **not** equal as
       strings and **are** an overlap. Share the normaliser with `safeResolve` — one implementation.
@@ -308,7 +346,7 @@ duration estimates that do not exist** — without them it degrades into longest
 - [ ] **Never repair an invalid plan with an LLM.** Reject and re-plan, bounded by a re-plan attempt
       limit. A model asked to fix its own cyclic graph produces a graph that passes and means
       something else — the failure moves from loud at plan time to silent at task 9.
-- [ ] Topological sort; identify parallelisable levels.
+- [x] Topological sort; identify parallelisable levels.
 - [ ] **Dispatch needs five gates, not one**
       ([D36](../DECISIONS.md#decision-36-dependencies-make-a-task-eligible-not-runnable--and-the-scheduler-is-not-the-orchestrator--active-target-v4)):
       dependencies green · no ownership conflict · no exclusive-resource conflict · capacity free ·
@@ -321,7 +359,7 @@ duration estimates that do not exist** — without them it degrades into longest
       Scheduler owns what runs next. A scheduler bug wastes time; an orchestrator bug loses a run.
 - [ ] **The write fence is narrowed per task to its `owns` glob** — enforced in the tool layer, not
       by the scheduler. The scheduler prevents _conflicts_; the fence prevents _violations_.
-- [ ] On task failure: retry ≤N with the error in context, then mark blocked and continue with
+- [x] On task failure: retry ≤N with the error in context, then mark blocked and continue with
       any tasks that don't depend on it. Report partial completion honestly. **This is the main
       path, not the edge case** — rework rate dominates wall-clock time.
 - [ ] Task status persisted, so a crash resumes at the first non-green node
@@ -375,7 +413,7 @@ medium        + tier 2  build · migrate · boot · GET /
 high          + tier 3  interact + security checks           (tier 3 lands at V5)
 ```
 
-- [ ] `riskTier` comes from **task type** — `schema`/`auth`/`payment`/`migration` are high — not
+- [x] `riskTier` comes from **task type** — `schema`/`auth`/`payment`/`migration` are high — not
       from a model scoring itself. The planner may override upward only.
 - [ ] Add a runtime smoke check: boot the dev server, hit the routes the task created, assert 200.
 - [ ] A task is not green until it verifies green. A red task never unblocks its dependents.

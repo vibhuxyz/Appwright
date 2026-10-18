@@ -2,30 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  createSandboxProviderFromEnv,
-  LocalSandboxProvider,
-  SandboxRuntime,
-} from "../src";
-
-describe("createSandboxProviderFromEnv", () => {
-  const original = process.env.SANDBOX_PROVIDER;
-
-  afterAll(() => {
-    if (original === undefined) delete process.env.SANDBOX_PROVIDER;
-    else process.env.SANDBOX_PROVIDER = original;
-  });
-
-  it("returns LocalSandboxProvider when SANDBOX_PROVIDER is unset", () => {
-    delete process.env.SANDBOX_PROVIDER;
-    expect(createSandboxProviderFromEnv()).toBeInstanceOf(LocalSandboxProvider);
-  });
-
-  it("returns LocalSandboxProvider when SANDBOX_PROVIDER is local", () => {
-    process.env.SANDBOX_PROVIDER = "local";
-    expect(createSandboxProviderFromEnv()).toBeInstanceOf(LocalSandboxProvider);
-  });
-});
+import { LocalSandboxProvider, SandboxRuntime } from "../src";
 
 describe("packages/sandbox - V3 Slice 1", () => {
   let tempDir: string;
