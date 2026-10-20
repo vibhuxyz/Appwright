@@ -1,6 +1,7 @@
 export * from "./lib/prisma";
 export * from "./lib/crypto";
 export * from "./lib/job-store";
+export { ScopedProjectDb, getProjectDb } from "./lib/project-db";
 export {
   Prisma,
   JobStatus,
