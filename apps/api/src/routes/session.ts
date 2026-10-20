@@ -94,6 +94,18 @@ const AVAILABLE_MODELS: AvailableModel[] = [
     provider: "xAI",
     description: "Real-time frontier intelligence by xAI",
   },
+  {
+    id: "deepseek-chat",
+    name: "DeepSeek Chat",
+    provider: "DeepSeek",
+    description: "Cost-efficient general-purpose model",
+  },
+  {
+    id: "deepseek-reasoner",
+    name: "DeepSeek Reasoner",
+    provider: "DeepSeek",
+    description: "Chain-of-thought reasoning for complex problems",
+  },
 ];
 
 sessionRouter.get("/models", (_req, res) => {

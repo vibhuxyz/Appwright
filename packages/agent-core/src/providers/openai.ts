@@ -12,6 +12,7 @@ import type { Provider, ProviderChunk, ToolSpec } from "./types";
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
+const DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions";
 // Google ships an OpenAI-compatible surface alongside its native API, which
 // is why Gemini needs no separate Provider class — same wire format, same
 // bearer auth. It is compatible, not identical: see the two quirks handled
@@ -109,13 +110,14 @@ function mapFinishReason(reason: string): "end_turn" | "tool_use" | "length" {
 // which sent `openai/gpt-oss-120b` and `qwen/qwen3.6-27b` to api.openai.com,
 // because the provider is a property of the *connection*, not a substring of
 // the label. A vendor renaming a model must not silently reroute it.
-export type ProviderId = "openai" | "groq" | "xai" | "gemini";
+export type ProviderId = "openai" | "groq" | "xai" | "gemini" | "deepseek";
 
 const ENDPOINTS: Record<ProviderId, { url: string; envKey: string }> = {
   openai: { url: OPENAI_CHAT_URL, envKey: "OPENAI_API_KEY" },
   groq: { url: GROQ_CHAT_URL, envKey: "GROQ_API_KEY" },
   xai: { url: XAI_CHAT_URL, envKey: "XAI_API_KEY" },
   gemini: { url: GEMINI_CHAT_URL, envKey: "GEMINI_API_KEY" },
+  deepseek: { url: DEEPSEEK_CHAT_URL, envKey: "DEEPSEEK_API_KEY" },
 };
 
 export const MODEL_PROVIDERS: Record<string, ProviderId> = {
@@ -131,6 +133,8 @@ export const MODEL_PROVIDERS: Record<string, ProviderId> = {
   "gemini-3.7-flash": "gemini",
   "gemini-3.1-pro-preview": "gemini",
   "gemini-flash-latest": "gemini",
+  "deepseek-chat": "deepseek",
+  "deepseek-reasoner": "deepseek",
 };
 
 export const DEFAULT_MODEL = process.env.DEFAULT_MODEL ?? "gpt-5.4-mini";
@@ -142,6 +146,7 @@ export function providerFor(model: string): ProviderId {
   const known = MODEL_PROVIDERS[model];
   if (known) return known;
   if (model.startsWith("grok")) return "xai";
+  if (model.startsWith("deepseek")) return "deepseek";
   if (
     model.startsWith("llama") ||
     model.startsWith("mixtral") ||
