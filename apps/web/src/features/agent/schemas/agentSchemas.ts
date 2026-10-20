@@ -24,10 +24,17 @@ export const sessionSchema = z.object({
   worktreePath: z.string().nullable().optional(),
   mode: z.string().optional(),
   devPort: z.number().nullable().optional(),
+  previewUrl: z.string().nullable().optional(),
   allowedTools: z.array(z.string()).optional(),
   createdAt: z.string(),
 });
 export type Session = z.infer<typeof sessionSchema>;
+
+export const sessionPreviewSchema = z.object({
+  devPort: z.number(),
+  previewUrl: z.string().min(1),
+});
+export type SessionPreview = z.infer<typeof sessionPreviewSchema>;
 
 export const msgSchema = z.object({
   id: z.string(),
@@ -41,6 +48,7 @@ export const msgSchema = z.object({
       toolName: z.string().optional(),
       args: z.record(z.string(), z.unknown()).optional(),
       stopReason: z.string().optional(),
+      intake: z.boolean().optional(),
     })
     .nullable(),
   createdAt: z.string(),

@@ -3,7 +3,31 @@
 > **Goal:** the user clicks a thing in the preview, drags it, and it changes. No prompt, no
 > tokens, no waiting for a model to guess which file they meant.
 >
-> **Status:** 🔴 not started · **Est.** 3–4 weeks · **Depends on:** [V4](./V4_APP_BUILDER.md)
+> **Status:** 🟡 first slice built (select an element → describe the change → agent edits it; the intent-edit path only) · **Est.** 3–4 weeks · **Depends on:** [V4](./V4_APP_BUILDER.md)
+
+---
+
+## Built so far — select an element, describe the change (2026-10-20)
+
+Click **Edit** in the preview header, click any element, and the chat shows an
+_"Editing section · “Our best sellers”"_ chip. The next message you send carries the selection and
+goes to the V4 agent loop scoped to that element. This is the **intent-edit** path of
+[D50](../DECISIONS.md#decision-50-two-interaction-modes--exact-edits-never-reach-the-model--active-target-v45) only.
+
+| Piece | Where |
+| ----- | ----- |
+| Inspector script injected into the proxied preview HTML (dormant until Edit is on; never written to disk) | `apps/api/src/preview`, `apps/api/src/routes/preview.ts` |
+| `ElementSelection` contract + optional `selection` on `POST /conversation` | `packages/contracts/src/element-selection.schema.ts` |
+| Deterministic source locator (text + class match → ranked `file:line`) and a data-tagged selection prompt | `apps/api/src/selection` |
+| Edit toggle, selection store, chat chip, send-with-selection | `apps/web/src/features/preview`, `features/agent` |
+
+**Deviation from [D49](../DECISIONS.md#decision-49-appwright-identity-is-injected-at-build-time-never-written-into-source--active-target-v45):**
+there is no `data-aw-id` and no SWC plugin. Identity is the rendered element's text, classes and
+DOM path, matched to source by the locator. Candidates are hints the agent must verify, so a
+wrong match costs a search, not a wrong edit. Not built: component graph table, property panel,
+DesignState batching, ChangeSet compiler, codemods, `boundingBox()` verification. Verified in real
+Chromium (dormant when off, posts the selection when on, blocks link navigation) and by unit
+tests; not yet run through a live agent edit.
 
 ---
 

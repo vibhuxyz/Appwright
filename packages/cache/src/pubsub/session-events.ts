@@ -58,10 +58,23 @@ export interface SseVerificationFrame {
   results: unknown;
 }
 
+export interface SseAssetRequestFrame {
+  kind: "assetRequest";
+  assetRequest: {
+    id: string;
+    sessionId: string;
+    blueprintId: string;
+    slots: unknown;
+    status: string;
+    createdAt: string;
+  };
+}
+
 export type SseFrame =
   | SseMessageFrame
   | SseDeltaFrame
   | SseUsageFrame
   | SseStatusFrame
   | SseApprovalFrame
-  | SseVerificationFrame;
+  | SseVerificationFrame
+  | SseAssetRequestFrame;

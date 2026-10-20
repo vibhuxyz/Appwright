@@ -1,5 +1,8 @@
+import { unlink } from "node:fs/promises";
+import path from "node:path";
 import { $ } from "bun";
 import type { DiffFileResponse, MergeSessionResponse } from "@repo/contracts";
+import { withRepoLock } from "./conflict/repo-lock";
 
 interface HunkStats {
   additions: number;
@@ -63,33 +66,89 @@ export async function diffSession(
   }
 }
 
-export async function mergeSession(
+function listedGitFiles(stderr: string, header: string): string[] {
+  const idx = stderr.indexOf(header);
+  if (idx === -1) return [];
+  const files: string[] = [];
+  for (const line of stderr.slice(idx + header.length).split("\n")) {
+    if (line.startsWith("\t")) files.push(line.trim());
+    else if (files.length > 0) break;
+  }
+  return files;
+}
+
+function resolvedInside(repoDir: string, relative: string): string | null {
+  const root = path.resolve(repoDir);
+  const full = path.resolve(root, relative);
+  return full === root || full.startsWith(root + path.sep) ? full : null;
+}
+
+async function clearMergeBlockers(repoDir: string, stderr: string): Promise<boolean> {
+  const untracked = listedGitFiles(
+    stderr,
+    "untracked working tree files would be overwritten",
+  );
+  const modified = listedGitFiles(
+    stderr,
+    "Your local changes to the following files would be overwritten",
+  );
+  if (untracked.length === 0 && modified.length === 0) return false;
+
+  for (const file of untracked) {
+    const full = resolvedInside(repoDir, file);
+    if (full) await unlink(full).catch(() => {});
+  }
+  if (modified.length > 0) {
+    await $`git -C ${repoDir} checkout -- ${modified}`.quiet().nothrow();
+  }
+  return true;
+}
+
+async function gitMerge(repoDir: string, branchName: string) {
+  return $`git -C ${repoDir} merge --no-ff ${branchName} -m ${`merge ${branchName}`}`
+    .quiet()
+    .nothrow();
+}
+
+async function mergeSessionLocked(
   repoDir: string,
   branchName: string,
 ): Promise<MergeSessionResponse> {
-  try {
-    await $`git -C ${repoDir} merge --no-ff ${branchName} -m ${`merge ${branchName}`}`.quiet();
+  let result = await gitMerge(repoDir, branchName);
+  if (result.exitCode !== 0) {
+    const stderr = result.stderr.toString();
+    if (await clearMergeBlockers(repoDir, stderr)) {
+      result = await gitMerge(repoDir, branchName);
+    }
+  }
+  if (result.exitCode === 0) {
     return { ok: true, conflict: false, message: "Merged cleanly" };
-  } catch {
-    const conflictFiles = await $`git -C ${repoDir} diff --name-only --diff-filter=U`
-      .text()
-      .catch(() => "");
-    await $`git -C ${repoDir} merge --abort`.quiet().catch(() => {});
-    const conflictedArray = conflictFiles
-      .split("\n")
-      .map((f) => f.trim())
-      .filter(Boolean);
-    const conflictedList = conflictedArray.join(", ");
+  }
+
+  const conflictedArray = (await $`git -C ${repoDir} diff --name-only --diff-filter=U`
+    .nothrow()
+    .text())
+    .split("\n")
+    .map((f) => f.trim())
+    .filter(Boolean);
+  await $`git -C ${repoDir} merge --abort`.quiet().nothrow();
+  if (conflictedArray.length > 0) {
     return {
       ok: false,
       conflict: true,
-      message:
-        conflictedList.length > 0
-          ? `Merge conflicts in: ${conflictedList}`
-          : "Merge failed due to conflicts",
+      message: `Merge conflicts in: ${conflictedArray.join(", ")}`,
       conflicts: conflictedArray,
     };
   }
+  const detail = result.stderr.toString().trim().split("\n").at(-1) ?? "merge failed";
+  return { ok: false, conflict: false, message: detail };
+}
+
+export function mergeSession(
+  repoDir: string,
+  branchName: string,
+): Promise<MergeSessionResponse> {
+  return withRepoLock(repoDir, () => mergeSessionLocked(repoDir, branchName));
 }
 
 export async function revertSession(worktreeDir: string): Promise<boolean> {

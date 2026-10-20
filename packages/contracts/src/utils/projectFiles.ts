@@ -168,3 +168,34 @@ export async function writeProjectFile(
 
   await writeFile(full, content, "utf8");
 }
+
+export type FileToolOp =
+  | { kind: "write_file"; path: string; content: string }
+  | { kind: "edit_file"; path: string; oldString: string; newString: string };
+
+// Replay write_file / edit_file in order. Last write wins. An edit is
+// skipped when the path has no content yet or oldString is not unique,
+// matching the live edit_file tool.
+export function applyFileToolOps(
+  ops: readonly FileToolOp[],
+  existing: ReadonlyMap<string, string> = new Map(),
+): Map<string, string> {
+  const files = new Map(existing);
+
+  for (const op of ops) {
+    if (op.kind === "write_file") {
+      files.set(op.path, op.content);
+      continue;
+    }
+
+    const current = files.get(op.path);
+    if (current === undefined) continue;
+
+    const occurrences = current.split(op.oldString).length - 1;
+    if (occurrences !== 1) continue;
+
+    files.set(op.path, current.replace(op.oldString, op.newString));
+  }
+
+  return files;
+}

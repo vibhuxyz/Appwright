@@ -23,6 +23,12 @@ const CAPABILITY_BY_TASK_TYPE = {
   seed: "fast_coding",
   page: "fast_coding",
   component: "fast_coding",
+  "design-system": "cheap",
+  "app-shell": "fast_coding",
+  typography: "cheap",
+  layout: "fast_coding",
+  responsive: "fast_coding",
+  "visual-verification": "cheap",
 } as const satisfies Record<TaskType, Capability>;
 
 const VERIFICATION_TIER_BY_RISK = {

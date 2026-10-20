@@ -25,3 +25,51 @@ export async function ownedSessionProjectId(
   });
   return row?.projectId ?? null;
 }
+
+// Same check, reached through a Run's session.
+export async function ownedRunSessionId(
+  runId: string,
+  userId: string,
+): Promise<string | null> {
+  const row = await prisma.run.findFirst({
+    where: { id: runId, session: { project: { userId } } },
+    select: { sessionId: true },
+  });
+  return row?.sessionId ?? null;
+}
+
+// Same check, reached through a Blueprint's session.
+export async function ownedBlueprintSessionId(
+  blueprintId: string,
+  userId: string,
+): Promise<string | null> {
+  const row = await prisma.blueprint.findFirst({
+    where: { id: blueprintId, session: { project: { userId } } },
+    select: { sessionId: true },
+  });
+  return row?.sessionId ?? null;
+}
+
+// Same check, reached through an AssetRequest's session.
+export async function ownedAssetRequestSessionId(
+  assetRequestId: string,
+  userId: string,
+): Promise<string | null> {
+  const row = await prisma.assetRequest.findFirst({
+    where: { id: assetRequestId, session: { project: { userId } } },
+    select: { sessionId: true },
+  });
+  return row?.sessionId ?? null;
+}
+
+// Same check, reached through a ProjectAsset's project.
+export async function ownedProjectAssetId(
+  assetId: string,
+  userId: string,
+): Promise<string | null> {
+  const row = await prisma.projectAsset.findFirst({
+    where: { id: assetId, project: { userId } },
+    select: { projectId: true },
+  });
+  return row?.projectId ?? null;
+}

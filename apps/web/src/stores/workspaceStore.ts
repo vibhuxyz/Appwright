@@ -3,7 +3,9 @@ import { create } from "zustand";
 export const WORKSPACE_TABS = [
   "code",
   "preview",
+  "plan",
   "diff",
+  "assets",
   "database",
   "logs",
   "analytics",

@@ -10,12 +10,16 @@ export interface Plan {
   graph: ValidatedGraph;
 }
 
-export function planBlueprint(input: unknown): PlanResult<Plan> {
-  const blueprint = validateBlueprint(input);
+export function planBlueprint(
+  input: unknown,
+  budgetCents?: number,
+  allowedPackages?: readonly string[],
+): PlanResult<Plan> {
+  const blueprint = validateBlueprint(input, allowedPackages);
   if (!blueprint.ok) return blueprint;
 
   const tasks = compileTasks(blueprint.value);
-  const graph = validateTaskGraph(tasks);
+  const graph = validateTaskGraph(tasks, budgetCents);
   if (!graph.ok) return graph;
 
   return {

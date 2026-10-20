@@ -172,6 +172,16 @@ gate is the first real consumer of the `"review"` policy V1.2 built but never en
       [D64](./DECISIONS.md)** — the user asked for the full platform this entry describes as
       deferred, in the 7 ordered slices now tracked in the version doc. Slice 1 (the
       `"low_confidence"` status) is done; see the version doc for the rest.
+- [x] **AI-generated intake questions, 2026-10-18** — `apps/api/src/intake` + the planner's
+      `requirements/generate-questions.ts` ask the model for product-specific clarifying questions
+      from the raw prompt (not the deterministic `selectQuestions()`/`QUESTION_TEXT` registry above,
+      which stays unused dead code on this path). Surfaced in the web UI as `IntakeDock` →
+      `QuestionFlow`, with "Help me answer" / "Skip question" / "End chat" controls.
+- [x] **D72 added 2026-10-19** — **intake questions carry model-generated multiple-choice options,
+      not a fixed yes/no.** `PromptQuestionSchema.options: string[]` (2–4, with a validated
+      `defaultOptionIndex`) replaces `defaultAnswer: boolean` end to end: the model prompt, the
+      parser's option normalize/dedupe/clamp, `applyPromptAnswers`/`requirementTurns`, and the
+      `question-flow` UI's answer buttons. See [D72](./DECISIONS.md).
 - [x] Slice 1 — `Message`, `AgentEvent` (with `seq`), `StopReason`, `Budget`, `AgentEventSink` in `packages/agent-core/src/types.ts`
 - [x] Slice 2 — provider abstraction (`providers/types.ts`), `FakeProvider`, `OpenAiProvider` (real, streaming, fetch-based, no SDK dep)
 - [x] Slice 3 — tools (`list_files`, `read_file`, `write_file`, `edit_file`, `grep`, `bash`), path fence + deny-list, `wrapUntrusted`, `deps.allow.json` guard

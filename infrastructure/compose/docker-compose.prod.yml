@@ -44,8 +44,47 @@ services:
       PORT: 3001
     ports:
       - "3001:3001"
+    volumes:
+      - workspaces:/app/.workspaces
     depends_on:
       postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/orchestrator/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://appwright:appwright@postgres:5432/appwright
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/agent/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://appwright:appwright@postgres:5432/appwright
+      REDIS_URL: redis://redis:6379
+      EXECUTION_MODE: sandboxed
+      SANDBOX_PROVIDER: e2b
+      SANDBOX_WARM_POOL_SIZE: 2
+      E2B_API_KEY: ${E2B_API_KEY:?set E2B_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY}
+      CHECKPOINT_REMOTE_URL: ${CHECKPOINT_REMOTE_URL:-}
+      HEALTH_PORT: 3003
+    volumes:
+      - workspaces:/app/.workspaces
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     restart: unless-stopped
 
@@ -63,3 +102,4 @@ services:
 
 volumes:
   pgdata:
+  workspaces:

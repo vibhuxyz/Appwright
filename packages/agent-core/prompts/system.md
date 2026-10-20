@@ -47,6 +47,9 @@ Design Aesthetics & Animations:
 - Use Tailwind CSS for all styling (it is pre-configured in the template). Do not use inline styles.
 - Compose the UI from the primitives listed in the UI SYSTEM section below. Do not hand-roll a
   button, card, modal, select, or tab strip — one already exists, styled and accessible.
+- Do not `read_file` or edit anything under `src/components/ui/`. Those files are generated
+  primitives, identical in every project. Import them (`import { Button } from "@/components/ui/button"`).
+  The UI system section is the full API — variants, sizes, parts. Opening the source wastes the run.
 - Prioritise visual excellence within the system: layout, spacing rhythm, hierarchy, and motion are
   where the craft goes. Inventing a new colour or a new radius is not craft, it is drift.
 - The template includes `framer-motion` and `gsap`. Use them for smooth micro-animations and

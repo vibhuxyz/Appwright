@@ -2206,6 +2206,53 @@ ceremony and should be cut down to what actually produced decisions.
 
 ---
 
+## Decision 72: Intake questions carry model-generated multiple-choice options, not a fixed yes/no ✅ ACTIVE _(2026-10-19, target: V4 intake)_
+
+**Decision:** `PromptQuestionSchema` (`packages/contracts`) replaces `defaultAnswer: boolean` with
+`options: string[]` (2–4, each ≤60 chars) plus a `defaultOptionIndex` that must index into it. The
+answer a user gives — typed, clicked, or skipped — is the chosen option's **text**, not a boolean.
+This threads through the whole intake pipeline: the model prompt in
+`packages/planner/src/requirements/generate-questions.ts` now asks for the real, distinct answers
+to each open product decision (e.g. `"Pickup only" / "Delivery only" / "Both pickup and delivery"`)
+instead of forcing everything into yes/no; `applyPromptAnswers`/`requirementTurns` read the chosen
+text directly; and the web `question-flow` components render one button per generated option
+instead of a hardcoded Yes/No pair.
+
+**Why:** the prior shape only ever supported binary decisions. Real product decisions are rarely
+binary — "should customers be able to order for pickup or delivery" has at least three real
+answers, and forcing it through yes/no either loses information or produces a question that
+doesn't match how a person would actually answer it. [principle-model-the-domain] applies directly:
+`defaultAnswer: boolean` was encoding an assumption ("every open question has two answers") the
+product itself contradicts.
+
+**What this closed, concretely:** a fixed boolean question turns out to be the two-option case of
+a multiple-choice one — nothing in the schema, parser, prompt-builder, or UI needs to branch on
+"is this yes/no or multi-choice" anymore, because there is only one shape.
+
+**Trade-offs we accepted:**
+- The model must now also choose *which* options to offer, not just true/false — one more thing
+  that can go wrong, mitigated the same way `GENERATION_FAILED` already was: the parser drops any
+  question left with fewer than 2 usable options after dedup/clip, and clamps an out-of-range or
+  non-integer `defaultOptionIndex` to `0` rather than trusting the model's arithmetic.
+- `MAX_QUESTION_OPTIONS` (4) and `MAX_QUESTION_OPTION_CHARS` (60) were chosen to fit the existing
+  button-row UI without a design pass — not validated against real model output yet (see Session 06
+  homework).
+- No backwards-compatibility shim for the old boolean shape — every caller (contracts, planner,
+  `apps/api`, `apps/web`) was migrated in the same change, per
+  `principle-migrate-callers-then-delete-legacy-apis`.
+
+**What stays unrelated:** `packages/planner/src/requirements/select-questions.ts` and
+`apply-answers.ts` — a separate, deterministic, boolean-only question path (`Question`,
+`selectQuestions()`, `QUESTION_TEXT` registry) that predates the AI-generated path and has no
+callers outside its own module. It was deliberately left untouched — out of scope for this change,
+and a candidate for deletion if it's confirmed genuinely dead.
+
+**Revisit when:** real model output shows the option/character caps are too tight (a question whose
+real answers need more than 4 options or longer phrasing), or if the dead deterministic
+`selectQuestions()` path is confirmed unused and removed.
+
+---
+
 ## Open — not yet decided
 
 These block work when they're reached. Each needs an entry above before the relevant slice starts.

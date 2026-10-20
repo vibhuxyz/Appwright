@@ -18,6 +18,15 @@ export * from "./fs";
 export * from "./shell";
 export * from "./search";
 export * from "./git";
+export {
+  ConflictResolution,
+  ConflictSide,
+  ResolveConflictsRequest,
+  detectConflicts,
+  resolveConflicts,
+  withRepoLock,
+} from "./conflict";
+export type { ConflictFile, ConflictReport, ResolveResult } from "./conflict";
 
 export const TOOLS_VERSION = "0.0.0";
 

@@ -347,3 +347,4 @@ Understood in principle, not yet shipped:
 | [03](./sessions/SESSION_03.md) | 2026-08-10 | _Coding Agents + Cloud_ deck → full architecture, V0–V5 ladder, decisions closed |
 | [04](./sessions/SESSION_04.md) | 2026-09-15 | Durable stop reasons & SSE resume cards (O7), dynamic capability prompt enhancer (D60) |
 | [05](./sessions/SESSION_05.md) | 2026-09-15 | Multimodal auth dialog, 4K template showcase, $10 credit grants & root routing (D62) |
+| [06](./sessions/SESSION_06.md) | 2026-10-19 | Intake questions: model-generated multiple-choice options replace fixed yes/no (D72) |

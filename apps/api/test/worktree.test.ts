@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import { existsSync } from "node:fs";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, rm, symlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
 import {
@@ -67,6 +67,38 @@ describe("Git Worktree Workspace Isolation (V2 Slice 1)", () => {
     );
     expect(secondCallPath).toBe(worktreeDir);
     expect(existsSync(worktreeDir)).toBe(true);
+  });
+
+  it("does not symlink repo node_modules into the session worktree", async () => {
+    const sessionId = `test-sess-nm-${Date.now()}`;
+    const wt = sessionWorktreePath(testProjectId, sessionId);
+    await mkdir(path.join(repoDir, "node_modules"), { recursive: true });
+    await writeFile(path.join(repoDir, "node_modules", "marker"), "repo");
+
+    await createSessionWorktree(testProjectId, sessionId);
+
+    expect(existsSync(path.join(wt, "node_modules"))).toBe(false);
+
+    await removeSessionWorktree(testProjectId, sessionId);
+  });
+
+  it("strips an existing node_modules symlink on a reused worktree", async () => {
+    const sessionId = `test-sess-nm-reuse-${Date.now()}`;
+    const wt = sessionWorktreePath(testProjectId, sessionId);
+    await mkdir(path.join(repoDir, "node_modules"), { recursive: true });
+    await createSessionWorktree(testProjectId, sessionId);
+    await symlink(
+      path.join(repoDir, "node_modules"),
+      path.join(wt, "node_modules"),
+      "dir",
+    );
+
+    await createSessionWorktree(testProjectId, sessionId);
+
+    const st = await lstat(path.join(wt, "node_modules")).catch(() => null);
+    expect(st?.isSymbolicLink() ?? false).toBe(false);
+
+    await removeSessionWorktree(testProjectId, sessionId);
   });
 
   it("changes in session worktree are isolated from the main repo", async () => {

@@ -1,18 +1,17 @@
 import { useMemo, useState } from "react";
-import { Plus, Sparkles } from "lucide-react";
 import type { Session } from "../schemas/agentSchemas";
 import { useAgentStore, agentStore } from "../store/agentStore";
 import { useCreateSession, useUpdateSessionModel } from "../hooks/useSession";
-import { useEnhancePrompt, useSendMessage, useStopConversation } from "../hooks/useSendMessage";
+import { useEnhancePrompt, useStopConversation } from "../hooks/useSendMessage";
+import { IntakeDock, useIntake } from "../intake";
 import { deriveActiveStopNotice } from "../utils/deriveStopNotice";
 import { evaluatePrompt } from "../utils/evaluatePrompt";
 import { getPromptSuggestions } from "../utils/promptSuggestions";
 import { Panel } from "@/shared/components/ui/Panel";
-import { Badge } from "@/shared/components/ui/Badge";
+import { SelectionChip, selectionStore } from "@/features/preview";
+import { ChatPaneHeader, PaneComposer } from "../composer";
 import { MessageList } from "./MessageList";
 import { StopNoticeCard } from "./StopNoticeCard";
-import { PromptSuggestionBar } from "./PromptSuggestionBar";
-import { ChatInput } from "./ChatInput";
 
 const RESUME_PROMPT = "Continue building the remaining tasks in the plan until complete.";
 
@@ -34,7 +33,7 @@ export function ChatPane({
   const statusDetail = useAgentStore((s) => s.statusDetail);
   const liveStopNotice = useAgentStore((s) => s.stopNotice);
 
-  const sendMessage = useSendMessage(sessionId);
+  const intake = useIntake(sessionId, messages);
   const stopConversation = useStopConversation(sessionId);
   const enhancePrompt = useEnhancePrompt();
   const createSession = useCreateSession(projectId);
@@ -53,16 +52,19 @@ export function ChatPane({
     [liveStopNotice, messages, userCredits],
   );
 
-  const submit = (prompt: string) => {
-    sendMessage.mutate(prompt);
-  };
-
   const send = () => {
-    if (!trimmed || running || enhancePrompt.isPending) return;
-    submit(trimmed);
+    if (!trimmed || running || enhancePrompt.isPending || intake.holdsComposer) return;
+    const prompt = trimmed;
     setInput("");
     setPrevInput(null);
     setEnhancedSuccess(false);
+    const selection = selectionStore.getState().selection;
+    if (selection) {
+      selectionStore.getState().clearSelection();
+      intake.sendNow(prompt, selection);
+      return;
+    }
+    intake.ask(prompt);
   };
 
   const handleEnhance = () => {
@@ -85,6 +87,7 @@ export function ChatPane({
 
   const startNewChat = () => {
     if (running || createSession.isPending) return;
+    intake.dismiss();
     createSession.mutate(undefined, {
       onSuccess: () => agentStore.getState().reset([], false, ""),
     });
@@ -92,24 +95,7 @@ export function ChatPane({
 
   return (
     <Panel className="flex flex-1 flex-col overflow-hidden bg-background">
-      <header className="shrink-0 border-b border-border-soft px-4 pt-4 pb-3.5">
-        <div className="flex items-center gap-2.5">
-          <Sparkles className="size-5 text-pink-light" />
-          <span className="text-[15px] font-semibold text-foreground">Appwright AI</span>
-          <Badge tone="premium">Beta</Badge>
-          <button
-            type="button"
-            onClick={startNewChat}
-            disabled={running || createSession.isPending}
-            className="ml-auto flex cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-surface-2 px-3 py-1.5 text-[13px] text-foreground-secondary transition-colors hover:bg-surface-3 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Plus className="size-3.5" /> New Chat
-          </button>
-        </div>
-        <p className="mt-2 truncate text-[13px] text-muted">
-          Build, edit, and improve your app with AI.
-        </p>
-      </header>
+      <ChatPaneHeader isBusy={running || createSession.isPending} onNewChat={startNewChat} />
 
       <MessageList
         messages={messages}
@@ -117,23 +103,47 @@ export function ChatPane({
         running={running}
         statusDetail={statusDetail}
         sessionId={sessionId}
+        projectId={projectId}
         onStop={() => stopConversation.mutate()}
+        footer={
+          intake.gate ? (
+            <IntakeDock
+              gate={intake.gate}
+              messages={messages}
+              isSubmitting={intake.isSubmitting}
+              onSubmit={intake.submit}
+              onRetry={intake.retry}
+              onContinue={intake.continueWithoutQuestions}
+              onAskAgain={intake.askAgain}
+            />
+          ) : null
+        }
       />
 
       {activeStopNotice && !running && (
         <StopNoticeCard
           notice={activeStopNotice}
           userCredits={userCredits}
-          onResume={() => submit(RESUME_PROMPT)}
+          onResume={() => intake.sendNow(RESUME_PROMPT)}
           onAddCredits={onAddCredits}
         />
       )}
 
-      {trimmed.length > 0 && (
-        <PromptSuggestionBar
+      {!intake.holdsComposer && <SelectionChip />}
+
+      {!intake.holdsComposer && (
+        <PaneComposer
+          input={input}
+          trimmed={trimmed}
+          running={running}
+          isEnhancing={enhancePrompt.isPending}
+          enhancedSuccess={enhancedSuccess}
+          enhanceError={enhancePrompt.error?.message ?? null}
+          quality={quality}
           tip={tip}
           suggestions={suggestions}
           canUndo={prevInput !== null}
+          model={session?.model}
           onUndo={() => {
             if (prevInput !== null) {
               setInput(prevInput);
@@ -142,28 +152,18 @@ export function ChatPane({
             }
           }}
           onApplySuggestion={handleApplySuggestion}
+          onModelChange={(model) => {
+            if (session) updateModel.mutate({ sessionId: session.id, model });
+          }}
+          onChange={(value) => {
+            setInput(value);
+            setEnhancedSuccess(false);
+          }}
+          onSubmit={send}
+          onEnhance={handleEnhance}
+          onStop={() => stopConversation.mutate()}
         />
       )}
-
-      <ChatInput
-        input={input}
-        running={running}
-        isEnhancing={enhancePrompt.isPending}
-        enhancedSuccess={enhancedSuccess}
-        enhanceError={enhancePrompt.error?.message ?? null}
-        quality={quality}
-        model={session?.model}
-        onModelChange={(model) => {
-          if (session) updateModel.mutate({ sessionId: session.id, model });
-        }}
-        onChange={(val) => {
-          setInput(val);
-          setEnhancedSuccess(false);
-        }}
-        onSubmit={send}
-        onEnhance={handleEnhance}
-        onStop={() => stopConversation.mutate()}
-      />
     </Panel>
   );
 }

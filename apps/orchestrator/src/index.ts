@@ -39,10 +39,29 @@ export {
   type WaitReason,
 } from "./scheduler";
 
+export { runBudgetCents, taskBudgetCents, type BudgetLevels } from "./budget";
+
 export {
   executeRun,
+  createPostgresPorts,
+  createPrismaRunStore,
+  createWorkspaceVerifier,
+  runPersistedRun,
   DEFAULT_MAX_ATTEMPTS_PER_TASK,
   DEFAULT_MAX_CONCURRENT_TASKS,
+  type FencedAttemptInput,
+  type GeneratedAttempt,
+  type PersistedRunOptions,
+  type PersistedRunResult,
+  type PostgresPortsConfig,
+  type PrismaRunClient,
+  type PrismaRunStoreConfig,
+  type RunFinish,
+  type RunStore,
+  type StoredRun,
+  type TaskGenerator,
+  type VerifyWorkspace,
+  type WorkspaceVerifier,
   type AttemptInput,
   type AttemptOutcome,
   type AttemptRecord,

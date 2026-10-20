@@ -7,6 +7,8 @@ import { randomUUID } from "node:crypto";
 import { runWithTrace, setTraceContext } from "@repo/logger";
 import { log } from "./log";
 import { authRouter } from "./routes/auth";
+import { blueprintRouter } from "./routes/blueprint";
+import { planRouter } from "./routes/plan";
 import { conversationRouter, streamRouter } from "./routes/conversation";
 import { filesRouter } from "./routes/files";
 import { projectRouter } from "./routes/project";
@@ -15,6 +17,7 @@ import { sessionRouter } from "./routes/session";
 import { vercelCallbackRouter, vercelRouter } from "./routes/vercel";
 import { gitRouter } from "./routes/git";
 import { approvalRouter } from "./routes/approval";
+import { assetsRouter } from "./routes/assets";
 import { previewRouter } from "./routes/preview";
 import { pruneAllWorktrees } from "./workspace/prune";
 
@@ -71,13 +74,16 @@ app.get("/health", (_req, res) => {
 app.use(authRouter);
 app.use(vercelCallbackRouter);
 
+// Also public: a plain <iframe src> can't attach an Authorization header
+// either. The random previewToken (not a JWT) is what gates this one.
+// Mounted before streamRouter so a mistaken router-level auth middleware on
+// the stream cannot shadow it (Express root-mounted .use() runs for every
+// request that reaches that router, not only its declared paths).
+app.use(previewRouter);
+
 // SSE sits between the two: authenticated, but EventSource cannot send an
 // Authorization header, so it verifies the same JWT from a query param.
 app.use(streamRouter);
-
-// Also public: a plain <iframe src> can't attach an Authorization header
-// either. The random previewToken (not a JWT) is what gates this one.
-app.use(previewRouter);
 
 // ── The auth wall ────────────────────────────────────────────────────────────
 // One line, one place. Previously each router applied requireAuth with its
@@ -98,11 +104,14 @@ app.use((req, _res, next) => {
 app.use(projectRouter);
 app.use(sessionRouter);
 app.use(conversationRouter);
+app.use(blueprintRouter);
+app.use(planRouter);
 app.use(filesRouter);
 app.use(vercelRouter);
 app.use(promptRouter);
 app.use(gitRouter);
 app.use(approvalRouter);
+app.use(assetsRouter);
 
 app.use(
   (

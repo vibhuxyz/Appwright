@@ -1,7 +1,14 @@
+import {
+  PromptQuestionsResponse,
+  type ElementSelection,
+  type PromptAnswerValue,
+  type PromptQuestion,
+} from "@repo/contracts";
 import { httpClient } from "@/shared/lib/httpClient";
 import {
   availableModelSchema,
   msgSchema,
+  sessionPreviewSchema,
   sessionSchema,
   type Approval,
   type DiffFile,
@@ -27,13 +34,33 @@ export const agentApi = {
     httpClient.put(`/session/${id}`, { model }).then(sessionSchema.parse),
   updateSessionMode: (id: string, mode: PermissionMode) =>
     httpClient.put(`/session/${id}`, { mode }).then(sessionSchema.parse),
+  startPreview: (sessionId: string, signal?: AbortSignal) =>
+    httpClient
+      .post(`/session/${sessionId}/preview`, undefined, signal)
+      .then(sessionPreviewSchema.parse),
 
   getConversation: (sessionId: string, afterSeq = -1) =>
     httpClient
       .get(`/conversations/${sessionId}?afterSeq=${afterSeq}`)
       .then((r) => z.array(msgSchema).parse(r)),
-  sendMessage: (sessionId: string, prompt: string) =>
-    httpClient.post("/conversation", { sessionId, prompt }),
+  questionsFor: (prompt: string) =>
+    httpClient
+      .post("/conversation/questions", { prompt })
+      .then((body) => PromptQuestionsResponse.parse(body).questions),
+  sendMessage: (
+    sessionId: string,
+    prompt: string,
+    answers?: Readonly<Record<string, PromptAnswerValue>>,
+    questions?: readonly PromptQuestion[],
+    selection?: ElementSelection,
+  ) =>
+    httpClient.postMaybeStream("/conversation", {
+      sessionId,
+      prompt,
+      ...(answers ? { answers } : {}),
+      ...(questions ? { questions } : {}),
+      ...(selection ? { selection } : {}),
+    }),
   stopConversation: (sessionId: string) =>
     httpClient.post<{ ok: boolean; stopped: boolean }>(
       `/conversation/${sessionId}/stop`,

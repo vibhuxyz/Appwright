@@ -11,6 +11,7 @@ import {
   topologicalLevels,
 } from "../task-graph";
 import { MAX_TASKS_PER_PLAN } from "./constants";
+import { budgetIssue } from "./estimate-cost";
 import type { ValidatedGraph } from "./types";
 
 function duplicateIdIssues(tasks: readonly TaskSpec[]): PlanIssue[] {
@@ -70,8 +71,13 @@ function structuralIssues(tasks: readonly TaskSpec[]): PlanIssue[] {
 
 export function validateTaskGraph(
   tasks: readonly TaskSpec[],
+  budgetCents?: number,
 ): PlanResult<ValidatedGraph> {
   const issues = structuralIssues(tasks);
+  if (budgetCents !== undefined) {
+    const overBudget = budgetIssue(tasks, budgetCents);
+    if (overBudget) issues.push(overBudget);
+  }
   if (issues.length > 0) return { ok: false, issues };
 
   const { dependsOn, ownershipConflicts } = buildTaskGraph([...tasks]);

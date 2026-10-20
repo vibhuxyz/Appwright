@@ -1,4 +1,5 @@
 import z from "zod";
+import { ElementSelectionSchema } from "./element-selection.schema";
 
 export const SessionStatus = z.enum([
   "IDLE",
@@ -47,13 +48,45 @@ export const SessionResponse = z.object({
   worktreePath: z.string().nullable().optional(),
   mode: z.string().optional(),
   devPort: z.number().nullable().optional(),
+  previewUrl: z.string().nullable().optional(),
   allowedTools: z.array(z.string()).optional(),
   createdAt: z.string(),
 });
 
+export const SessionPreviewResponse = z.object({
+  devPort: z.number(),
+  previewUrl: z.string().min(1),
+});
+
+export const PromptAnswerValue = z.union([z.string().min(1).max(200), z.literal("skip")]);
+
+export const PromptQuestionSchema = z
+  .object({
+    need: z.string().min(1).max(40),
+    text: z.string().min(1).max(200),
+    label: z.string().min(1).max(40),
+    options: z.array(z.string().min(1).max(60)).min(2).max(4),
+    defaultOptionIndex: z.number().int().min(0),
+  })
+  .refine((question) => question.defaultOptionIndex < question.options.length, {
+    message: "defaultOptionIndex must index into options",
+    path: ["defaultOptionIndex"],
+  });
+
 export const SendMessageRequest = z.object({
   sessionId: z.string(),
   prompt: z.string().min(1),
+  answers: z.record(z.string(), PromptAnswerValue).optional(),
+  questions: z.array(PromptQuestionSchema).max(3).optional(),
+  selection: ElementSelectionSchema.optional(),
+});
+
+export const PromptQuestionsRequest = z.object({
+  prompt: z.string().trim().min(1),
+});
+
+export const PromptQuestionsResponse = z.object({
+  questions: z.array(PromptQuestionSchema).max(3),
 });
 
 export const EnhancePromptRequest = z.object({
@@ -78,7 +111,12 @@ export const AvailableModelSchema = z.object({
 export type CreateSessionRequest = z.infer<typeof CreateSessionRequest>;
 export type UpdateSessionRequest = z.infer<typeof UpdateSessionRequest>;
 export type SessionResponse = z.infer<typeof SessionResponse>;
+export type SessionPreviewResponse = z.infer<typeof SessionPreviewResponse>;
 export type SendMessageRequest = z.infer<typeof SendMessageRequest>;
+export type PromptAnswerValue = z.infer<typeof PromptAnswerValue>;
+export type PromptQuestionsRequest = z.infer<typeof PromptQuestionsRequest>;
+export type PromptQuestion = z.infer<typeof PromptQuestionSchema>;
+export type PromptQuestionsResponse = z.infer<typeof PromptQuestionsResponse>;
 export type EnhancePromptRequest = z.infer<typeof EnhancePromptRequest>;
 export type EnhancePromptResponse = z.infer<typeof EnhancePromptResponse>;
 export type AvailableModel = z.infer<typeof AvailableModelSchema>;

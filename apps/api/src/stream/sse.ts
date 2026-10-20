@@ -4,6 +4,7 @@ import {
   sessionChannel,
   subscribeChannel,
   type SseApprovalFrame,
+  type SseAssetRequestFrame,
   type SseDeltaFrame,
   type SseFrame,
   type SseMessageFrame,
@@ -15,6 +16,7 @@ import {
 
 export type {
   SseApprovalFrame,
+  SseAssetRequestFrame,
   SseDeltaFrame,
   SseFrame,
   SseMessageFrame,
@@ -120,6 +122,15 @@ export function publishApproval(
   approval: SseApprovalFrame["approval"],
 ): void {
   const frame: SseApprovalFrame = { kind: "approval", approval };
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
+}
+
+export function publishAssetRequest(
+  sessionId: string,
+  assetRequest: SseAssetRequestFrame["assetRequest"],
+): void {
+  const frame: SseAssetRequestFrame = { kind: "assetRequest", assetRequest };
   broadcastLocal(sessionId, frame);
   publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }

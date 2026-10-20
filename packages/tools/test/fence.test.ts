@@ -1,5 +1,5 @@
-import { safeResolve } from "@repo/contracts";
-import { isDenied } from "../src/fence";
+import { safeResolve } from "@repo/contracts/files";
+import { isDenied, isGeneratedUiPrimitive, uiPrimitiveImportPath } from "../src/fence";
 import { describe, expect, test } from "bun:test";
 
 describe("safeResolve", () => {
@@ -32,5 +32,23 @@ describe("isDenied", () => {
 
   test("allows an ordinary source file", () => {
     expect(isDenied("src/App.tsx")).toBe(false);
+  });
+});
+
+describe("isGeneratedUiPrimitive", () => {
+  test("matches vendored primitives in both templates", () => {
+    expect(isGeneratedUiPrimitive("src/components/ui/button.tsx")).toBe(true);
+    expect(isGeneratedUiPrimitive("src/components/ui/dialog.tsx")).toBe(true);
+  });
+
+  test("allows app components next to the primitives", () => {
+    expect(isGeneratedUiPrimitive("src/components/Animations.tsx")).toBe(false);
+    expect(isGeneratedUiPrimitive("src/app/page.tsx")).toBe(false);
+  });
+
+  test("maps a primitive path to the import the agent should use", () => {
+    expect(uiPrimitiveImportPath("src/components/ui/button.tsx")).toBe(
+      "@/components/ui/button",
+    );
   });
 });

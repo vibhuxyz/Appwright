@@ -16,6 +16,13 @@ const DEFAULT_POLL_INTERVAL_MS = 1000;
 const DEFAULT_LEASE_DURATION_MS = 30_000;
 const DEFAULT_MAX_CONCURRENCY = 3;
 
+function formatJobError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const stderr =
+    "stderr" in err && typeof err.stderr === "string" ? err.stderr.trim() : "";
+  return stderr ? `${err.message} (${stderr})` : err.message;
+}
+
 export function startPoller(
   sandboxProvider: SandboxProvider,
   opts?: PollerOptions,
@@ -40,9 +47,13 @@ export function startPoller(
       await setJobStatus(job.id, jobStatusFor(result.stopReason));
       log.info("job finished", { jobId: job.id, stopReason: result.stopReason });
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      const message = formatJobError(err);
+      const sandboxId =
+        err instanceof Error && "sandboxId" in err && typeof err.sandboxId === "string"
+          ? err.sandboxId
+          : undefined;
       await setJobStatus(job.id, "FAILED", { error: message }).catch(() => {});
-      log.error("job crashed", { jobId: job.id, err: message });
+      log.error("job crashed", { jobId: job.id, sessionId: job.sessionId, sandboxId, err: message });
     } finally {
       running--;
     }

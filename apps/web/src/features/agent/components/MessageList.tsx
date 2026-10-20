@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Loader2, Sparkles, Square } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { AssetRequestCard, useAssetRequests } from "@/features/assets";
 import type { Msg } from "../schemas/agentSchemas";
 import { agentApi } from "../api/agentApi";
 import { ApprovalCard } from "./ApprovalCard";
@@ -53,14 +54,18 @@ export function MessageList({
   running,
   statusDetail,
   sessionId,
+  projectId,
   onStop,
+  footer,
 }: {
   messages: Msg[];
   delta: string;
   running: boolean;
   statusDetail: string;
   sessionId?: string;
+  projectId?: string;
   onStop: () => void;
+  footer?: ReactNode;
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -74,9 +79,11 @@ export function MessageList({
     },
   });
 
+  const { data: assetRequests = [] } = useAssetRequests(sessionId);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, delta, running, approvals]);
+  }, [messages, delta, running, approvals, assetRequests]);
 
   const responsesByCallId = new Map(
     messages.filter((m) => m.type === "toolResponse").map((m) => [m.data?.toolCallId, m]),
@@ -86,7 +93,7 @@ export function MessageList({
 
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-auto p-4">
-      {visible.length === 0 && !delta && !running && <EmptyState />}
+      {visible.length === 0 && !delta && !running && !footer && <EmptyState />}
 
       {grouped.map((item) =>
         item.kind === "toolGroup" ? (
@@ -140,11 +147,23 @@ export function MessageList({
         </div>
       )}
 
+      {footer}
       {sessionId &&
         approvals
           .filter((a) => a.status === "PENDING")
           .map((a) => (
             <ApprovalCard key={a.id} approval={a} sessionId={sessionId} />
+          ))}
+      {sessionId &&
+        assetRequests
+          .filter((request) => request.status === "PENDING")
+          .map((request) => (
+            <AssetRequestCard
+              key={request.id}
+              assetRequest={request}
+              sessionId={sessionId}
+              projectId={projectId}
+            />
           ))}
 
       <div ref={bottomRef} />

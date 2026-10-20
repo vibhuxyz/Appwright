@@ -6,7 +6,13 @@ export const DEFAULT_CONFIDENCE = 0.8;
 export const QUESTION_CONFIDENCE_THRESHOLD = 0.7;
 export const MAX_QUESTIONS = 3;
 export const MAX_PROMPT_CHARS = 4000;
+export const MAX_QUESTION_NEED_CHARS = 40;
+export const MAX_QUESTION_TEXT_CHARS = 160;
+export const MAX_QUESTION_LABEL_CHARS = 40;
 export const MAX_EVIDENCE_PER_NEED = 5;
+export const MIN_QUESTION_OPTIONS = 2;
+export const MAX_QUESTION_OPTIONS = 4;
+export const MAX_QUESTION_OPTION_CHARS = 60;
 
 export const EXPLICIT_PATTERNS: Readonly<Record<NeedName, readonly RegExp[]>> = {
   auth: [/\b(log ?in|sign ?(up|in)|authenticat\w*|accounts?|passwords?)\b/i],

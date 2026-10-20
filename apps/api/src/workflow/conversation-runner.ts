@@ -5,11 +5,14 @@ import {
   runAgentLoop,
   type Message as CoreMessage,
 } from "@repo/agent-core";
+import type { ElementSelection } from "@repo/contracts";
 import { prisma, type Prisma } from "@repo/db";
 import { classify, resolvePolicy, type VerifyOutcome } from "@repo/decision-engine";
+import { applyPromptAnswers, type IntakeQuestion, type PromptAnswer } from "@repo/planner";
 import { ALL_TOOLS } from "@repo/tools";
 import type { Response } from "express";
 import { log } from "../log";
+import { buildSelectionPrompt, locateSelectionSource } from "../selection";
 import {
   attachSseClient,
   publishMessage,
@@ -22,7 +25,8 @@ import { resolveStopNotice } from "./stop-notice";
 import { createAgentEventHandler } from "./agent-event-handler";
 import { runVerifyStep } from "./verify-step";
 import { runTaskPlanStep } from "./task-plan-step";
-import { commitSessionCheckpoint } from "./commit-checkpoint";
+import { finalizeRun } from "./finalize-run";
+import { recordRequirementTurns } from "./enqueue-conversation";
 
 export const activeControllers = new Map<string, AbortController>();
 
@@ -30,6 +34,9 @@ export interface RunConversationOptions {
   sessionId: string;
   userId: string;
   prompt: string;
+  answers?: Readonly<Record<string, PromptAnswer>>;
+  questions?: readonly IntakeQuestion[];
+  selection?: ElementSelection;
   res: Response;
 }
 
@@ -77,50 +84,57 @@ export async function runConversation(opts: RunConversationOptions): Promise<voi
     if (!res.writableEnded) res.status(402).json({ error: notice.detail });
     return;
   }
-
   const userRow = await persist({ role: "user", type: "text", content: prompt });
+  const answerRows = await recordRequirementTurns(opts.answers, opts.questions, persist);
   await prisma.session.update({ where: { id: session.id }, data: { status: "RUNNING" } });
   publishStatus(session.id, "RUNNING", "Analyzing request…");
-
-  await createSessionWorktree(session.projectId, session.id);
-  const runtime = new LocalRuntime(session.projectId, session.id);
-  const systemPrompt = await buildSystemPrompt(runtime);
-  const systemMessage: CoreMessage = { role: "user", type: "text", content: systemPrompt };
-
-  const planningProvider = new OpenAiProvider({ model: session.model });
-  const decisionResult = await classify(prompt, planningProvider);
-  const policy = resolvePolicy(decisionResult);
-  const plannerSkipped = policy === "direct" || policy === "blocked";
-  log.info("decision", { sessionId: session.id, status: decisionResult.status, decision: decisionResult.decision, policy, plannerSkipped });
-
-  const planMessage = plannerSkipped
-    ? undefined
-    : await runTaskPlanStep({
-        sessionId: session.id,
-        prompt,
-        runtime,
-        provider: planningProvider,
-        persist,
-      });
-
-  const messages: CoreMessage[] = [
-    systemMessage,
-    ...priorRows.map(toCoreMessage),
-    toCoreMessage(userRow),
-    ...(planMessage ? [planMessage] : []),
-  ];
   const controller = new AbortController();
   activeControllers.set(session.id, controller);
-
   const { emit } = createAgentEventHandler({ sessionId: session.id, userId, persist });
-
   const MAX_VERIFY_ATTEMPTS = 2;
   const verifyHistory: VerifyOutcome[] = [];
   let finalStopReason = "completed";
   let finalReason: string | undefined;
   let finalDetail: string | undefined;
+  let verificationPassed = false;
 
   try {
+    const worktreeDir = await createSessionWorktree(session.projectId, session.id);
+    const runtime = new LocalRuntime(session.projectId, session.id);
+    const systemPrompt = await buildSystemPrompt(runtime);
+    const systemMessage: CoreMessage = { role: "user", type: "text", content: systemPrompt };
+    const planningProvider = new OpenAiProvider({ model: session.model });
+    const answeredPrompt = applyPromptAnswers(prompt, opts.answers, opts.questions ?? []);
+    const modelPrompt = opts.selection
+      ? buildSelectionPrompt(
+          answeredPrompt,
+          opts.selection,
+          await locateSelectionSource(worktreeDir, opts.selection),
+        )
+      : answeredPrompt;
+    const decisionResult = await classify(modelPrompt, planningProvider);
+    const policy = resolvePolicy(decisionResult);
+    const plannerSkipped = policy === "direct" || policy === "blocked";
+    log.info("decision", { sessionId: session.id, status: decisionResult.status, decision: decisionResult.decision, policy, plannerSkipped });
+
+    const planMessage = plannerSkipped
+      ? undefined
+      : await runTaskPlanStep({
+          sessionId: session.id,
+          prompt: modelPrompt,
+          runtime,
+          provider: planningProvider,
+          persist,
+        });
+
+    const messages: CoreMessage[] = [
+      systemMessage,
+      ...priorRows.map(toCoreMessage),
+      toCoreMessage(userRow),
+      ...answerRows.map(toCoreMessage),
+      ...(planMessage ? [planMessage] : []),
+    ];
+
     for (let attempt = 0; attempt <= MAX_VERIFY_ATTEMPTS; attempt++) {
       if (policy === "blocked") {
         const notice = resolveStopNotice("blocked");
@@ -195,7 +209,10 @@ export async function runConversation(opts: RunConversationOptions): Promise<voi
         history: verifyHistory,
       });
 
-      if (verify.passed) break;
+      if (verify.passed) {
+        verificationPassed = true;
+        break;
+      }
 
       if (!verify.shouldRetry) {
         log.info("verification gave up", { sessionId: session.id, attempts: verifyHistory.length, stuck: verify.stuck });
@@ -222,7 +239,7 @@ export async function runConversation(opts: RunConversationOptions): Promise<voi
     }
 
     if (finalStopReason !== "fatalError") {
-      await commitSessionCheckpoint(session.projectId, session.id, prompt);
+      await finalizeRun({ projectId: session.projectId, sessionId: session.id, prompt, verificationPassed, persist });
     }
 
     await prisma.session.update({
@@ -232,9 +249,10 @@ export async function runConversation(opts: RunConversationOptions): Promise<voi
   } catch (err) {
     finalStopReason = "fatalError";
     finalReason = "fatalError";
-    finalDetail = "Execution error";
-    await prisma.session.update({ where: { id: session.id }, data: { status: "ERROR" } });
+    finalDetail = err instanceof Error ? err.message : "Execution error";
     log.error("run failed", { sessionId: session.id, err: String(err) });
+    await prisma.session.update({ where: { id: session.id }, data: { status: "ERROR" } });
+    await persist({ role: "assistant", type: "text", content: `The run stopped before finishing: ${finalDetail}`, data: { stopReason: "fatalError" } });
   } finally {
     activeControllers.delete(session.id);
     publishStatus(session.id, finalStopReason === "fatalError" ? "ERROR" : "IDLE", finalDetail, finalReason);

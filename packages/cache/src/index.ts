@@ -97,6 +97,7 @@ export type {
   MessageHandler,
   Subscription,
   SseApprovalFrame,
+  SseAssetRequestFrame,
   SseDeltaFrame,
   SseFrame,
   SseMessageFrame,

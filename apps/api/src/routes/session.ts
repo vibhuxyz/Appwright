@@ -8,14 +8,19 @@ import { DEFAULT_MODEL } from "@repo/agent-core";
 import { prisma } from "@repo/db";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import { PUBLIC_API_URL } from "../env";
 import { ownedProjectId, ownedSessionProjectId } from "../ownership";
 import {
-  createSessionWorktree,
   removeSessionWorktree,
   sessionServerKey,
   startSessionDevServer,
   stopDevServer,
 } from "../workspace/manager";
+import { ensureSessionWorktree } from "../workspace/ensure-session-worktree";
+
+function sessionPreviewUrl(previewToken: string | null | undefined): string | null {
+  return previewToken ? `${PUBLIC_API_URL}/preview/${previewToken}` : null;
+}
 
 export const sessionRouter = Router();
 
@@ -108,6 +113,7 @@ function serializeSession(s: {
   worktreePath: string | null;
   mode: string;
   devPort: number | null;
+  previewToken?: string | null;
   allowedTools?: string[];
   createdAt: Date;
 }): SessionResponse {
@@ -124,6 +130,7 @@ function serializeSession(s: {
     worktreePath: s.worktreePath,
     mode: s.mode,
     devPort: s.devPort,
+    previewUrl: sessionPreviewUrl(s.previewToken),
     allowedTools: s.allowedTools ?? [],
     createdAt: s.createdAt.toISOString(),
   };
@@ -134,6 +141,12 @@ sessionRouter.post("/project/:projectId/session", async (req, res) => {
   if (!(await ownedProjectId(req.params.projectId, req.userId!))) {
     return res.status(404).json({ error: "not found" });
   }
+  // D18 — opening a project costs nothing; only sending a message boots a
+  // sandbox. The worktree itself is created lazily, the first time a message
+  // or a preview actually needs it (runConversation / enqueueConversation /
+  // startSessionDevServer each call createSessionWorktree before using one).
+  // createSessionWorktree persists branch/worktreePath onto the session row
+  // itself once it has run, so there is one place that does it, not four.
   const session = await prisma.session.create({
     data: {
       projectId: req.params.projectId,
@@ -141,15 +154,7 @@ sessionRouter.post("/project/:projectId/session", async (req, res) => {
       model: DEFAULT_MODEL,
     },
   });
-  const worktreePath = await createSessionWorktree(
-    req.params.projectId,
-    session.id,
-  );
-  const withWorktree = await prisma.session.update({
-    where: { id: session.id },
-    data: { branch: `agent/${session.id}`, worktreePath },
-  });
-  res.status(201).json(serializeSession(withWorktree));
+  res.status(201).json(serializeSession(session));
 });
 
 sessionRouter.get("/project/:projectId/sessions", async (req, res) => {
@@ -210,14 +215,25 @@ sessionRouter.post("/session/:id/preview", async (req, res) => {
   if (!projectId) {
     return res.status(404).json({ error: "not found" });
   }
+  const existing = await prisma.session.findUnique({
+    where: { id: req.params.id },
+    select: { devPort: true, previewToken: true },
+  });
+  await ensureSessionWorktree(projectId, req.params.id);
   const devPort = await startSessionDevServer(projectId, req.params.id);
-  // Rotated on every call: a new dev server means a new capability, and an
-  // old link stops working instead of pointing at whatever starts next on
-  // the same port.
-  const previewToken = randomUUID();
+  // Keep the token when the port is unchanged so a polling client does not
+  // rotate the capability out from under an open iframe. Rotate only when
+  // the upstream port changes (restart / reallocate).
+  const previewToken =
+    existing?.devPort === devPort && existing.previewToken
+      ? existing.previewToken
+      : randomUUID();
   await prisma.session.update({
     where: { id: req.params.id },
     data: { devPort, previewToken },
   });
-  res.json({ devPort, previewUrl: `/preview/${previewToken}` });
+  res.json({
+    devPort,
+    previewUrl: sessionPreviewUrl(previewToken),
+  });
 });

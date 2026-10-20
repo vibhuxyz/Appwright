@@ -3,6 +3,7 @@ export type { MessageHandler, Subscription } from "./types";
 export { sessionChannel } from "./session-events";
 export type {
   SseApprovalFrame,
+  SseAssetRequestFrame,
   SseDeltaFrame,
   SseFrame,
   SseMessageFrame,

@@ -27,6 +27,7 @@ export function uiSystemPromptSection(): string {
 
 These primitives are already in the project under \`src/components/ui/\`. Import and compose
 them. Do NOT hand-roll a button, card, modal, or select that already exists here.
+Do not read_file or edit those files — this section is the API.
 
 ${entries.map(([name, entry]) => line(name, entry)).join("\n")}
 

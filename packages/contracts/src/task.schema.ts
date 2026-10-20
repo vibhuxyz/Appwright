@@ -1,10 +1,5 @@
 import z from "zod";
 
-// D30: owns/reads are the graph. D31: capability, never a model name.
-// D32: riskTier, derived from type. Both ship in the schema from the first
-// version with a Task table, even unused — adding them later migrates
-// every persisted task.
-
 export const TaskType = z.enum([
   "scaffold",
   "schema",
@@ -16,14 +11,18 @@ export const TaskType = z.enum([
   "page",
   "component",
   "theme",
+  "design-system",
+  "app-shell",
+  "typography",
+  "layout",
+  "responsive",
+  "visual-verification",
 ]);
 export type TaskType = z.infer<typeof TaskType>;
 
 export const RiskTier = z.enum(["low", "medium", "high"]);
 export type RiskTier = z.infer<typeof RiskTier>;
 
-// D32: a lookup table, not a model scoring itself. The planner may only
-// override upward from this.
 export const RISK_TIER_BY_TASK_TYPE: Record<TaskType, RiskTier> = {
   schema: "high",
   auth: "high",
@@ -35,6 +34,12 @@ export const RISK_TIER_BY_TASK_TYPE: Record<TaskType, RiskTier> = {
   component: "low",
   theme: "low",
   scaffold: "low",
+  "design-system": "low",
+  "app-shell": "medium",
+  typography: "low",
+  layout: "low",
+  responsive: "low",
+  "visual-verification": "low",
 };
 
 export const Capability = z.enum([
@@ -55,10 +60,6 @@ export const TaskStatus = z.enum([
 ]);
 export type TaskStatus = z.infer<typeof TaskStatus>;
 
-// D37: file globs and non-file resources share one declaration list.
-// `db:app`, `port:3000`, `prisma:app.prisma`, `env:STRIPE_KEY` alongside
-// `src/checkout/**`. Canonicalisation and overlap live in packages/planner
-// — this schema only records the raw declaration.
 export const OwnershipDeclarationSchema = z.string().min(1);
 
 export const VerificationPolicySchema = z.object({

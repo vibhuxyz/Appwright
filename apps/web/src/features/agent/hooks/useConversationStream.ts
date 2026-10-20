@@ -47,7 +47,7 @@ export function useConversationStream(
               agentStore.getState()
                 .setRunning(true, toolName ? `Running ${toolName}…` : "");
             }
-            if (message.role === "assistant" && message.type === "text") {
+            if (message.role === "assistant" && message.type === "text" && message.data?.intake !== true) {
               if (message.content.startsWith("Plan:\n")) {
                 agentStore.getState().setRunning(true, "Plan ready. Executing tasks…");
               } else {

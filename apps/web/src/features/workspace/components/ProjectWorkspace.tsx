@@ -5,6 +5,8 @@ import { useSession } from "@/features/agent/hooks/useSession";
 import { useConversationStream } from "@/features/agent/hooks/useConversationStream";
 import { ChatPane } from "@/features/agent/components/ChatPane";
 import { PreviewPane } from "@/features/preview/components/PreviewPane";
+import { PlanTab } from "@/features/plan";
+import { AssetsPane } from "@/features/assets";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { SplitPane } from "@/shared/components/ui/SplitPane";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -55,8 +57,12 @@ export function ProjectWorkspace({
         );
       case "preview":
         return <PreviewPane project={project} session={session} />;
+      case "plan":
+        return <PlanTab sessionId={session?.id} />;
       case "diff":
         return <DiffPane sessionId={session?.id ?? ""} />;
+      case "assets":
+        return <AssetsPane projectId={projectId} />;
       case "database":
         return (
           <PlaceholderPane

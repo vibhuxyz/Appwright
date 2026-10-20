@@ -1,4 +1,9 @@
-import { enqueueJob, prisma, type Job } from "@repo/db";
+import { enqueueJob, prisma, type Job, type Prisma } from "@repo/db";
+import {
+  requirementTurns,
+  type IntakeQuestion,
+  type PromptAnswer,
+} from "@repo/planner";
 import { createSessionWorktree } from "../workspace/manager";
 import { publishMessage } from "../stream/sse";
 import { serializeRow } from "./message-mapper";
@@ -7,6 +12,32 @@ export interface EnqueueConversationOptions {
   sessionId: string;
   projectId: string;
   prompt: string;
+  answers?: Readonly<Record<string, PromptAnswer>>;
+  questions?: readonly IntakeQuestion[];
+}
+
+export async function recordRequirementTurns<T>(
+  answers: Readonly<Record<string, PromptAnswer>> | undefined,
+  questions: readonly IntakeQuestion[] | undefined,
+  persist: (fields: {
+    role: string;
+    type: string;
+    content: string;
+    data?: Record<string, unknown>;
+  }) => Promise<T>,
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (const turn of requirementTurns(answers, questions ?? [])) {
+    rows.push(
+      await persist({
+        role: turn.role,
+        type: "text",
+        content: turn.content,
+        data: { intake: true },
+      }),
+    );
+  }
+  return rows;
 }
 
 // The flag-gated V3 path: persist + enqueue, then return. apps/agent (a
@@ -17,27 +48,38 @@ export interface EnqueueConversationOptions {
 export async function enqueueConversation(
   opts: EnqueueConversationOptions,
 ): Promise<Job> {
-  const { sessionId, projectId, prompt } = opts;
+  const { sessionId, projectId, prompt, answers, questions } = opts;
 
   const lastMessage = await prisma.message.findFirst({
     where: { sessionId },
     orderBy: { seq: "desc" },
     select: { seq: true },
   });
-  const seq = (lastMessage?.seq ?? -1) + 1;
+  let seq = (lastMessage?.seq ?? -1) + 1;
 
-  const userRow = await prisma.message.create({
-    data: {
-      sessionId,
-      seq,
-      role: "user",
-      type: "text",
-      content: prompt.replaceAll("\u0000", ""),
-    },
-  });
-  publishMessage(sessionId, { kind: "message", seq, message: serializeRow(userRow) });
+  const persistTurn = async (fields: {
+    role: string;
+    type: string;
+    content: string;
+    data?: Record<string, unknown>;
+  }) => {
+    const row = await prisma.message.create({
+      data: {
+        sessionId,
+        seq,
+        role: fields.role,
+        type: "text",
+        content: fields.content.replaceAll("\u0000", ""),
+        ...(fields.data ? { data: fields.data as Prisma.InputJsonValue } : {}),
+      },
+    });
+    publishMessage(sessionId, { kind: "message", seq: row.seq, message: serializeRow(row) });
+    seq += 1;
+    return row;
+  };
 
+  await persistTurn({ role: "user", type: "text", content: prompt });
+  await recordRequirementTurns(answers, questions, persistTurn);
   await createSessionWorktree(projectId, sessionId);
-
   return enqueueJob({ sessionId, projectId });
 }

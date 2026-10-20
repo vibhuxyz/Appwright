@@ -5,7 +5,7 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
 import { prisma } from "@repo/db";
-import { listProjectPaths } from "@repo/contracts";
+import { listProjectPaths } from "@repo/contracts/files";
 import { diffSession, mergeSession } from "@repo/tools";
 import { parseTscErrors } from "@repo/verify";
 import { requiresApproval } from "@repo/decision-engine";

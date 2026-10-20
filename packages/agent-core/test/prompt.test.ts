@@ -43,4 +43,10 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("compose");
     expect(prompt).toContain("p-[17px]");
   });
+
+  test("tells the agent not to open generated UI primitive sources", async () => {
+    const prompt = await buildSystemPrompt(runtimeWith([]));
+    expect(prompt).toContain("Do not `read_file` or edit anything under `src/components/ui/`");
+    expect(prompt).toContain("Do not read_file or edit those files");
+  });
 });

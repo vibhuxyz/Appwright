@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, rm, symlink } from "node:fs/promises";
+import { lstat, mkdir, rm, unlink } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
 import {
@@ -48,6 +48,7 @@ export async function createSessionWorktree(
   const branchName = `agent/${sessionId}`;
 
   if (existsSync(worktreeDir)) {
+    await unlinkNodeModulesSymlink(worktreeDir);
     return worktreeDir;
   }
 
@@ -62,18 +63,31 @@ export async function createSessionWorktree(
     await $`git -C ${repoDir} worktree add ${worktreeDir} -b ${branchName} main`.quiet();
   }
 
-  // Symlink node_modules from base repo if available so dependencies resolve instantly
-  const repoModules = path.join(repoDir, "node_modules");
-  const worktreeModules = path.join(worktreeDir, "node_modules");
-  if (existsSync(repoModules) && !existsSync(worktreeModules)) {
-    try {
-      await symlink(repoModules, worktreeModules, "dir");
-    } catch {
-      // ignore if symlink cannot be created
-    }
-  }
-
+  await unlinkNodeModulesSymlink(worktreeDir);
   return worktreeDir;
+}
+
+function isEnoent(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    err.code === "ENOENT"
+  );
+}
+
+/** Next/Turbopack panics when node_modules is a symlink that leaves the nested git root. */
+export async function unlinkNodeModulesSymlink(dir: string): Promise<void> {
+  const modules = path.join(dir, "node_modules");
+  try {
+    const st = await lstat(modules);
+    if (st.isSymbolicLink()) {
+      await unlink(modules);
+    }
+  } catch (err) {
+    if (isEnoent(err)) return;
+    throw err;
+  }
 }
 
 export async function removeSessionWorktree(
@@ -198,6 +212,7 @@ async function startServerAt(projectId: string, cwd: string): Promise<number> {
   if (!promise) {
     promise = (async () => {
       try {
+        await unlinkNodeModulesSymlink(cwd);
         const install = Bun.spawn(["bun", "install"], {
           cwd,
           stdout: "inherit",

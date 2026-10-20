@@ -1,5 +1,6 @@
 import { BlueprintSchema, type Blueprint } from "@repo/contracts";
 import type { PlanIssue, PlanResult } from "../shared";
+import { validatePackageAllowlist } from "./validate-packages";
 
 const ROUTE_PATTERN = /^\/[A-Za-z0-9_\-/[\]]*$/;
 const ENTITY_NAME_PATTERN = /^[A-Z][A-Za-z0-9]*$/;
@@ -60,7 +61,10 @@ function semanticIssues(blueprint: Blueprint): PlanIssue[] {
   return issues;
 }
 
-export function validateBlueprint(input: unknown): PlanResult<Blueprint> {
+export function validateBlueprint(
+  input: unknown,
+  allowedPackages?: readonly string[],
+): PlanResult<Blueprint> {
   const parsed = BlueprintSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -71,7 +75,10 @@ export function validateBlueprint(input: unknown): PlanResult<Blueprint> {
       })),
     };
   }
-  const issues = semanticIssues(parsed.data);
+  const issues = [
+    ...semanticIssues(parsed.data),
+    ...validatePackageAllowlist(parsed.data, allowedPackages),
+  ];
   return issues.length > 0
     ? { ok: false, issues }
     : { ok: true, value: parsed.data };

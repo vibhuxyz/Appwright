@@ -1,4 +1,4 @@
-import { safeResolve } from "@repo/contracts";
+import { safeResolve } from "@repo/contracts/files";
 
 // Runtime — the execution seam (D27). The agent is a CLIENT of a runtime, never
 // a resident: it never touches node:fs / node:child_process, and it never

@@ -469,6 +469,17 @@ version reaches them: backpressure (V1) · DAG scheduling & topological sort (V4
 
 ---
 
+### A boolean field is the two-option case of multiple choice
+
+**What** — `options: string[]` + `defaultOptionIndex: number` replacing `defaultAnswer: boolean` as the shape for an intake question's possible answers.
+**Why** — a boolean field only ever supports a yes/no decision. The moment a real decision has three answers ("pickup only" / "delivery only" / "both"), a boolean forces a lossy translation, and every consumer of that field (prompt, parser, UI) has to special-case it. Generalizing the field to a list removes the special case instead of adding a branch for it.
+**Like** — a multiple-choice question is the general form; true/false is just the version with exactly two choices printed on the card. You don't need a different answer sheet for a two-option question.
+**Here** — [D72](./DECISIONS.md#decision-72-intake-questions-carry-model-generated-multiple-choice-options-not-a-fixed-yesno--active-2026-10-19-target-v4-intake). `PromptQuestionSchema.options`/`defaultOptionIndex` in `packages/contracts`, threaded through `generate-questions.ts`'s model prompt, `apply-prompt-answers.ts`, and the `question-flow` UI's per-option buttons.
+**Costs** — the model now also decides *which* options to offer, which can fail in a new way (too few, duplicate, or a nonsensical default index) — handled by dropping the question or clamping the index to `0`, the same fail-closed posture as a malformed-JSON response.
+**Go deeper** — V4, once intake questions feed the planner's requirement engine directly instead of only building a prompt string.
+
+---
+
 ## Maintaining this file
 
 Add a card **the moment a concept is explained**, not at `/wrap` — by then the wording is gone.

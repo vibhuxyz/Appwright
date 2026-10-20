@@ -3,7 +3,10 @@
   "module": "src/index.ts",
   "type": "module",
   "private": true,
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./files": "./src/utils/projectFiles.ts"
+  },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts"
   },

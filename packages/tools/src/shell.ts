@@ -1,6 +1,6 @@
 import { truncate, type Runtime } from "@repo/agent-core";
+import { ALLOWED_PACKAGES } from "@repo/contracts";
 import { z } from "zod";
-import allowlist from "../deps.allow.json";
 import { wrapUntrusted } from "./untrusted";
 
 export const bashArgs = z.object({
@@ -19,7 +19,7 @@ export function guardBashArgv(argv: string[]): string[] {
 
   const packages = rest.filter((arg) => !arg.startsWith("-"));
   const notAllowed = packages.filter(
-    (pkg) => !allowlist.packages.includes(pkg),
+    (pkg) => !ALLOWED_PACKAGES.includes(pkg),
   );
   if (notAllowed.length > 0) {
     throw new Error(

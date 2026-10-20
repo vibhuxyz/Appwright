@@ -103,6 +103,30 @@ describe("planBlueprint", () => {
     const result = planBlueprint({ ...FOOD_DELIVERY, pages: [] });
     expect(result.ok).toBe(false);
   });
+
+  it("rejects a plan whose estimated cost exceeds the run budget", () => {
+    const result = planBlueprint(FOOD_DELIVERY, 1);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues.map((i) => i.code)).toContain("over_budget");
+  });
+
+  it("accepts a plan within the run budget", () => {
+    const result = planBlueprint(FOOD_DELIVERY, 100_000);
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects a plan with a package not in the allowlist", () => {
+    const result = planBlueprint(FOOD_DELIVERY, undefined, ["zod"]);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues.map((i) => i.code)).toContain("package_not_allowed");
+  });
+
+  it("accepts a plan whose packages are all in the allowlist", () => {
+    const result = planBlueprint(FOOD_DELIVERY, undefined, ["next-auth"]);
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("validateTaskGraph", () => {

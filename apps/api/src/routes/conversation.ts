@@ -1,9 +1,11 @@
 import { cancelFlagKey, CANCEL_FLAG_TTL_SECONDS, set as cacheSet } from "@repo/cache";
-import { SendMessageRequest } from "@repo/contracts";
+import { PromptQuestionsRequest, SendMessageRequest } from "@repo/contracts";
 import { prisma } from "@repo/db";
 import { Router } from "express";
 import { requireAuthAllowingQueryToken } from "@repo/auth";
 import { setTraceContext } from "@repo/logger";
+import { generateIntakeQuestions, IntakeQuestionsError } from "../intake";
+import { log } from "../log";
 import { ownedSessionProjectId } from "../ownership";
 import { attachSseClient, publishStatus } from "../stream/sse";
 import { hasRunCapacity } from "../workflow/run-limit";
@@ -26,13 +28,15 @@ export { activeControllers };
 export const conversationRouter = Router();
 
 export const streamRouter = Router();
-streamRouter.use(requireAuthAllowingQueryToken);
-streamRouter.use((req, _res, next) => {
-  if (req.userId) {
-    setTraceContext({ userId: req.userId });
-  }
+// Auth is scoped to /stream/* only. A root-level streamRouter.use(requireAuth…)
+// would 401 every later public mount (preview) — see apps/api/src/index.ts.
+const streamAuthed = Router({ mergeParams: true });
+streamAuthed.use(requireAuthAllowingQueryToken);
+streamAuthed.use((req, _res, next) => {
+  if (req.userId) setTraceContext({ userId: req.userId });
   next();
 });
+streamRouter.use("/stream", streamAuthed);
 
 conversationRouter.get("/conversations/:sessionId", async (req, res) => {
   if (!(await ownedSessionProjectId(req.params.sessionId, req.userId!))) {
@@ -70,7 +74,7 @@ conversationRouter.post("/conversation/:sessionId/stop", async (req, res) => {
   res.json({ ok: true, stopped: true });
 });
 
-streamRouter.get("/stream/:sessionId", async (req, res) => {
+streamAuthed.get("/:sessionId", async (req, res) => {
   if (!(await ownedSessionProjectId(req.params.sessionId, req.userId!))) {
     return res.status(404).json({
       error: { code: "NOT_FOUND", message: "session not found" },
@@ -80,8 +84,58 @@ streamRouter.get("/stream/:sessionId", async (req, res) => {
   attachSseClient(req.params.sessionId, res, afterSeq);
 });
 
+function requestIdOf(res: { getHeader(name: string): unknown }): string {
+  const value = res.getHeader("x-request-id");
+  return typeof value === "string" ? value : "";
+}
+
+conversationRouter.post("/conversation/questions", async (req, res) => {
+  const parsed = PromptQuestionsRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      error: {
+        code: "INVALID_REQUEST",
+        message: "Prompt is required",
+        details: {},
+        requestId: requestIdOf(res),
+      },
+    });
+  }
+  if (!(await conversationRateLimitOk(req.userId!))) {
+    return res.status(429).json({
+      error: {
+        code: "TOO_MANY_REQUESTS",
+        message: "Too many requests. Slow down and try again shortly.",
+        details: {},
+        requestId: requestIdOf(res),
+      },
+    });
+  }
+  try {
+    const questions = await generateIntakeQuestions(parsed.data.prompt);
+    res.json({ questions });
+  } catch (error) {
+    const timeout = error instanceof IntakeQuestionsError && error.code === "TIMEOUT";
+    log.error("intake questions failed", {
+      code: timeout ? "GENERATION_TIMEOUT" : "GENERATION_FAILED",
+    });
+    return res.status(503).json({
+      error: {
+        code: timeout ? "GENERATION_TIMEOUT" : "GENERATION_FAILED",
+        message: timeout
+          ? "Timed out while choosing questions"
+          : "Could not generate questions. Try again.",
+        details: {},
+        requestId: requestIdOf(res),
+      },
+    });
+  }
+});
+
 conversationRouter.post("/conversation", async (req, res) => {
   const body = SendMessageRequest.parse(req.body);
+  const prompt = body.prompt;
+  const answers = body.answers;
   const session = await prisma.session.findFirst({
     where: { id: body.sessionId, project: { userId: req.userId! } },
   });
@@ -122,7 +176,9 @@ conversationRouter.post("/conversation", async (req, res) => {
     const job = await enqueueConversation({
       sessionId: session.id,
       projectId: session.projectId,
-      prompt: body.prompt,
+      prompt,
+      answers,
+      questions: body.questions,
     });
     res.status(202).json({ jobId: job.id, sessionId: session.id });
     return;
@@ -131,7 +187,10 @@ conversationRouter.post("/conversation", async (req, res) => {
   await runConversation({
     sessionId: session.id,
     userId: req.userId!,
-    prompt: body.prompt,
+    prompt,
+    answers,
+    questions: body.questions,
+    selection: body.selection,
     res,
   });
 });

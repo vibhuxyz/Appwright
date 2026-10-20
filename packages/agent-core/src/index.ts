@@ -25,3 +25,21 @@ export { planTasks, formatPlanForAgent } from "./planner";
 export { verifyTypeScript, type VerifyResult } from "./verify";
 export { serializeRow, toCoreMessage, type MessageRow } from "./transcript";
 export { resolveStopNotice, type StopNotice } from "./notices";
+export {
+  createCapabilityRegistry,
+  loadCapabilityConfig,
+  type CapabilityConfig,
+  type CapabilityRegistry,
+  type ModelResolution,
+} from "./capability";
+export {
+  buildTaskPrompt,
+  generateForTask,
+  type GenerateForTaskOptions,
+  type GeneratedFile,
+  type GenerationErrorCode,
+  type GenerationResult,
+  type GenerationUsage,
+  type PathFence,
+  type RejectedFile,
+} from "./generation";

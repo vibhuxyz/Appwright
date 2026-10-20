@@ -1,14 +1,7 @@
 import z from "zod";
 
-// The most important artifact in V4 — everything downstream consumes this.
-// Versioned from day one (docs/versions/V4_APP_BUILDER.md Slice 1): a
-// blueprint is immutable per version, an approved change request writes a
-// new row at blueprintVersion + 1, it never edits the old one.
-
 export const BLUEPRINT_SCHEMA_VERSION = 1;
 
-// D14/Slice 3: one stack, not a matrix. Adding a second stack is a new
-// literal in each enum plus a template, not a redesign of this schema.
 export const StackSchema = z.object({
   framework: z.literal("next"),
   db: z.literal("postgres"),
@@ -25,9 +18,6 @@ export const IntentSchema = z.object({
 });
 export type Intent = z.infer<typeof IntentSchema>;
 
-// Prisma scalar types the template actually supports. `Decimal` is
-// deliberately absent — V4 doc's Slice-0 trap table: it cannot serialise
-// across the Server -> Client Component boundary. Money is `Int` cents.
 export const EntityFieldType = z.enum([
   "String",
   "Int",
@@ -65,6 +55,64 @@ export const ThemeSchema = z.object({
 });
 export type Theme = z.infer<typeof ThemeSchema>;
 
+export const DesignBlockSchema = z.object({
+  style: z.string().default("minimal-premium"),
+  density: z.enum(["compact", "comfortable", "spacious"]).default("comfortable"),
+  fontFamily: z.string().default("Inter"),
+  colorMode: z.enum(["light", "dark", "system"]).default("light"),
+  primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#111111"),
+  accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#6366F1"),
+  radius: z.enum(["none", "sm", "md", "lg", "full"]).default("md"),
+  maxContentWidth: z.string().default("1280px"),
+});
+export type DesignBlock = z.infer<typeof DesignBlockSchema>;
+
+export const DEFAULT_DESIGN_BLOCK: DesignBlock = {
+  style: "minimal-premium",
+  density: "comfortable",
+  fontFamily: "Inter",
+  colorMode: "light",
+  primaryColor: "#111111",
+  accentColor: "#6366F1",
+  radius: "md",
+  maxContentWidth: "1280px",
+};
+
+export const LayoutBlockSchema = z.object({
+  header: z.string().default("72px"),
+  sidebar: z.string().default("240px"),
+  content: z.string().default("12-column"),
+  mobileNavigation: z.enum(["bottom", "drawer", "header", "none"]).default("bottom"),
+});
+export type LayoutBlock = z.infer<typeof LayoutBlockSchema>;
+
+export const DEFAULT_LAYOUT_BLOCK: LayoutBlock = {
+  header: "72px",
+  sidebar: "240px",
+  content: "12-column",
+  mobileNavigation: "bottom",
+};
+
+export const ResponsiveBreakpointSchema = z.object({
+  columns: z.number().int().positive().optional(),
+  padding: z.string().optional(),
+  navigation: z.string().optional(),
+}).passthrough();
+export type ResponsiveBreakpoint = z.infer<typeof ResponsiveBreakpointSchema>;
+
+export const ResponsiveBlockSchema = z.object({
+  desktop: ResponsiveBreakpointSchema.default({}),
+  tablet: ResponsiveBreakpointSchema.default({}),
+  mobile: ResponsiveBreakpointSchema.default({}),
+});
+export type ResponsiveBlock = z.infer<typeof ResponsiveBlockSchema>;
+
+export const DEFAULT_RESPONSIVE_BLOCK: ResponsiveBlock = {
+  desktop: {},
+  tablet: {},
+  mobile: {},
+};
+
 export const BlueprintSchema = z.object({
   blueprintVersion: z.number().int().positive(),
   intent: IntentSchema,
@@ -73,5 +121,8 @@ export const BlueprintSchema = z.object({
   pages: z.array(PageSchema).min(1),
   features: z.array(z.string()).default([]),
   theme: ThemeSchema,
+  design: DesignBlockSchema.default(DEFAULT_DESIGN_BLOCK),
+  layout: LayoutBlockSchema.default(DEFAULT_LAYOUT_BLOCK),
+  responsive: ResponsiveBlockSchema.default(DEFAULT_RESPONSIVE_BLOCK),
 });
 export type Blueprint = z.infer<typeof BlueprintSchema>;

@@ -14,6 +14,9 @@
     "check-types": "tsc --noEmit",
     "build": "tsup src/index.ts --format esm --dts"
   },
+  "dependencies": {
+    "@repo/contracts": "workspace:*"
+  },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/node": "^25.9.3",

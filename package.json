@@ -18,11 +18,11 @@
     "agent": "bun scripts/agent.ts",
     "ui:emit": "bun packages/ui-system/bin/emit.ts",
     "ui:check": "bun packages/ui-system/bin/emit.ts --check",
-    "dev": "turbo run dev --filter=api --filter=web",
+    "dev": "turbo run dev --filter=api --filter=web --filter=agent-worker",
     "dev:api": "bun --filter api dev",
     "dev:web": "bun --filter web dev",
     "dev:agent": "bun --filter agent-worker dev",
-    "dev:v3": "turbo run dev --filter=api --filter=web --filter=agent-worker",
+    "dev:v3": "bun run dev",
     "dev:workers": "turbo run dev --filter=worker-indexing --filter=worker-evaluation --filter=worker-maintenance",
     "infra:up": "docker compose up -d postgres redis",
     "infra:down": "docker compose down",
@@ -37,7 +37,8 @@
     "db:studio": "cd packages/db && bunx prisma studio",
     "health:check": "bun scripts/health-check.ts",
     "bootstrap": "bun scripts/bootstrap.ts",
-    "db:seed": "bun scripts/seed.ts"
+    "db:seed": "bun scripts/seed.ts",
+    "postinstall": "DATABASE_URL=${DATABASE_URL:-postgresql://localhost:5432/prisma-generate} bun run --filter @repo/db db:generate"
   },
   "devDependencies": {
     "@types/node": "^25.9.3",

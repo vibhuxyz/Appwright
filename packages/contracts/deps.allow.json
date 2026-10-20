@@ -1,0 +1,17 @@
+{
+  "packages": [
+    "@prisma/client",
+    "clsx",
+    "lucide-react",
+    "next",
+    "next-auth",
+    "react",
+    "react-dom",
+    "stripe",
+    "tailwind-merge",
+    "tailwindcss",
+    "uploadthing",
+    "ws",
+    "zod"
+  ]
+}

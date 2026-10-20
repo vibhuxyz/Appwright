@@ -57,6 +57,7 @@ model Project {
   vercelProjectId String?
   sessions      Session[]
   secret        Secret[]
+  assets        ProjectAsset[]
   // Deleting a project cleans up its sessions/messages/secrets too — there's
   // no route that deletes a session or secret on its own in V1.
   createdAt     DateTime      @default(now())
@@ -94,6 +95,8 @@ model Session {
   jobs         Job[]
   blueprints   Blueprint[]
   runs         Run[]
+  assetRequests AssetRequest[]
+  assets       ProjectAsset[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @default(now()) @updatedAt
 
@@ -145,11 +148,67 @@ model Blueprint {
   pages            Json
   features         Json
   theme            Json
+  design           Json?
+  layout           Json?
+  responsive       Json?
   tasks            Task[]
   changeRequests   ChangeRequest[]
+  assetRequests    AssetRequest[]
   createdAt        DateTime       @default(now())
 
   @@unique([sessionId, blueprintVersion])
+  @@index([sessionId])
+}
+
+enum AssetRequestStatus {
+  PENDING
+  RESOLVED
+}
+
+enum AssetSource {
+  UPLOADED
+  GENERATED
+}
+
+// Ephemeral per-blueprint Q&A gate: one row per Blueprint, `slots` holds
+// the detected image slots and their in-progress state (which status is
+// queried by the chat card). Resolved slots become durable ProjectAsset
+// rows; this row's only job is tracking "is every slot resolved yet".
+model AssetRequest {
+  id          String             @id @default(cuid()) @db.VarChar(30)
+  sessionId   String
+  session     Session            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  blueprintId String
+  blueprint   Blueprint          @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+  slots       Json
+  status      AssetRequestStatus @default(PENDING)
+  createdAt   DateTime           @default(now())
+  resolvedAt  DateTime?
+
+  @@index([sessionId])
+  @@index([blueprintId])
+  @@index([sessionId, status])
+}
+
+// Durable asset library row, one per finished image (uploaded or
+// AI-generated). Populates the project's Assets tab independently of
+// whichever AssetRequest produced it.
+model ProjectAsset {
+  id                 String      @id @default(cuid()) @db.VarChar(30)
+  projectId          String
+  project            Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sessionId          String
+  session            Session     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  purpose            String
+  source             AssetSource
+  prompt             String?
+  cloudinaryPublicId String
+  cloudinaryUrl      String
+  localPath          String
+  altText            String
+  createdAt          DateTime    @default(now())
+
+  @@index([projectId])
   @@index([sessionId])
 }
 

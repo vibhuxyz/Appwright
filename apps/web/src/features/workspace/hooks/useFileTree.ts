@@ -12,5 +12,6 @@ export function useFileTree(
     queryKey: ["file-tree", projectId, touchedCount, sessionId],
     queryFn: ({ signal }) =>
       workspaceApi.listFiles(projectId, sessionId, signal).then((r) => r.paths),
+    refetchOnMount: "always",
   });
 }

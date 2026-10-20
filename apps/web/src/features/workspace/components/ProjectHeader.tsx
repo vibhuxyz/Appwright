@@ -36,7 +36,7 @@ function ProjectChip({
   const [open, setOpen] = useState(false);
   const name = project?.name ?? projectId;
   const status = project ? STATUS[project.status] : undefined;
-  const url = project?.previewUrl;
+  const url = session?.previewUrl ?? project?.previewUrl ?? null;
 
   return (
     <div className="relative flex min-w-0 items-center gap-2 rounded-full border border-border-soft bg-surface p-1">

@@ -25,3 +25,11 @@ export interface Question {
   text: string;
   defaultAnswer: boolean;
 }
+
+export interface IntakeQuestion {
+  need: string;
+  text: string;
+  label: string;
+  options: readonly string[];
+  defaultOptionIndex: number;
+}

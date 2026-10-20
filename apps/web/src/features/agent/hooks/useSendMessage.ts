@@ -1,14 +1,22 @@
 import { useMutation } from "@tanstack/react-query";
+import type { ElementSelection, PromptAnswerValue, PromptQuestion } from "@repo/contracts";
 import { agentApi } from "../api/agentApi";
 import { agentStore } from "../store/agentStore";
 
+export interface OutgoingMessage {
+  prompt: string;
+  answers?: Readonly<Record<string, PromptAnswerValue>>;
+  questions?: readonly PromptQuestion[];
+  selection?: ElementSelection;
+}
+
 export function useSendMessage(sessionId: string | undefined) {
   return useMutation({
-    mutationFn: (prompt: string) => {
+    mutationFn: ({ prompt, answers, questions, selection }: OutgoingMessage) => {
       if (!sessionId) throw new Error("No active session");
       agentStore.getState().setStopNotice(null);
       agentStore.getState().setRunning(true, "Analyzing request & planning…");
-      return agentApi.sendMessage(sessionId, prompt);
+      return agentApi.sendMessage(sessionId, prompt, answers, questions, selection);
     },
     onError: (err: Error) => {
       agentStore.getState().setRunning(false);

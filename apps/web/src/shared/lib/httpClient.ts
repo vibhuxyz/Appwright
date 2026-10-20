@@ -26,16 +26,30 @@ function authHeaders(
 
 const JSON_HEADERS = { "Content-Type": "application/json" };
 
-async function parseJson<T>(res: Response): Promise<T> {
+function messageFromErrorBody(body: unknown, fallback: string): string {
+  if (!body || typeof body !== "object" || !("error" in body)) return fallback;
+  const error = body.error;
+  if (typeof error === "string" && error.length > 0) return error;
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+  return fallback;
+}
+
+async function rejectIfBad(res: Response): Promise<void> {
   if (res.status === 401) {
     setToken(null);
     window.dispatchEvent(new Event("appwright:unauthorized"));
     throw new Error("Your session expired. Please sign in again.");
   }
-  if (!res.ok)
-    throw new Error(
-      (await res.json().catch(() => ({}))).error ?? res.statusText,
-    );
+  if (!res.ok) {
+    const body: unknown = await res.json().catch(() => ({}));
+    throw new Error(messageFromErrorBody(body, res.statusText));
+  }
+}
+
+async function parseJson<T>(res: Response): Promise<T> {
+  await rejectIfBad(res);
   return res.json();
 }
 
@@ -62,6 +76,25 @@ export const httpClient = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
     }).then((r) => parseJson<T>(r)),
+  postMaybeStream: async (path: string, body?: unknown, signal?: AbortSignal) => {
+    const res = await request(path, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
+    });
+    await rejectIfBad(res);
+    const type = res.headers.get("content-type") ?? "";
+    if (type.includes("text/event-stream")) {
+      await res.body?.cancel();
+      return;
+    }
+    await res.json().catch(() => undefined);
+  },
+  // No Content-Type here on purpose — the browser sets the multipart
+  // boundary itself when the body is a FormData; overriding it breaks parsing.
+  postForm: <T>(path: string, formData: FormData, signal?: AbortSignal) =>
+    request(path, { method: "POST", body: formData, signal }).then((r) => parseJson<T>(r)),
   put: <T>(path: string, body?: unknown, signal?: AbortSignal) =>
     request(path, {
       method: "PUT",

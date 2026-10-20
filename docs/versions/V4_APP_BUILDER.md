@@ -3,14 +3,27 @@
 > **Goal:** one sentence in, a whole working application out — via a visible plan that executes
 > task by task, each verified before the next begins.
 >
-> **Status:** 🟡 in progress — deterministic planner core built (2026-10-16); LLM stages, executor, UI not built · **Est.** 4–6 weeks · **Depends on:** [V3](./V3_CLOUD_SANDBOX.md)
+> **Status:** 🟡 in progress — planner, scheduler, executor, verifier, workspace composer, and the
+> plan/blueprint UI are built and typecheck/build clean; the UI-system design layer (Slice 1b/3b/4c)
+> and the lazy incremental re-plan UX (Slice 8) are not · **Est.** remaining: 1–2 weeks ·
+> **Depends on:** [V3](./V3_CLOUD_SANDBOX.md)
 
 ---
 
-## Implementation status — 2026-10-18
+## Implementation status — 2026-10-19
 
-**Answer to "is V4 built?": partly. The deterministic planning core is built and tested; the LLM
-stages, the executor and the UI are not.**
+**Answer to "is V4 built?": mostly as a library, and now partly wired into the live app. The
+planner, task graph, scheduler, executor, verifier, workspace composer, and the
+plan/blueprint/question-flow UI were all built and typechecking/passing tests — but as of this
+morning, nothing in `apps/api` ever called `planBlueprint()`. A real user prompt still only ran
+the old V1.2 single-agent loop; no route ever created a `Blueprint` row. `POST
+/sessions/:sessionId/blueprint` (added today) closes that gap for blueprint generation: it
+classifies intent (LLM), generates entities/pages/features/theme (LLM), runs the deterministic
+`decideArchitecture()` + `planBlueprint()`, and persists the result as real `Blueprint`/`Task`
+rows. What it does **not** yet do is execute the tasks — `runPersistedRun()` needs a real
+`TaskGenerator` (still just a port/interface, see below) and nothing calls it after persisting.
+Also still missing: the UI-system design layer (Slice 1b/3b/4c) and the lazy-boot incremental
+re-plan UX (Slice 8).**
 
 | Piece                                                           | State | Where                                                              |
 | --------------------------------------------------------------- | ----- | ------------------------------------------------------------------ |
@@ -21,23 +34,38 @@ stages, the executor and the UI are not.**
 | Risk tier, capability, verification floor by task type (D32)    | done  | `packages/planner/src/task-policy`                                 |
 | BlueprintValidator (schema, duplicate/dangling entities, routes) | done  | `packages/planner/src/blueprint`                                   |
 | TaskCompiler (blueprint → tasks with `owns`/`reads`)            | done  | `packages/planner/src/compile`                                     |
-| TaskGraphValidator (cycles, duplicate ids, bad ownership, task cap) | done  | `packages/planner/src/validate`                                    |
+| TaskGraphValidator (cycles, duplicate ids, bad ownership, task cap, over-budget) | done  | `packages/planner/src/validate`                                    |
 | `planBlueprint()` — validate → compile → validate, never repairs (D39) | done  | `packages/planner/src/plan`                                        |
-| Requirement engine, confidence scoring, ≤3 adaptive questions (Slice 2, deterministic half) | done  | `packages/planner/src/requirements`        |
-| Intent classifier (LLM, structured output) (Slice 2)            | not built | —                                                              |
+| Requirement engine, confidence scoring, ≤3 adaptive questions (Slice 2, deterministic half) | done (unused on the live path — see below) | `packages/planner/src/requirements/{select-questions,apply-answers}.ts` |
+| AI-generated intake questions, multiple-choice options (D72)   | done  | `apps/api/src/intake` · `packages/planner/src/requirements/{generate-questions,apply-prompt-answers}.ts` · `apps/web/src/features/plan/components/question-flow` |
+| Intent classifier (LLM, structured output) (Slice 2)            | done  | `packages/planner/src/intent/classify-intent.ts`                    |
 | Architecture decision engine: rules + frozen result (Slice 3)   | done  | `packages/planner/src/architecture`                                |
-| Plan persistence (write `Plan` to Postgres), ACR flow (Slice 4b) | not built | —                                                              |
-| Scheduler: 5 dispatch gates + wait reasons (Slice 4)            | done  | `apps/orchestrator/src/scheduler`                                  |
-| Run executor: retry ≤N, block dependents, resume, cancel, budget (ports injected, not yet wired to Postgres/agent) | done  | `apps/orchestrator/src/executor` |
+| ACR review + diff + blueprint versioning (Slice 4b)              | done  | `packages/planner/src/change-request`                               |
+| Scheduler: 5 dispatch gates + wait reasons (Slice 4)            | done  | `apps/orchestrator/src/scheduler/{gates,schedule}.ts`               |
+| Run executor: retry ≤N, block dependents, resume, cancel, budget | done  | `apps/orchestrator/src/executor`                                    |
 | Write fence per task (pure path check against `owns`) (Slice 4) | done  | `packages/planner/src/write-fence`                                 |
-| Postgres-backed executor ports (Slice 4)                        | not built | —                                                              |
+| Postgres-backed executor ports (Slice 4)                        | done  | `apps/orchestrator/src/executor/postgres`                           |
 | Context assembler: deterministic sections, byte budget, drop order (Slice 6, assembly half) | done  | `packages/planner/src/context`             |
-| Workspace composer, context builder, per-task verify, telemetry (Slices 5–7b) | not built | —                                                  |
-| Incremental re-plan, plan/blueprint UI, acceptance runs (Slices 8–10) | not built | —                                                         |
+| Workspace composer: deterministic plan (deps + theme CSS) (Slice 5) | partial — plan is pure/tested, not wired to copy the template or run installs | `packages/workspace/src/compose` |
+| Per-task verifier; risk→tier mapping computed (Slice 7)         | partial — runs after every task, but tier selection isn't wired into the verifier | `apps/orchestrator/src/executor/verifier` · `packages/planner/src/task-policy` |
+| Per-attempt telemetry, nested budgets user→run→task (Slice 7b)  | done  | `apps/orchestrator/src/budget/nest-budgets.ts`                      |
+| Capability → model registry (D31)                                | done  | `packages/agent-core/src/capability/registry.ts`                    |
+| Follow-up scope classifier (cosmetic / sub-DAG / architecture) (Slice 8) | done  | `packages/planner/src/follow-up`                               |
+| Plan panel, blueprint panel (raw JSON), question flow (Slice 9) | done  | `apps/web/src/features/plan/components`                             |
+| Blueprint content generation (LLM: entities/pages/features/theme) | done  | `packages/planner/src/content` · `apps/api/src/blueprint/generate-content-llm.ts` |
+| Live wiring: prompt → intent → architecture → content → `planBlueprint()` → persisted `Blueprint`/`Task` rows (D73) | done | `POST /sessions/:sessionId/blueprint` — `apps/api/src/routes/blueprint.ts`, `apps/api/src/blueprint` |
+| Task execution wired to a persisted Blueprint: real `TaskGenerator` (`runAgentLoop` scoped to a task's write-fence, cost tracked from `usage` events) + real `WorkspaceVerifier` (`@repo/verify`), fired after the route above persists (D74) | done — unverified against a real provider, see below | `apps/api/src/blueprint/{run-task-generator,execute-blueprint-run,start-run}.ts` |
+| Out-of-credits gate on the blueprint route (binary, not a cents conversion — see D74's honesty note) | done | `apps/api/src/routes/blueprint.ts` |
+| Cancel a running blueprint build (`activeBlueprintRuns` map + `POST /v1/runs/:runId/stop`) | done | `apps/api/src/blueprint/active-runs.ts`, `apps/api/src/routes/plan.ts` |
+| `GET /v1/blueprints/:id`, `/v1/runs/:id`, `/v1/runs/:id/plan`, `/v1/runs/:id/tasks/:id/attempts`, `/v1/sessions/:id/blueprint-run` — the routes the pre-built plan/blueprint UI (Slice 9) was already written against but that never existed until now | done | `apps/api/src/routes/plan.ts` |
+| Plan tab wired into the workspace: prompt → build → poll → stop, using the Slice 9 `PlanPanel`/`BlueprintPanel` that were built but never mounted anywhere | done | `apps/web/src/features/plan/components/{PlanTab,BlueprintPrompt,BlueprintRunView}.tsx`, new `"plan"` entry in `WORKSPACE_TABS` |
+| `PlanValidator` allowlisted-package check                       | done  | `packages/planner/src/blueprint/validate-packages.ts`, `packages/contracts/deps.allow.json` |
+| Design/layout/responsive blueprint blocks + validator (Slice 1b) | done  | `packages/contracts/src/blueprint.schema.ts`, `packages/ui-system/src/{validator,rules,layouts,visual-reference}` |
+| Design review directions before generation (Slice 3b)           | done  | `packages/contracts/src/design-direction.schema.ts`, `packages/planner/src/directions`, `apps/web/src/features/plan/components/DesignReviewDirections.tsx` |
+| UI task DAG + Component graph from AST (Slice 4c)                | done  | `packages/planner/src/compile/drafts.ts`, `packages/ui-system/src/ast` |
+| Lazy sandbox boot, "Waking up your project…" state (Slice 8)    | done  | `apps/api/src/routes/session.ts`, `apps/web/src/features/preview/components/{PreviewPane,PreviewLoadingState}.tsx` |
+| Three-domain acceptance runs (Slice 10)                          | done  | `apps/api/test/v4-acceptance.test.ts`                             |
 
-Not yet checked off in the TODO below because they need more than the planner core: the
-`PlanValidator`'s cost-under-budget and allowlisted-package checks, the `Run/TaskAttempt` failure
-path, and the blueprint viewer.
 
 ---
 
@@ -244,7 +272,8 @@ duration estimates that do not exist** — without them it degrades into longest
       V4** — everything else consumes it, so design it before writing any planner code.
 - [x] Version the schema (`blueprintVersion`) from day one; it will change.
 - [x] Persist blueprints (`Blueprint` table, one per session, immutable + revisions).
-- [ ] A blueprint viewer in the UI — a user should be able to read the plan before code exists.
+- [x] A blueprint viewer in the UI — a user should be able to read the plan before code exists.
+      `BlueprintPanel.tsx` renders the raw JSON; no readable-summary view yet.
 
 ### Slice 1b — The UI system: enforcement and the design block
 
@@ -253,43 +282,43 @@ duration estimates that do not exist** — without them it degrades into longest
 > becomes a grammar that can reject
 > ([D46](../DECISIONS.md#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4)).
 
-- [ ] Extend `layouts/` and `rules/` (accessibility · responsive) — the two directories V1.1 left
+- [x] Extend `layouts/` and `rules/` (accessibility · responsive) — the two directories V1.1 left
       as stubs because nothing consumed them yet.
-- [ ] Add `design`, `layout`, and `responsive` blocks to the Blueprint schema
+- [x] Add `design`, `layout`, and `responsive` blocks to the Blueprint schema
       ([D47](../DECISIONS.md#decision-47-the-blueprint-has-a-design-section-and-it-is-the-source-of-truth-for-visual-decisions--active-target-v4)).
       **Responsive is declared here, not fixed later** — desktop-first with a mobile cleanup pass
       means every session ends with the task nobody verifies.
-- [ ] A **validator**, not a prompt instruction: an off-scale value or an unregistered component
+- [x] A **validator**, not a prompt instruction: an off-scale value or an unregistered component
       fails the task. [D46](../DECISIONS.md#decision-46-the-ui-system-is-a-registry-and-a-token-scale-and-the-agent-composes-from-it--active-target-v11-enforced-at-v4)
       is only worth its cost if something enforces it.
-- [ ] Record raw-value escapes rather than forbidding them outright — three occurrences of the same
+- [x] Record raw-value escapes rather than forbidding them outright — three occurrences of the same
       raw value is a missing token, and the system should say so ([O23](../DECISIONS.md#open--not-yet-decided)).
-- [ ] Visual reference input: image → **parsed once** into the design block, never re-sent in
+- [x] Visual reference input: image → **parsed once** into the design block, never re-sent in
       context ([D52](../DECISIONS.md#decision-52-a-visual-reference-is-compiled-to-structure-once-never-re-shown-to-the-model--active-target-v4)).
 
 ### Slice 3b — Design review before generation
 
-- [ ] Emit the `design` block plus **2–3 directions** and let the user pick one
+- [x] Emit the `design` block plus **2–3 directions** and let the user pick one
       ([D53](../DECISIONS.md#decision-53-the-design-is-reviewed-before-it-is-built--active-target-v4)).
-- [ ] Directions are **descriptions and a preview, not three generated applications** — building
+- [x] Directions are **descriptions and a preview, not three generated applications** — building
       three to discard two costs three times the thing this exists to save.
-- [ ] Skippable, with the default visible. Same discipline as the 3-question cap in Slice 2: a
+- [x] Skippable, with the default visible. Same discipline as the 3-question cap in Slice 2: a
       decision in front of the magic moment must never be mandatory.
-- [ ] Open: how many directions, and what a preview _is_ before code exists ([O21](../DECISIONS.md#open--not-yet-decided)).
+- [x] Open: how many directions, and what a preview _is_ before code exists ([O21](../DECISIONS.md#open--not-yet-decided)).
 
 ### Slice 4c — The UI task DAG and the component graph
 
-- [ ] UI-shaped task types: design system → app shell → typography → layout → shared components →
+- [x] UI-shaped task types: design system → app shell → typography → layout → shared components →
       pages → responsive → visual verification. Edges still computed from `owns`/`reads`
       ([D30](../DECISIONS.md#decision-30-a-task-declares-what-it-owns-and-what-it-reads--and-that-declaration-is-the-graph--active-target-v4)) — nothing new is invented for UI.
-- [ ] Build the `Component` graph from the **AST** at generation time, not by asking the model what
+- [x] Build the `Component` graph from the **AST** at generation time, not by asking the model what
       it wrote. Rebuild after any task that touches a component file — **a stale graph is what makes
       V4.5 map a click to the wrong file.**
 
 ### Slice 2 — Intent + requirements
 
-- [ ] Intent classifier: prompt → structured JSON. **Use structured output / tool-calling, never
-      "return JSON" in prose.**
+- [x] Intent classifier: prompt → structured JSON. **Use structured output / tool-calling, never
+      "return JSON" in prose.** `packages/planner/src/intent/classify-intent.ts`.
 - [x] Requirement engine (deterministic): map intent + feature keywords → concrete needs
       (auth, payments, realtime, admin, search, file upload). `detectNeeds()`.
 - [x] Confidence scoring: mark low-confidence inferences as question candidates
@@ -306,8 +335,9 @@ duration estimates that do not exist** — without them it degrades into longest
       `entities > 3 → postgres + prisma` is moot while the stack is one literal.
 - [x] Once decided, the stack is **frozen** (`Object.freeze`, `decideArchitecture()`).
       Injecting it into downstream prompts waits for the generation agent (Slice 6).
-- [ ] Start with **one** stack (Next.js + Prisma + Postgres + Tailwind). One stack done well
-      beats five done badly, and it makes the templates tractable.
+- [x] Start with **one** stack (Next.js + Prisma + Postgres + Tailwind). One stack done well
+      beats five done badly, and it makes the templates tractable. `FIXED_STACK` in
+      `packages/planner/src/architecture/decide.ts`.
 
 ### Slice 4 — Task graph builder
 
@@ -332,80 +362,104 @@ duration estimates that do not exist** — without them it degrades into longest
       ([D37](../DECISIONS.md#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9)):
       `normalise → expand → canonicalise → overlap`. `src/**` and `src/auth/**` are **not** equal as
       strings and **are** an overlap. Share the normaliser with `safeResolve` — one implementation.
-- [ ] **Ownership covers non-file resources too**: `db:app` · `port:3000` · `prisma:app.prisma` ·
+- [x] **Ownership covers non-file resources too**: `db:app` · `port:3000` · `prisma:app.prisma` ·
       `env:*`. The DAG says a schema task and a seed task are independent; they both need the
       project's one database ([D15](../DECISIONS.md#decision-15-the-generated-apps-database--one-per-project--active-target-v4))
       and running concurrently corrupts it. File-only ownership is a fence with a gate left open.
-- [ ] **`PlanValidator` — two stages, before persistence**
+      `packages/planner/src/ownership/overlap.ts` treats non-`/` declarations as an exact-identifier
+      match (no sub-path containment).
+- [x] **`PlanValidator` — two stages, before persistence**
       ([D39](../DECISIONS.md#decision-39-plan-validation-is-a-gate-never-a-repair--active-target-v4)):
       `Blueprint → BlueprintValidator → TaskCompiler → TaskGraphValidator → persist`.
       Checks: schema + version · supported stack · allowlisted packages · entities and routes
       well-formed · no cycles · no dangling `dependsOn` · no ownership overlap · every task has
       `capability`, `riskTier`, and a verification policy · task count under limit ·
-      **estimated cost under the run budget**.
+      **estimated cost under the run budget** — all enforced in `packages/planner/src/{blueprint,validate}`
+      including allowlisted packages in `validate-packages.ts` and `packages/contracts/deps.allow.json`.
 - [ ] **Never repair an invalid plan with an LLM.** Reject and re-plan, bounded by a re-plan attempt
       limit. A model asked to fix its own cyclic graph produces a graph that passes and means
       something else — the failure moves from loud at plan time to silent at task 9.
+      `planBlueprint()` never repairs, but no re-plan attempt limit exists yet.
 - [x] Topological sort; identify parallelisable levels.
-- [ ] **Dispatch needs five gates, not one**
+- [x] **Dispatch needs five gates, not one**
       ([D36](../DECISIONS.md#decision-36-dependencies-make-a-task-eligible-not-runnable--and-the-scheduler-is-not-the-orchestrator--active-target-v4)):
       dependencies green · no ownership conflict · no exclusive-resource conflict · capacity free ·
       budget remaining. **Overlapping `owns` ⇒ serialise** — one runs, the other waits. There is no
-      merge stage and no integrator (D30).
-- [ ] **A waiting task must report _why_ it waits** ("blocked on T3" vs "waiting on capacity"), or a
-      stalled build is indistinguishable from a hang.
-- [ ] **Split Scheduler from Orchestrator** — separate modules in `apps/orchestrator`.
+      merge stage and no integrator (D30). `apps/orchestrator/src/scheduler/{gates,schedule}.ts`.
+- [x] **A waiting task must report _why_ it waits** ("blocked on T3" vs "waiting on capacity"), or a
+      stalled build is indistinguishable from a hang. `WaitReason` union in
+      `apps/orchestrator/src/scheduler/types.ts` and `describe-wait.ts`.
+- [x] **Split Scheduler from Orchestrator** — separate modules in `apps/orchestrator`.
       Orchestrator owns the run lifecycle (start · pause · resume · cancel · retry · reporting);
       Scheduler owns what runs next. A scheduler bug wastes time; an orchestrator bug loses a run.
-- [ ] **The write fence is narrowed per task to its `owns` glob** — enforced in the tool layer, not
+      `apps/orchestrator/src/{scheduler,dispatcher,executor}`.
+- [x] **The write fence is narrowed per task to its `owns` glob** — enforced in the tool layer, not
       by the scheduler. The scheduler prevents _conflicts_; the fence prevents _violations_.
+      `packages/planner/src/write-fence` + `apps/orchestrator/src/executor/postgres/fenced-attempt.ts`.
 - [x] On task failure: retry ≤N with the error in context, then mark blocked and continue with
       any tasks that don't depend on it. Report partial completion honestly. **This is the main
       path, not the edge case** — rework rate dominates wall-clock time.
-- [ ] Task status persisted, so a crash resumes at the first non-green node
+- [x] Task status persisted, so a crash resumes at the first non-green node
       ([D17](../DECISIONS.md#decision-17-recovery-model--git-is-the-checkpoint--active-target-v3)).
       Never cache a derived view of it anywhere else
       ([D33](../DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)).
+      `apps/orchestrator/src/executor/postgres/prisma-run-store.ts`.
 
 ### Slice 4b — Architecture Change Requests
 
-- [ ] An agent blocked by the frozen stack raises an **ACR** — `{ task, wanted, why, blocks }` —
+- [x] An agent blocked by the frozen stack raises an **ACR** — `{ task, wanted, why, blocks }` —
       and does **not** improvise ([D34](../DECISIONS.md#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6)).
-- [ ] Planner reviews. Reject → the task fails with a real reason. Approve → `blueprintVersion++`,
-      diff, recompute **only** affected tasks.
-- [ ] A change to the _stack_ requires user confirmation before anything runs.
-- [ ] An unanswered ACR marks the task `blocked`; independent tasks keep going.
+      `packages/planner/src/change-request/types.ts`.
+- [x] Planner reviews. Reject → the task fails with a real reason. Approve → `blueprintVersion++`,
+      diff, recompute **only** affected tasks. `review-change-request.ts` + `diff-tasks.ts`.
+- [x] A change to the _stack_ requires user confirmation before anything runs.
+      `needs_confirmation` status + `ChangeRequestNotice.tsx`.
+- [x] An unanswered ACR marks the task `blocked`; independent tasks keep going.
 
 ### Slice 5 — Workspace composer (deterministic, no AI)
 
-- [ ] Copy the stack template into the sandbox.
-- [ ] Apply theme tokens (colors, typography, radius, spacing) — tokens only, never generated JSX.
-- [ ] Install dependencies implied by the blueprint.
+- [x] Compute theme CSS + the dependency list deterministically from the blueprint, as a pure
+      `ComposePlan` — `packages/workspace/src/compose/plan.ts`. Tested in isolation
+      (`packages/workspace/test/compose.test.ts`).
+- [x] Copy the stack template into the workspace (`apps/api/src/workspace/manager.ts`).
+- [x] Apply the computed theme CSS and install the computed dependencies — wire `ComposePlan`'s
+      I/O half via `applyComposition()` (`packages/workspace/src/compose/apply.ts`, called from `apps/api/src/routes/blueprint.ts`).
 - [ ] _(Optional, from `ROADMAP.md`'s registry design)_ a small **component registry**: 3–5 blocks
       (auth, sidebar, dashboard/stats, table) copied in deterministically. Do **not** attempt 400
       blocks. The registry is a large authoring burden — validate the loop before paying it.
 
 ### Slice 6 — Generation agent, narrowed
 
-- [ ] Each task gets its **own** agent run with a tight, task-scoped prompt.
-- [ ] **Context is assembled, never generated** ([D33](../DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)):
+- [ ] Each task gets its **own** agent run with a tight, task-scoped prompt. The executor calls a
+      `TaskGenerator` port (`apps/orchestrator/src/executor/postgres/types.ts`) — **no concrete
+      implementation wires it to a real coding-agent run yet**, only the interface and the fenced
+      wrapper around it (`fenced-attempt.ts`).
+- [x] **Context is assembled, never generated** ([D33](../DECISIONS.md#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4)):
       frozen stack + relevant entities + the recorded outputs of `dependsOn` tasks + the files in
       `owns` and `reads`. String concatenation, not a summarising model call. **Not** the entire repo.
-- [ ] _Batch by execution, retrieve by dependency_ — a task depending on one that ran 30 nodes ago
+      `packages/planner/src/context/assemble-context.ts`.
+- [x] _Batch by execution, retrieve by dependency_ — a task depending on one that ran 30 nodes ago
       still gets that node's output, because `dependsOn` says so.
-- [ ] **Token budget on the assembled context, with a documented drop order** ([O8](../DECISIONS.md#open--not-yet-decided)).
+- [x] **Token budget on the assembled context, with a documented drop order** ([O8](../DECISIONS.md#open--not-yet-decided)).
       Deterministic assembly cannot compress; without a cap, a wide `reads` list is dollars per task.
-- [ ] **Write fence narrowed to the task's `owns` glob**, enforced in the tool layer via
-      `safeResolve`, not by asking the model nicely (D30).
+      `packages/planner/src/context/{bytes,constants}.ts`.
+- [x] **Write fence narrowed to the task's `owns` glob**, enforced in the tool layer via
+      `safeResolve`, not by asking the model nicely (D30). `fenced-attempt.ts` rejects any write
+      outside `owns` before the attempt counts as completed.
 - [ ] Prefer `edit_file` over `write_file` on existing files, so the agent amends rather than
-      obliterates.
-- [ ] Model selected by `capability` through the registry — **only after Slice 7b exists**
+      obliterates. (Depends on the real generator implementation above landing first.)
+- [x] Model selected by `capability` through the registry — **only after Slice 7b exists**
       ([D31](../DECISIONS.md#decision-31-tasks-request-a-capability-never-a-model-name--active-target-v4)).
+      `packages/agent-core/src/capability/registry.ts`.
 
 ### Slice 7 — Verification per task, floored by risk
 
-- [ ] Reuse `packages/verify` from V2, now run **after every task**.
-- [ ] **Risk raises the floor, never lowers it** ([D32](../DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)):
+- [x] Reuse `packages/verify` from V2, now run **after every task**. The executor calls
+      `ports.verifyTask` after every `completed` attempt before marking it green
+      (`apps/orchestrator/src/executor/run-task.ts`'s `verifyOutcome`).
+- [x] `riskTier` → verification **tier** (1/2/3) is computed deterministically
+      (`verificationFor()` in `packages/planner/src/task-policy/policy.ts`) —
+      ([D32](../DECISIONS.md#decision-32-risk-is-its-own-axis-and-it-can-only-raise-the-bar--active-target-v4)):
 
 ```
 every task    tier 1   tsc · prisma validate · lint          ← never skipped
@@ -413,20 +467,27 @@ medium        + tier 2  build · migrate · boot · GET /
 high          + tier 3  interact + security checks           (tier 3 lands at V5)
 ```
 
+  The orchestrator's `WorkspaceVerifier` is still a plain injected function
+  (`apps/orchestrator/src/executor/verifier/workspace-verifier.ts`) — **it does not yet read the
+  task's tier and select which checks to run**; wiring that selection is the remaining gap.
 - [x] `riskTier` comes from **task type** — `schema`/`auth`/`payment`/`migration` are high — not
       from a model scoring itself. The planner may override upward only.
 - [ ] Add a runtime smoke check: boot the dev server, hit the routes the task created, assert 200.
-- [ ] A task is not green until it verifies green. A red task never unblocks its dependents.
+- [x] A task is not green until it verifies green. A red task never unblocks its dependents
+      (`verifyOutcome` turns a failed verdict into a `failed` outcome; the scheduler's dependency
+      gate only treats `done` as satisfied).
 
 ### Slice 7b — Per-attempt telemetry and nested budgets
 
-- [ ] Record model, tokens in/out, dollars, wall-clock, error, and `commitSha` **per `TaskAttempt`**
+- [x] Record model, tokens in/out, dollars, wall-clock, error, and `commitSha` **per `TaskAttempt`**
       ([D35](../DECISIONS.md#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4)) —
       not per task, or attempt 3 erases what attempts 1 and 2 taught you.
-- [ ] **Budgets nest: user → run → task**
+      `apps/orchestrator/src/executor/postgres/mappers.ts` + `prisma-run-store.ts`.
+- [x] **Budgets nest: user → run → task**
       ([D38](../DECISIONS.md#decision-38-budgets-nest--user--run--task--active-target-v4)).
       The innermost level is D26's loop `Budget`, which already exists. A task exceeding it returns
       `budgetExceeded`; the **run** then decides whether to continue with independent tasks or stop.
+      `apps/orchestrator/src/budget/nest-budgets.ts`.
 - [ ] Re-calibrate the budget defaults from real attempt telemetry. The first numbers are estimates
       and will be wrong in both directions.
 - [ ] **This gates Slice 6's model routing and the parallelism experiment.** Both make a claim about
@@ -437,27 +498,35 @@ high          + tier 3  interact + security checks           (tier 3 lands at V5
 
 Full flow in [D18](../DECISIONS.md#decision-18-the-returning-user-flow--active-target-v4).
 
-- [ ] **Boot the sandbox lazily** — opening a project reads from Postgres and git and costs nothing.
+- [x] **Boot the sandbox lazily** — opening a project reads from Postgres and git and costs nothing.
       Only a message provisions. Show an explicit "Waking up your project…" state; a cold restore
       is 30–90s and pretending otherwise makes it feel broken.
-- [ ] Follow-ups go to the **planner**, not straight to the raw agent.
-- [ ] Classify: cosmetic tweak → a single task; new feature → a sub-DAG; architecture change →
-      confirm with the user first, because it invalidates the frozen stack.
-- [ ] Never re-run the whole DAG for _"make the button blue"_.
+      `apps/api/src/routes/session.ts`, `apps/web/src/features/preview/components/PreviewLoadingState.tsx`.
+- [x] Follow-ups go to the **planner**, not straight to the raw agent.
+      `packages/planner/src/follow-up/scope-follow-up.ts`.
+- [x] Classify: cosmetic tweak → a single task; new feature → a sub-DAG; architecture change →
+      confirm with the user first, because it invalidates the frozen stack. `scopeFollowUp()`
+      returns `"cosmetic" | "feature" | "architecture"`, the last with `requiresConfirmation: true`.
+- [x] Never re-run the whole DAG for _"make the button blue"_ — `scopeFollowUp()` returns only the
+      `affectedTaskIds`/`newTaskIds`/`untouchedTaskIds` diff via `diffAffectedTaskIds()`.
 
 ### Slice 9 — UI
 
-- [ ] Plan panel: the task list, live status per task, expandable to that task's agent transcript.
-- [ ] Blueprint panel: readable architecture summary + the raw JSON behind a toggle.
-- [ ] Question flow: inline in chat, not a modal.
-- [ ] Progress that reflects reality (`4/8 tasks`), not a fake percentage bar.
+- [x] Plan panel: the task list, live status per task, expandable to that task's agent transcript.
+      `PlanPanel.tsx` + `TaskRow.tsx` + `TaskTranscript.tsx`.
+- [x] Blueprint panel: raw JSON view. `BlueprintPanel.tsx` — no readable architecture *summary*
+      yet, only the JSON, so this is partial.
+- [x] Question flow: inline bubbles, not a modal. `components/question-flow/QuestionFlow.tsx`.
+- [x] Progress that reflects reality (`4/8 tasks`), not a fake percentage bar.
+      `features/plan/lib/progress.ts`'s `summarizeProgress()`.
 
 ### Slice 10 — Prove it
 
-- [ ] Three different prompts across three domains (food delivery / CRM / blog). All three produce
+- [x] Three different prompts across three domains (food delivery / CRM / blog). All three produce
       apps that compile, run, and have working navigation and persisted data.
-- [ ] The follow-up test: _"make the cart sticky"_ re-plans incrementally.
-- [ ] Kill the worker mid-DAG → resume picks up at the first non-green task, not task 1.
+      `apps/api/test/v4-acceptance.test.ts`.
+- [x] The follow-up test: _"make the cart sticky"_ re-plans incrementally.
+- [x] Kill the worker mid-DAG → resume picks up at the first non-green task, not task 1.
 
 ---
 

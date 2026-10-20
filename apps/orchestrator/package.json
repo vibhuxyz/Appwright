@@ -19,6 +19,7 @@
   "dependencies": {
     "@repo/contracts": "workspace:*",
     "@repo/logger": "workspace:*",
-    "@repo/planner": "workspace:*"
+    "@repo/planner": "workspace:*",
+    "zod": "^4.4.3"
   }
 }

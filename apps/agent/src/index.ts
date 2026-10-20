@@ -1,8 +1,10 @@
 import { createLogger } from "@repo/logger";
 import { createSandboxProviderFromEnv, type SandboxProvider } from "@repo/sandbox";
+import { startHealthServer } from "./health";
 import { startPoller, type Poller } from "./poller";
 
 const log = createLogger("agent-worker");
+const DEFAULT_HEALTH_PORT = 3003;
 
 export { executeAgentJob } from "./worker";
 export type { AgentJobResult } from "./worker";
@@ -30,8 +32,15 @@ export function startAgentWorker(): {
 
 if (import.meta.main) {
   const worker = startAgentWorker();
+  let isShuttingDown = false;
+  const health = startHealthServer({
+    port: Number(process.env.HEALTH_PORT ?? DEFAULT_HEALTH_PORT),
+    isReady: () => !isShuttingDown,
+  });
   const shutdown = async (): Promise<void> => {
+    isShuttingDown = true;
     log.info("shutting down, finishing in-flight work");
+    health.stop();
     await worker.stop();
     process.exit(0);
   };

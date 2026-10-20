@@ -18,3 +18,13 @@ export interface ComposePlan {
   dependencies: string[];
   skipped: SkippedInput[];
 }
+
+export interface ApplyOptions {
+  installDependencies?: boolean;
+}
+
+export interface ApplyResult {
+  writtenFiles: string[];
+  installedDependencies: string[];
+}
+

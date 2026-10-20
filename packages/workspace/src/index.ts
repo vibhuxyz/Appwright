@@ -21,11 +21,16 @@ export function sessionWorktreePath(
 }
 
 export {
+  applyComposition,
   planComposition,
   withThemeImport,
   GLOBALS_CSS_PATH,
+  THEME_CSS_PATH,
+  type ApplyOptions,
+  type ApplyResult,
   type ComposeInput,
   type ComposePlan,
   type FileWrite,
   type SkippedInput,
 } from "./compose";
+
