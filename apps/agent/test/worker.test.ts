@@ -61,6 +61,19 @@ describe("apps/agent - V3 sandboxed job execution", () => {
     const sandboxProvider = new LocalSandboxProvider();
     const fakeProvider = new FakeProvider([
       {
+        kind: "text",
+        text: JSON.stringify({
+          intent: "modify",
+          changeType: "text",
+          risk: "low",
+          route: "none",
+          component: "none",
+          complexity: 1,
+          ambiguity: 1,
+          confidence: 0.9,
+        }),
+      },
+      {
         kind: "toolCall",
         toolCallId: "call-1",
         toolName: "write_file",

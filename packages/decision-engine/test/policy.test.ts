@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { UNKNOWN_DECISION } from "../src/classify";
-import { resolvePolicy } from "../src/policy";
+import { needsDetailedPlan, resolvePolicy } from "../src/policy";
 import type { Decision, DecisionResult } from "../src/types";
 
 function accepted(overrides: Partial<Decision>): DecisionResult {
@@ -84,6 +84,38 @@ describe("resolvePolicy", () => {
     expect(
       resolvePolicy({ status: "provider_error", decision: UNKNOWN_DECISION }),
     ).toBe("review");
+  });
+});
+
+describe("needsDetailedPlan", () => {
+  it("plans a complex, confident request to create something", () => {
+    expect(
+      needsDetailedPlan(accepted({ intent: "create", complexity: 8, confidence: 0.8 })),
+    ).toBe(true);
+  });
+
+  it("skips planning for a simple style tweak", () => {
+    expect(
+      needsDetailedPlan(accepted({ intent: "modify", complexity: 1, confidence: 0.9 })),
+    ).toBe(false);
+  });
+
+  it("skips planning when complexity is below the threshold, even for create", () => {
+    expect(
+      needsDetailedPlan(accepted({ intent: "create", complexity: 5, confidence: 0.8 })),
+    ).toBe(false);
+  });
+
+  it("skips planning when confidence is too low to trust the read", () => {
+    expect(
+      needsDetailedPlan(accepted({ intent: "create", complexity: 9, confidence: 0.4 })),
+    ).toBe(false);
+  });
+
+  it("fails closed on a non-accepted status", () => {
+    expect(
+      needsDetailedPlan({ status: "invalid", decision: UNKNOWN_DECISION }),
+    ).toBe(false);
   });
 
   it("would NOT send the placeholder decision to review on its own merits alone", () => {

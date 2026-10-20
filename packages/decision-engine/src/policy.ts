@@ -43,3 +43,23 @@ export function resolvePolicy(result: DecisionResult): ExecutionMode {
 
   return "agent";
 }
+
+// Threshold a prompt's complexity must clear before it's worth the extra
+// round trip of building a Blueprint and task DAG up front, rather than
+// just handing the agent a single-pass loop.
+const MIN_COMPLEXITY_FOR_PLAN = 6;
+
+// Whether this request is substantial enough to plan in detail first
+// (Blueprint → task DAG → multi-task run) instead of a single agent pass.
+// Same fail-closed rule as resolvePolicy: anything other than a confident,
+// accepted "create" reads as "no plan" and falls through to the existing
+// single-pass path, which already handles everything safely.
+export function needsDetailedPlan(result: DecisionResult): boolean {
+  if (result.status !== "accepted") return false;
+  const { decision } = result;
+  return (
+    decision.intent === "create" &&
+    decision.complexity >= MIN_COMPLEXITY_FOR_PLAN &&
+    decision.confidence >= 0.5
+  );
+}

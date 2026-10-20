@@ -16,7 +16,7 @@ export {
   type DecisionResult,
 } from "./types";
 export { classify, UNKNOWN_DECISION } from "./classify";
-export { resolvePolicy } from "./policy";
+export { resolvePolicy, needsDetailedPlan } from "./policy";
 export { shouldRetryVerification, type VerifyOutcome } from "./verify";
 export {
   isDeniedInMode,

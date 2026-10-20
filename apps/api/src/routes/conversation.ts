@@ -4,7 +4,7 @@ import { prisma } from "@repo/db";
 import { Router } from "express";
 import { requireAuthAllowingQueryToken } from "@repo/auth";
 import { setTraceContext } from "@repo/logger";
-import { generateIntakeQuestions, IntakeQuestionsError } from "../intake";
+import { generateIntakeQuestions, IntakeQuestionsError, shouldPlanInDetail } from "../intake";
 import { log } from "../log";
 import { ownedSessionProjectId } from "../ownership";
 import { attachSseClient, publishStatus } from "../stream/sse";
@@ -112,7 +112,8 @@ conversationRouter.post("/conversation/questions", async (req, res) => {
     });
   }
   try {
-    const questions = await generateIntakeQuestions(parsed.data.prompt);
+    const planInDetail = await shouldPlanInDetail(parsed.data.prompt);
+    const questions = planInDetail ? await generateIntakeQuestions(parsed.data.prompt) : [];
     res.json({ questions });
   } catch (error) {
     const timeout = error instanceof IntakeQuestionsError && error.code === "TIMEOUT";

@@ -1,8 +1,8 @@
 import {
-  LocalRuntime,
   OpenAiProvider,
   runAgentLoop,
   type AgentEventSink,
+  type Runtime,
 } from "@repo/agent-core";
 import { ALL_TOOLS } from "@repo/tools";
 import type { FencedAttemptInput, GeneratedAttempt, TaskGenerator } from "orchestrator";
@@ -17,9 +17,9 @@ const CENTS_PER_USD = 100;
 const WRITE_TOOL_NAMES = new Set(["write_file", "edit_file"]);
 
 export interface RunTaskGeneratorOptions {
-  projectId: string;
   sessionId: string;
   model: string;
+  runtime: Runtime;
 }
 
 function pathFromToolArgs(args: Record<string, unknown>): string | undefined {
@@ -27,12 +27,11 @@ function pathFromToolArgs(args: Record<string, unknown>): string | undefined {
 }
 
 export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGenerator {
-  const { projectId, sessionId, model } = options;
+  const { sessionId, model, runtime } = options;
 
   return {
     async generate(input: FencedAttemptInput): Promise<GeneratedAttempt> {
       const task = await loadTaskDetail(input.task.id);
-      const runtime = new LocalRuntime(projectId, sessionId);
       const writtenPaths: string[] = [];
       let costUsd = 0;
 

@@ -1,3 +1,4 @@
+import { LocalRuntime } from "@repo/agent-core";
 import {
   activeBlueprintRuns,
   buildBlueprint,
@@ -98,6 +99,7 @@ blueprintRouter.post("/sessions/:sessionId/blueprint", async (req, res) => {
         projectId,
         model: session.model,
         userRemainingCents: Number.POSITIVE_INFINITY,
+        runtime: new LocalRuntime(projectId, req.params.sessionId),
       },
       controller.signal,
     )

@@ -2,6 +2,7 @@ import { workspaceRoot } from "@repo/contracts/files";
 import { prisma } from "@repo/db";
 import { createLogger } from "@repo/logger";
 import { verifyWorkspace } from "@repo/verify";
+import type { Runtime } from "@repo/agent-core";
 import {
   createPostgresPorts,
   createPrismaRunStore,
@@ -10,6 +11,7 @@ import {
   runBudgetCents,
   DEFAULT_MAX_ATTEMPTS_PER_TASK,
   DEFAULT_MAX_CONCURRENT_TASKS,
+  type RunStore,
   type RunSummary,
 } from "orchestrator";
 import { createRunTaskGenerator } from "./run-task-generator";
@@ -29,14 +31,30 @@ export interface ExecuteBlueprintRunOptions {
   projectId: string;
   model: string;
   userRemainingCents: number;
+  runtime: Runtime;
+  onTaskStatus?: (taskId: string, status: string) => void;
+}
+
+function withTaskStatusNotifications(
+  store: RunStore,
+  onTaskStatus: (taskId: string, status: string) => void,
+): RunStore {
+  return {
+    ...store,
+    setTaskStatus: (taskId, status) => {
+      onTaskStatus(taskId, status);
+      return store.setTaskStatus(taskId, status);
+    },
+  };
 }
 
 export async function executeBlueprintRun(
   options: ExecuteBlueprintRunOptions,
   signal: AbortSignal,
 ): Promise<RunSummary | undefined> {
-  const { runId, sessionId, projectId, model, userRemainingCents } = options;
-  const store = createPrismaRunStore({ client: prisma, modelName: model, now: () => Date.now() });
+  const { runId, sessionId, projectId, model, userRemainingCents, runtime, onTaskStatus } = options;
+  const baseStore = createPrismaRunStore({ client: prisma, modelName: model, now: () => Date.now() });
+  const store = onTaskStatus ? withTaskStatusNotifications(baseStore, onTaskStatus) : baseStore;
   const run = await store.loadRun(runId);
   if (!run) {
     log.error("blueprint run not found at execution time", { runId });
@@ -50,7 +68,7 @@ export async function executeBlueprintRun(
     runSpentCents: run.spentCents,
   });
 
-  const generator = createRunTaskGenerator({ projectId, sessionId, model });
+  const generator = createRunTaskGenerator({ sessionId, model, runtime });
   const workspaceDir = workspaceRoot(projectId, sessionId);
   const verifier = createWorkspaceVerifier(workspaceDir, verifyWorkspace);
   const ports = createPostgresPorts({ runId, store, generator, verifier, now: () => Date.now() });

@@ -13,7 +13,7 @@ import {
   get as cacheGet,
 } from "@repo/cache";
 import { prisma, type Job } from "@repo/db";
-import { type VerifyOutcome } from "@repo/decision-engine";
+import { classify, needsDetailedPlan, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
 import { SandboxRuntime, type SandboxProvider } from "@repo/sandbox";
 import { ALL_TOOLS } from "@repo/tools";
@@ -21,9 +21,11 @@ import { sessionWorktreePath } from "@repo/workspace";
 import { restoreWorkspace } from "../recovery";
 import { autoMergeSession } from "./auto-merge-session";
 import { checkpointSession } from "./checkpoint";
+import { currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
 import { HostMirrorRuntime } from "./host-mirror-runtime";
 import { createPersist, publishStatus } from "./persist";
+import { runBlueprintPath } from "./run-blueprint-path";
 import type { AgentJobResult } from "./types";
 import { runVerifyStep } from "./verify-step";
 
@@ -128,61 +130,102 @@ export async function executeAgentJob(
 
     const { emit } = createEmitAdapter({ sessionId: session.id, userId, persist });
 
-    const verifyHistory: VerifyOutcome[] = [];
     let verificationPassed = false;
     let verifyGaveUp = false;
 
-    for (let attempt = 0; attempt <= MAX_VERIFY_ATTEMPTS; attempt++) {
-      stopReason = await runAgentLoop({
-        messages,
-        tools: ALL_TOOLS,
-        provider: provider ?? new OpenAiProvider({ model: session.model }),
+    const decisionResult = await classify(
+      currentTurnText(priorRows),
+      provider ?? new OpenAiProvider({ model: session.model }),
+    );
+    const planInDetail = needsDetailedPlan(decisionResult);
+
+    if (planInDetail) {
+      stopReason = await runBlueprintPath({
+        prompt: currentTurnText(priorRows),
+        projectId: job.projectId,
+        sessionId: session.id,
+        model: session.model,
         runtime,
-        emit,
-        budget: {
-          maxIterations: MAX_ITERATIONS,
-          maxTokens: Math.max(500, Math.min(user.credits, 2_000_000)),
-          maxCostUsd: MAX_COST_USD,
-          deadline: Date.now() + LOOP_DEADLINE_MS,
-        },
         signal: controller.signal,
-        sessionId: session.id,
+        persist,
       });
 
-      if (stopReason !== "completed") break;
-
-      const verify = await runVerifyStep({
-        sessionId: session.id,
-        worktreeDir,
-        maxAttempts: MAX_VERIFY_ATTEMPTS,
-        history: verifyHistory,
-      });
-
-      if (verify.passed) {
-        verificationPassed = true;
-        break;
-      }
-
-      if (!verify.shouldRetry) {
-        verifyGaveUp = true;
-        stopReason = "fatalError";
-        await persist({
-          role: "assistant",
-          type: "text",
-          content: verify.stuck
-            ? "❌ Verification failed with the same error as the last attempt — retrying wouldn't help. Giving up."
-            : `❌ Verification still failing after ${MAX_VERIFY_ATTEMPTS} attempts. Giving up.`,
-          data: { stopReason: "fatalError", verification: verify.results },
+      if (stopReason === "completed") {
+        const verify = await runVerifyStep({
+          sessionId: session.id,
+          worktreeDir,
+          maxAttempts: MAX_VERIFY_ATTEMPTS,
+          history: [],
         });
-        break;
-      }
 
-      messages.push({
-        role: "user",
-        type: "text",
-        content: `Running verification checks on your changes found real errors — fix them, then\nstop. Do not describe the fix, make it with edit_file/write_file.\n\n${verify.outputText}`,
-      });
-      await persist({ role: "user", type: "text", content: `Verification failed, retrying:\n${verify.outputText}` });
+        if (verify.passed) {
+          verificationPassed = true;
+        } else {
+          verifyGaveUp = true;
+          stopReason = "fatalError";
+          await persist({
+            role: "assistant",
+            type: "text",
+            content: "❌ Built the plan, but verification found real errors. Giving up.",
+            data: { stopReason: "fatalError", verification: verify.results },
+          });
+        }
+      }
+    } else {
+      const verifyHistory: VerifyOutcome[] = [];
+
+      for (let attempt = 0; attempt <= MAX_VERIFY_ATTEMPTS; attempt++) {
+        stopReason = await runAgentLoop({
+          messages,
+          tools: ALL_TOOLS,
+          provider: provider ?? new OpenAiProvider({ model: session.model }),
+          runtime,
+          emit,
+          budget: {
+            maxIterations: MAX_ITERATIONS,
+            maxTokens: Math.max(500, Math.min(user.credits, 2_000_000)),
+            maxCostUsd: MAX_COST_USD,
+            deadline: Date.now() + LOOP_DEADLINE_MS,
+          },
+          signal: controller.signal,
+          sessionId: session.id,
+        });
+
+        if (stopReason !== "completed") break;
+
+        const verify = await runVerifyStep({
+          sessionId: session.id,
+          worktreeDir,
+          maxAttempts: MAX_VERIFY_ATTEMPTS,
+          history: verifyHistory,
+        });
+
+        if (verify.passed) {
+          verificationPassed = true;
+          break;
+        }
+
+        if (!verify.shouldRetry) {
+          verifyGaveUp = true;
+          stopReason = "fatalError";
+          await persist({
+            role: "assistant",
+            type: "text",
+            content: verify.stuck
+              ? "❌ Verification failed with the same error as the last attempt — retrying wouldn't help. Giving up."
+              : `❌ Verification still failing after ${MAX_VERIFY_ATTEMPTS} attempts. Giving up.`,
+            data: { stopReason: "fatalError", verification: verify.results },
+          });
+          break;
+        }
+
+        messages.push({
+          role: "user",
+          type: "text",
+          content: `Running verification checks on your changes found real errors — fix them, then\nstop. Do not describe the fix, make it with edit_file/write_file.\n\n${verify.outputText}`,
+        });
+        await persist({ role: "user", type: "text", content: `Verification failed, retrying:\n${verify.outputText}` });
+      }
     }
 
     if (stopReason !== "completed" && !verifyGaveUp) {
