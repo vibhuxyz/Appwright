@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@repo/agent-core": "workspace:*",
+    "@repo/assets": "workspace:*",
     "@repo/blueprint": "workspace:*",
     "@repo/cache": "workspace:*",
     "@repo/contracts": "workspace:*",

@@ -16,6 +16,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/agent-core": "workspace:*",
+        "@repo/assets": "workspace:*",
         "@repo/blueprint": "workspace:*",
         "@repo/cache": "workspace:*",
         "@repo/contracts": "workspace:*",
@@ -38,6 +39,7 @@
       "name": "api",
       "dependencies": {
         "@repo/agent-core": "workspace:*",
+        "@repo/assets": "workspace:*",
         "@repo/auth": "workspace:*",
         "@repo/blueprint": "workspace:*",
         "@repo/cache": "workspace:*",
@@ -137,6 +139,23 @@
       },
       "devDependencies": {
         "@types/bun": "^1.4.2",
+        "tsup": "^8.3.5",
+      },
+      "peerDependencies": {
+        "typescript": "^5",
+      },
+    },
+    "packages/assets": {
+      "name": "@repo/assets",
+      "version": "0.0.0",
+      "dependencies": {
+        "@repo/contracts": "workspace:*",
+        "@repo/db": "workspace:*",
+        "@repo/media": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
         "tsup": "^8.3.5",
       },
       "peerDependencies": {
@@ -685,6 +704,8 @@
     "@radix-ui/react-use-layout-effect": ["@radix-ui/react-use-layout-effect@1.1.1", "", { "peerDependencies": { "@types/react": "*", "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc" }, "optionalPeers": ["@types/react"] }, "sha512-RbJRS4UWQFkzHTTwVymMTUv8EqYhOp8dOOviLj2ugtTiXRaRQS7GLGxZTLL1jWhMeoSCf5zmcZkqTl9IiYfXcQ=="],
 
     "@repo/agent-core": ["@repo/agent-core@workspace:packages/agent-core"],
+
+    "@repo/assets": ["@repo/assets@workspace:packages/assets"],
 
     "@repo/auth": ["@repo/auth@workspace:packages/auth"],
 

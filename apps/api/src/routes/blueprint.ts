@@ -13,6 +13,7 @@ import { Router } from "express";
 import { createAssetRequest } from "../assets";
 import { log } from "../log";
 import { ownedSessionProjectId } from "../ownership";
+import { publishAssetRequest } from "../stream/sse";
 import { conversationRateLimitOk } from "../workflow/rate-limit";
 import { applyComposition, planComposition } from "@repo/workspace";
 import { createSessionWorktree } from "../workspace/manager";
@@ -84,11 +85,13 @@ blueprintRouter.post("/sessions/:sessionId/blueprint", async (req, res) => {
     // Task Graph below — the agent writes pages that reference each slot's
     // final, predictable path, and the chat card resolves slots whenever the
     // user answers, independently of build progress.
-    const assetRequestId = await createAssetRequest(
+    const assetRequest = await createAssetRequest(
       req.params.sessionId,
       persisted.blueprintId,
       plan.blueprint,
     );
+    if (assetRequest) publishAssetRequest(req.params.sessionId, assetRequest);
+    const assetRequestId = assetRequest?.id ?? null;
 
     const controller = new AbortController();
     activeBlueprintRuns.set(runId, controller);

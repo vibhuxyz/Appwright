@@ -1,14 +1,13 @@
-import type { Blueprint } from "@repo/contracts";
+import type { AssetRequestResponse, Blueprint } from "@repo/contracts";
 import { prisma, type Prisma } from "@repo/db";
 import { detectAssetSlots } from "@repo/media";
-import { publishAssetRequest } from "../stream/sse";
 import { serializeAssetRequest } from "./serialize";
 
 export async function createAssetRequest(
   sessionId: string,
   blueprintId: string,
   blueprint: Blueprint,
-): Promise<string | null> {
+): Promise<AssetRequestResponse | null> {
   const slots = detectAssetSlots(blueprint);
   if (slots.length === 0) return null;
 
@@ -21,6 +20,5 @@ export async function createAssetRequest(
     },
   });
 
-  publishAssetRequest(sessionId, serializeAssetRequest(row));
-  return row.id;
+  return serializeAssetRequest(row);
 }

@@ -1,10 +1,12 @@
 import type { Runtime } from "@repo/agent-core";
+import { createAssetRequest } from "@repo/assets";
 import {
   buildBlueprint,
   executeBlueprintRun,
   persistBlueprint,
   startBlueprintRun,
 } from "@repo/blueprint";
+import { publishChannel, sessionChannel, type SseAssetRequestFrame } from "@repo/cache";
 import { publishStatus } from "./persist";
 import type { PersistFields } from "./persist";
 
@@ -33,6 +35,12 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
   const plan = await buildBlueprint(prompt);
   const persisted = await persistBlueprint(sessionId, plan);
   const runId = await startBlueprintRun(sessionId, persisted.blueprintVersion);
+
+  const assetRequest = await createAssetRequest(sessionId, persisted.blueprintId, plan.blueprint);
+  if (assetRequest) {
+    const frame: SseAssetRequestFrame = { kind: "assetRequest", assetRequest };
+    await publishChannel(sessionChannel(sessionId), frame);
+  }
 
   await persist({
     role: "assistant",
