@@ -1,6 +1,3 @@
-import { BuildBlueprintRequest, BuildBlueprintResponse } from "@repo/contracts";
-import { prisma } from "@repo/db";
-import { Router } from "express";
 import {
   activeBlueprintRuns,
   buildBlueprint,
@@ -8,7 +5,10 @@ import {
   executeBlueprintRun,
   persistBlueprint,
   startBlueprintRun,
-} from "../blueprint";
+} from "@repo/blueprint";
+import { BuildBlueprintRequest, BuildBlueprintResponse } from "@repo/contracts";
+import { prisma } from "@repo/db";
+import { Router } from "express";
 import { createAssetRequest } from "../assets";
 import { log } from "../log";
 import { ownedSessionProjectId } from "../ownership";

@@ -1,10 +1,9 @@
-import { DEFAULT_MODEL, OpenAiProvider, type Provider } from "@repo/agent-core";
+import { DEFAULT_MODEL, OpenAiProvider, readProviderText, type Provider } from "@repo/agent-core";
 import {
   buildContentPrompt,
   parseGeneratedContent,
   type BlueprintContent,
 } from "@repo/planner";
-import { readProviderText } from "../llm";
 
 const MAX_OUTPUT_BYTES = 8_000;
 

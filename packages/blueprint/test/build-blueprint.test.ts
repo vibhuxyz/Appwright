@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { FakeProvider } from "@repo/agent-core";
 import { generateDesignDirections } from "@repo/planner";
-import { buildBlueprint, BuildBlueprintError } from "../src/blueprint";
+import { buildBlueprint, BuildBlueprintError } from "../src";
 
 const INTENT_JSON = JSON.stringify({ type: "new-app", domain: "food-delivery", complexity: "complex" });
 const CONTENT_JSON = JSON.stringify({

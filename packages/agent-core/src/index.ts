@@ -20,6 +20,11 @@ export {
   OpenAiProvider,
 } from "./providers/openai";
 export { costUsd, priceFor } from "./providers/pricing";
+export {
+  readProviderText,
+  isAbortError,
+  ProviderOutputTooLargeError,
+} from "./providers/read-provider-text";
 export { buildSystemPrompt } from "./prompt";
 export { planTasks, formatPlanForAgent } from "./planner";
 export { verifyTypeScript, type VerifyResult } from "./verify";

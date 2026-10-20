@@ -1,4 +1,4 @@
-import type { Provider } from "@repo/agent-core";
+import type { Provider } from "./types";
 
 export function isAbortError(error: unknown): boolean {
   return (

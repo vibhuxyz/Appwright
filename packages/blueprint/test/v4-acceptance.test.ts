@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { FakeProvider } from "@repo/agent-core";
 import { scopeFollowUp } from "@repo/planner";
-import { buildBlueprint } from "../src/blueprint";
+import { buildBlueprint } from "../src";
 
 const FOOD_DELIVERY_INTENT = JSON.stringify({
   type: "marketplace",

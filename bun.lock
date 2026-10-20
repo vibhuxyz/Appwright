@@ -16,6 +16,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/agent-core": "workspace:*",
+        "@repo/blueprint": "workspace:*",
         "@repo/cache": "workspace:*",
         "@repo/contracts": "workspace:*",
         "@repo/db": "workspace:*",
@@ -38,6 +39,7 @@
       "dependencies": {
         "@repo/agent-core": "workspace:*",
         "@repo/auth": "workspace:*",
+        "@repo/blueprint": "workspace:*",
         "@repo/cache": "workspace:*",
         "@repo/contracts": "workspace:*",
         "@repo/db": "workspace:*",
@@ -156,6 +158,28 @@
       },
       "peerDependencies": {
         "express": "^5",
+        "typescript": "^5",
+      },
+    },
+    "packages/blueprint": {
+      "name": "@repo/blueprint",
+      "version": "0.0.0",
+      "dependencies": {
+        "@repo/agent-core": "workspace:*",
+        "@repo/contracts": "workspace:*",
+        "@repo/db": "workspace:*",
+        "@repo/logger": "workspace:*",
+        "@repo/planner": "workspace:*",
+        "@repo/tools": "workspace:*",
+        "@repo/verify": "workspace:*",
+        "orchestrator": "workspace:*",
+        "zod": "^4.4.3",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "tsup": "^8.3.5",
+      },
+      "peerDependencies": {
         "typescript": "^5",
       },
     },
@@ -663,6 +687,8 @@
     "@repo/agent-core": ["@repo/agent-core@workspace:packages/agent-core"],
 
     "@repo/auth": ["@repo/auth@workspace:packages/auth"],
+
+    "@repo/blueprint": ["@repo/blueprint@workspace:packages/blueprint"],
 
     "@repo/cache": ["@repo/cache@workspace:packages/cache"],
 

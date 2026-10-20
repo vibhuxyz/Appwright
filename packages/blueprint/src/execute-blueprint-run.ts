@@ -1,5 +1,6 @@
 import { workspaceRoot } from "@repo/contracts/files";
 import { prisma } from "@repo/db";
+import { createLogger } from "@repo/logger";
 import { verifyWorkspace } from "@repo/verify";
 import {
   createPostgresPorts,
@@ -11,8 +12,9 @@ import {
   DEFAULT_MAX_CONCURRENT_TASKS,
   type RunSummary,
 } from "orchestrator";
-import { log } from "../log";
 import { createRunTaskGenerator } from "./run-task-generator";
+
+const log = createLogger("blueprint");
 
 const RUN_FINAL_STATUS_BY_OUTCOME = {
   completed: "completed",
