@@ -2,12 +2,14 @@ import { existsSync } from "node:fs";
 import { lstat, mkdir, rm, unlink } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
+import { tryGetProjectRuntimeEnv } from "@repo/db";
 import {
   projectRepoPath,
   sessionWorktreePath,
   workspacePath,
   WORKSPACES_DIR,
 } from "@repo/workspace";
+import { writeProjectRuntimeEnvFile } from "../project-database/write-runtime-env";
 
 export { projectRepoPath, sessionWorktreePath, workspacePath, WORKSPACES_DIR };
 
@@ -154,21 +156,40 @@ async function allocatePort(): Promise<number> {
   );
 }
 
+const DEV_SERVER_READY_TIMEOUT_MS = 90_000;
+const DEV_SERVER_POLL_MS = 500;
+
+async function isListening(port: number): Promise<boolean> {
+  try {
+    const socket = await Bun.connect({
+      hostname: "127.0.0.1",
+      port,
+      socket: { data() {} },
+    });
+    socket.end();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function waitForServer(
   port: number,
-  timeoutMs = 30_000,
+  timeoutMs = DEV_SERVER_READY_TIMEOUT_MS,
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try {
-      const res = await fetch(`http://localhost:${port}`);
-      if (res.ok || res.status < 500) return true;
-    } catch {
-      // not up yet
-    }
-    await new Promise((r) => setTimeout(r, 500));
+    if (await isListening(port)) return true;
+    await new Promise((r) => setTimeout(r, DEV_SERVER_POLL_MS));
   }
   return false;
+}
+
+function warmUpFirstPage(port: number): void {
+  void fetch(`http://127.0.0.1:${port}/`).then(
+    () => undefined,
+    () => undefined,
+  );
 }
 
 const starting = new Map<string, Promise<number>>();
@@ -185,7 +206,7 @@ async function devServerArgs(cwd: string, port: number): Promise<string[]> {
 
 
 export function startDevServer(projectId: string): Promise<number> {
-  return startServerAt(projectId, projectRepoPath(projectId));
+  return startServerAt(projectId, projectRepoPath(projectId), projectId);
 }
 
 export async function startSessionDevServer(
@@ -193,22 +214,33 @@ export async function startSessionDevServer(
   sessionId: string,
 ): Promise<number> {
   const cwd = await createSessionWorktree(projectId, sessionId);
-  return startServerAt(sessionServerKey(sessionId), cwd);
+  await writeProjectRuntimeEnvFile({
+    projectId,
+    environment: "development",
+    sessionId,
+  }).catch(() => undefined);
+  return startServerAt(sessionServerKey(sessionId), cwd, projectId);
 }
 
 export function sessionServerKey(sessionId: string): string {
   return `session:${sessionId}`;
 }
 
-async function startServerAt(projectId: string, cwd: string): Promise<number> {
-  const existing = servers.get(projectId);
+async function startServerAt(
+  serverKey: string,
+  cwd: string,
+  envProjectId: string,
+): Promise<number> {
+  const existing = servers.get(serverKey);
  
   if (existing && existing.proc.exitCode === null && !existing.proc.killed) {
-    return existing.port;
+    if (await isListening(existing.port)) return existing.port;
+    existing.proc.kill();
+    servers.delete(serverKey);
   }
-  if (existing) servers.delete(projectId);
+  if (existing) servers.delete(serverKey);
 
-  let promise = starting.get(projectId);
+  let promise = starting.get(serverKey);
   if (!promise) {
     promise = (async () => {
       try {
@@ -221,33 +253,42 @@ async function startServerAt(projectId: string, cwd: string): Promise<number> {
         const installExit = await install.exited;
         if (installExit !== 0) {
           throw new Error(
-            `bun install failed for project ${projectId} (exit ${installExit})`,
+            `bun install failed for project ${envProjectId} (exit ${installExit})`,
           );
         }
 
         const port = await allocatePort();
+        const runtimeEnv = await tryGetProjectRuntimeEnv({
+          projectId: envProjectId,
+          environment: "development",
+        });
         const proc = Bun.spawn(
           await devServerArgs(cwd, port),
-          
-          { cwd, stdout: "inherit", stderr: "inherit" },
+          {
+            cwd,
+            stdout: "inherit",
+            stderr: "inherit",
+            env: { ...process.env, ...runtimeEnv },
+          },
         );
-        servers.set(projectId, { port, proc });
+        servers.set(serverKey, { port, proc });
 
         const healthy = await waitForServer(port);
         if (!healthy) {
           proc.kill();
-          servers.delete(projectId);
+          servers.delete(serverKey);
           throw new Error(
-            `dev server for project ${projectId} never became healthy on :${port}`,
+            `dev server for project ${envProjectId} never became healthy on :${port}`,
           );
         }
 
+        warmUpFirstPage(port);
         return port;
       } finally {
-        starting.delete(projectId);
+        starting.delete(serverKey);
       }
     })();
-    starting.set(projectId, promise);
+    starting.set(serverKey, promise);
   }
   return promise;
 }

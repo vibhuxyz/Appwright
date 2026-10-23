@@ -1,11 +1,37 @@
 import z from "zod";
+import { ProjectType, RequirementSchema } from "./requirement.schema";
+import { PlannedSectionSchema, SECTION_PLAN_LIMITS } from "./section-plan.schema";
+import { ThemeOptionSchema } from "./theme";
+
+export const WorkflowKind = z.enum([
+  "browse-catalog",
+  "pickup-order",
+  "delivery-order",
+  "custom-request",
+  "pop-up-locations",
+  "inventory",
+  "notifications",
+  "admin-operations",
+]);
+export type WorkflowKind = z.infer<typeof WorkflowKind>;
+
+export const WorkflowSchema = z.object({
+  id: z.string().min(1),
+  kind: WorkflowKind,
+  name: z.string().min(1),
+  inScope: z.boolean(),
+  reason: z.string().min(1),
+  actors: z.array(z.string().min(1)).default([]),
+  steps: z.array(z.string().min(1)).default([]),
+});
+export type Workflow = z.infer<typeof WorkflowSchema>;
 
 export const BLUEPRINT_SCHEMA_VERSION = 1;
 
 export const StackSchema = z.object({
   framework: z.literal("next"),
-  db: z.literal("postgres"),
-  orm: z.literal("prisma"),
+  db: z.enum(["mongodb", "postgres", "none"]),
+  orm: z.enum(["mongoose", "prisma", "none"]),
   auth: z.literal("authjs"),
   styling: z.literal("tailwind"),
 });
@@ -15,6 +41,7 @@ export const IntentSchema = z.object({
   type: z.string().min(1),
   domain: z.string().min(1),
   complexity: z.enum(["simple", "medium", "complex"]),
+  projectType: ProjectType.optional().catch(undefined),
 });
 export type Intent = z.infer<typeof IntentSchema>;
 
@@ -46,6 +73,7 @@ export const PageSchema = z.object({
   route: z.string().min(1),
   purpose: z.string().min(1),
   components: z.array(z.string()).default([]),
+  sections: z.array(PlannedSectionSchema).max(SECTION_PLAN_LIMITS.maxSectionsPerPage).optional(),
 });
 export type Page = z.infer<typeof PageSchema>;
 
@@ -64,6 +92,7 @@ export const DesignBlockSchema = z.object({
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#6366F1"),
   radius: z.enum(["none", "sm", "md", "lg", "full"]).default("md"),
   maxContentWidth: z.string().default("1280px"),
+  theme: ThemeOptionSchema.optional(),
 });
 export type DesignBlock = z.infer<typeof DesignBlockSchema>;
 
@@ -124,5 +153,8 @@ export const BlueprintSchema = z.object({
   design: DesignBlockSchema.default(DEFAULT_DESIGN_BLOCK),
   layout: LayoutBlockSchema.default(DEFAULT_LAYOUT_BLOCK),
   responsive: ResponsiveBlockSchema.default(DEFAULT_RESPONSIVE_BLOCK),
+  projectType: ProjectType.optional(),
+  requirements: z.array(RequirementSchema).optional(),
+  workflows: z.array(WorkflowSchema).optional(),
 });
 export type Blueprint = z.infer<typeof BlueprintSchema>;

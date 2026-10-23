@@ -26,8 +26,11 @@ export function QuestionScrollback({ answered, currentQuestion }: QuestionScroll
         </li>
       ))}
       {currentQuestion && (
-        <li>
+        <li className="flex flex-col gap-1">
           <QuestionBubble role="assistant">{currentQuestion.text}</QuestionBubble>
+          {currentQuestion.why && (
+            <p className="pl-8 text-xs text-muted">{currentQuestion.why}</p>
+          )}
         </li>
       )}
     </ul>

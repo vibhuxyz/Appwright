@@ -1,8 +1,11 @@
 import {
+  PlanPreviewSchema,
   PromptQuestionsResponse,
+  type PlanPreviewRequest,
   type ElementSelection,
   type PromptAnswerValue,
   type PromptQuestion,
+  type ThemeOption,
 } from "@repo/contracts";
 import { httpClient } from "@/shared/lib/httpClient";
 import {
@@ -17,10 +20,19 @@ import {
 } from "../schemas/agentSchemas";
 import { z } from "zod";
 
+export interface SendMessagePayload {
+  prompt: string;
+  answers?: Readonly<Record<string, PromptAnswerValue>>;
+  questions?: readonly PromptQuestion[];
+  selection?: ElementSelection;
+  theme?: ThemeOption;
+  blueprintId?: string;
+}
+
 export const agentApi = {
-  getAvailableModels: () =>
+  getAvailableModels: (signal?: AbortSignal) =>
     httpClient
-      .get("/models")
+      .get("/models", signal)
       .then((r) => z.array(availableModelSchema).parse(r)),
   listSessions: (projectId: string) =>
     httpClient
@@ -43,24 +55,30 @@ export const agentApi = {
     httpClient
       .get(`/conversations/${sessionId}?afterSeq=${afterSeq}`)
       .then((r) => z.array(msgSchema).parse(r)),
-  questionsFor: (prompt: string) =>
-    httpClient
-      .post("/conversation/questions", { prompt })
-      .then((body) => PromptQuestionsResponse.parse(body).questions),
-  sendMessage: (
-    sessionId: string,
+  questionsFor: (
     prompt: string,
+    sessionId?: string,
     answers?: Readonly<Record<string, PromptAnswerValue>>,
-    questions?: readonly PromptQuestion[],
-    selection?: ElementSelection,
   ) =>
-    httpClient.postMaybeStream("/conversation", {
-      sessionId,
-      prompt,
-      ...(answers ? { answers } : {}),
-      ...(questions ? { questions } : {}),
-      ...(selection ? { selection } : {}),
-    }),
+    httpClient
+      .post("/conversation/questions", {
+        prompt,
+        sessionId,
+        ...(answers && Object.keys(answers).length > 0 ? { answers } : {}),
+      })
+      .then((body) => {
+        const parsed = PromptQuestionsResponse.safeParse(body);
+        if (!parsed.success) {
+          throw new Error("Could not load questions for this prompt");
+        }
+        return parsed.data;
+      }),
+  planPreview: (sessionId: string, request: PlanPreviewRequest) =>
+    httpClient
+      .post(`/v1/sessions/${sessionId}/plan-previews`, request)
+      .then((body) => PlanPreviewSchema.parse(body)),
+  sendMessage: (sessionId: string, message: SendMessagePayload) =>
+    httpClient.postMaybeStream("/conversation", { sessionId, ...message }),
   stopConversation: (sessionId: string) =>
     httpClient.post<{ ok: boolean; stopped: boolean }>(
       `/conversation/${sessionId}/stop`,

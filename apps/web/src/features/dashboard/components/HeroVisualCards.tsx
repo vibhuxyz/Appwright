@@ -22,7 +22,7 @@ export function TerminalSlideVisual() {
         </div>
         <div className="flex items-center gap-1.5 text-emerald-400">
           <Check className="size-3" />
-          <span>PostgreSQL + Prisma sandbox ready</span>
+          <span>MongoDB + Mongoose sandbox ready</span>
         </div>
         <div className="mt-1 inline-flex items-center gap-1 rounded-md bg-lime/10 px-2 py-0.5 text-[10px] font-semibold text-lime">
           <Zap className="size-3" />

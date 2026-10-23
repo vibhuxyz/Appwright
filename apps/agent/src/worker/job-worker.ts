@@ -1,6 +1,11 @@
 import {
   buildSystemPrompt,
+  isProviderCreditsDepleted,
   OpenAiProvider,
+  plannerModel,
+  PROVIDER_CREDITS_DEPLETED_NOTICE,
+  providerFor,
+  resolveModelForPlan,
   resolveStopNotice,
   runAgentLoop,
   toCoreMessage,
@@ -12,32 +17,37 @@ import {
   del as cacheDel,
   get as cacheGet,
 } from "@repo/cache";
+import { loadMissingAssetsNotice } from "@repo/assets";
+import { applyTheme, chosenThemeFromRows } from "@repo/blueprint";
+import { AGENT_LOOP_LIMITS, loopSpendLimits } from "@repo/contracts";
 import { prisma, type Job } from "@repo/db";
-import { classify, needsDetailedPlan, type VerifyOutcome } from "@repo/decision-engine";
+import { classify, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
 import { SandboxRuntime, type SandboxProvider } from "@repo/sandbox";
 import { ALL_TOOLS } from "@repo/tools";
 import { sessionWorktreePath } from "@repo/workspace";
 import { restoreWorkspace } from "../recovery";
+import { withSelectionApplied } from "./apply-selection";
+import { approvedBlueprintIdFromRows } from "./approved-blueprint-id";
 import { autoMergeSession } from "./auto-merge-session";
+import { isBrowserCheckEnabled, runBrowserCheckStep } from "./browser-check-step";
 import { checkpointSession } from "./checkpoint";
-import { currentTurnText } from "./current-turn-text";
+import { currentTurnRows, currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
 import { HostMirrorRuntime } from "./host-mirror-runtime";
+import { injectProjectRuntimeEnv } from "./inject-project-env";
 import { createPersist, publishStatus } from "./persist";
+import { reportSandboxStartFailure } from "./report-sandbox-start-failure";
 import { runBlueprintPath } from "./run-blueprint-path";
+import { shouldRunBlueprintPath } from "./should-run-blueprint";
 import type { AgentJobResult } from "./types";
 import { runVerifyStep } from "./verify-step";
 
 const log = createLogger("agent-job");
-const MAX_ITERATIONS = 60;
-const MAX_COST_USD = 5;
 const MAX_VERIFY_ATTEMPTS = 2;
-const LOOP_DEADLINE_MS = 10 * 60_000;
 // A backstop above the loop's own deadline: that deadline is cooperative
 // (checked between iterations), so it can't catch a single call that never
 // returns. This can, because it tears down the sandbox from the outside.
-const WALL_CLOCK_CAP_MS = 15 * 60_000;
 const CANCEL_POLL_MS = 1000;
 const HEARTBEAT_MS = 5000;
 
@@ -65,7 +75,7 @@ export async function executeAgentJob(
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { credits: true },
+    select: { credits: true, plan: true },
   });
   if (!user || user.credits <= 0) {
     const notice = resolveStopNotice("outOfCredits");
@@ -79,6 +89,7 @@ export async function executeAgentJob(
     return { jobId: job.id, sessionId: job.sessionId, stopReason: notice.stopReason };
   }
 
+  const sessionModel = resolveModelForPlan(user.plan, session.model);
   await prisma.session.update({ where: { id: session.id }, data: { status: "RUNNING" } });
   publishStatus(session.id, "RUNNING", "Analyzing request…");
 
@@ -86,12 +97,19 @@ export async function executeAgentJob(
   const controller = new AbortController();
   const sandboxStartedAt = Date.now();
 
-  const sandbox = await sandboxProvider.create({
-    projectId: job.projectId,
-    workspaceDir: worktreeDir,
-    maxWallClockMs: WALL_CLOCK_CAP_MS,
-    onWallClockExceeded: () => controller.abort(),
-  });
+  const sandbox = await sandboxProvider
+    .create({
+      projectId: job.projectId,
+      workspaceDir: worktreeDir,
+      maxWallClockMs: AGENT_LOOP_LIMITS.wallClockCapMs,
+      onWallClockExceeded: () => controller.abort(),
+    })
+    .catch((error: unknown) =>
+      reportSandboxStartFailure({ jobId: job.id, sessionId: session.id, error, persist }),
+    );
+  if (!sandbox) {
+    return { jobId: job.id, sessionId: job.sessionId, stopReason: "fatalError" };
+  }
   log.info("job sandbox attached", {
     jobId: job.id,
     sessionId: session.id,
@@ -124,9 +142,20 @@ export async function executeAgentJob(
       job.projectId,
       job.sessionId,
     );
+    await injectProjectRuntimeEnv({
+      projectId: job.projectId,
+      sessionId: job.sessionId,
+      runtime,
+    });
+    const chosenTheme = chosenThemeFromRows(priorRows);
+    if (chosenTheme) {
+      const themed = await applyTheme(runtime, chosenTheme);
+      log.info("applied chosen theme", { sessionId: session.id, theme: chosenTheme.id, written: themed });
+    }
+    const effectiveRows = await withSelectionApplied(priorRows, worktreeDir);
     const systemPrompt = await buildSystemPrompt(runtime);
     const systemMessage: CoreMessage = { role: "user", type: "text", content: systemPrompt };
-    const messages: CoreMessage[] = [systemMessage, ...priorRows.map(toCoreMessage)];
+    const messages: CoreMessage[] = [systemMessage, ...effectiveRows.map(toCoreMessage)];
 
     const { emit } = createEmitAdapter({ sessionId: session.id, userId, persist });
 
@@ -134,23 +163,32 @@ export async function executeAgentJob(
     let verifyGaveUp = false;
 
     const decisionResult = await classify(
-      currentTurnText(priorRows),
-      provider ?? new OpenAiProvider({ model: session.model }),
+      currentTurnText(effectiveRows),
+      provider ?? new OpenAiProvider({ model: plannerModel(user.plan) }),
     );
-    const planInDetail = needsDetailedPlan(decisionResult);
+    const planInDetail = shouldRunBlueprintPath(
+      chosenThemeFromRows(currentTurnRows(priorRows)),
+      decisionResult,
+    );
 
     if (planInDetail) {
       stopReason = await runBlueprintPath({
-        prompt: currentTurnText(priorRows),
+        prompt: currentTurnText(effectiveRows),
         projectId: job.projectId,
         sessionId: session.id,
-        model: session.model,
+        model: sessionModel,
+        credits: user.credits,
+        userId,
+        userPlan: user.plan,
+        theme: chosenTheme,
         runtime,
         signal: controller.signal,
         persist,
+        approvedBlueprintId: approvedBlueprintIdFromRows(currentTurnRows(priorRows)),
       });
 
       if (stopReason === "completed") {
+        await runtime.flush();
         const verify = await runVerifyStep({
           sessionId: session.id,
           worktreeDir,
@@ -160,6 +198,10 @@ export async function executeAgentJob(
 
         if (verify.passed) {
           verificationPassed = true;
+          const missingAssets = await loadMissingAssetsNotice(session.id);
+          if (missingAssets) {
+            await persist({ role: "assistant", type: "text", content: missingAssets });
+          }
         } else {
           verifyGaveUp = true;
           stopReason = "fatalError";
@@ -178,14 +220,13 @@ export async function executeAgentJob(
         stopReason = await runAgentLoop({
           messages,
           tools: ALL_TOOLS,
-          provider: provider ?? new OpenAiProvider({ model: session.model }),
+          provider: provider ?? new OpenAiProvider({ model: sessionModel }),
           runtime,
           emit,
           budget: {
-            maxIterations: MAX_ITERATIONS,
-            maxTokens: Math.max(500, Math.min(user.credits, 2_000_000)),
-            maxCostUsd: MAX_COST_USD,
-            deadline: Date.now() + LOOP_DEADLINE_MS,
+            maxIterations: AGENT_LOOP_LIMITS.maxIterations,
+            ...loopSpendLimits(user.credits),
+            deadline: Date.now() + AGENT_LOOP_LIMITS.loopDeadlineMs,
           },
           signal: controller.signal,
           sessionId: session.id,
@@ -193,6 +234,7 @@ export async function executeAgentJob(
 
         if (stopReason !== "completed") break;
 
+        await runtime.flush();
         const verify = await runVerifyStep({
           sessionId: session.id,
           worktreeDir,
@@ -226,6 +268,15 @@ export async function executeAgentJob(
         });
         await persist({ role: "user", type: "text", content: `Verification failed, retrying:\n${verify.outputText}` });
       }
+    }
+
+    if (verificationPassed && isBrowserCheckEnabled()) {
+      await runBrowserCheckStep({
+        projectId: job.projectId,
+        sessionId: session.id,
+        worktreeDir,
+        persist,
+      });
     }
 
     if (stopReason !== "completed" && !verifyGaveUp) {
@@ -288,11 +339,23 @@ export async function executeAgentJob(
       });
     } else {
       stopReason = "fatalError";
+      const message = err instanceof Error ? err.message : String(err);
+      const providerCreditsDepleted = isProviderCreditsDepleted(message);
+      log.error("job run failed", {
+        jobId: job.id,
+        sessionId: session.id,
+        model: session.model,
+        provider: providerFor(session.model),
+        providerCreditsDepleted,
+        message,
+      });
       await prisma.session.update({ where: { id: session.id }, data: { status: "ERROR" } });
       await persist({
         role: "assistant",
         type: "text",
-        content: `Something went wrong and the run stopped: ${err instanceof Error ? err.message : String(err)}`,
+        content: providerCreditsDepleted
+          ? PROVIDER_CREDITS_DEPLETED_NOTICE
+          : `Something went wrong and the run stopped: ${message}`,
       });
     }
   } finally {

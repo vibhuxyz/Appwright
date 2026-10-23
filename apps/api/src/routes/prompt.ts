@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, OpenAiProvider } from "@repo/agent-core";
+import { bestAvailableModel, OpenAiProvider } from "@repo/agent-core";
 import { EnhancePromptRequest } from "@repo/contracts";
 import { describeTools } from "@repo/tools";
 import { uiSystemPromptSection } from "@repo/ui-system";
@@ -94,7 +94,7 @@ promptRouter.post("/prompt/enhance", async (req, res) => {
       return res.status(400).json({ error: "Prompt cannot be empty" });
     }
 
-    const provider = new OpenAiProvider({ model: DEFAULT_MODEL });
+    const provider = new OpenAiProvider({ model: bestAvailableModel() });
     let enhanced = "";
     const controller = new AbortController();
 

@@ -1,4 +1,5 @@
 import type { Message } from "../types";
+import { INTERRUPTED_TOOL_RESULT, repairToolPairing } from "./tool-pairing";
 import type { Provider, ProviderChunk, ToolSpec } from "./types";
 
 // OpenAiProvider — the one real provider for V0 (Slice 2). Talks to the Chat
@@ -13,6 +14,9 @@ const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
 const XAI_CHAT_URL = "https://api.x.ai/v1/chat/completions";
 const GROQ_CHAT_URL = "https://api.groq.com/openai/v1/chat/completions";
 const DEEPSEEK_CHAT_URL = "https://api.deepseek.com/chat/completions";
+// Anthropic's OpenAI-compatible surface — same chat/completions wire as
+// the other hosts. Native Messages API would need a second Provider class.
+const ANTHROPIC_CHAT_URL = "https://api.anthropic.com/v1/chat/completions";
 // Google ships an OpenAI-compatible surface alongside its native API, which
 // is why Gemini needs no separate Provider class — same wire format, same
 // bearer auth. It is compatible, not identical: see the two quirks handled
@@ -23,6 +27,7 @@ const GEMINI_CHAT_URL =
 interface OpenAiChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string | null;
+  reasoning_content?: string;
   tool_calls?: {
     id: string;
     type: "function";
@@ -45,6 +50,26 @@ interface OpenAiChatMessage {
 // "assistant message with tool_calls must be followed by tool messages".
 // So: merge consecutive toolCall messages into a single wire message here,
 // rather than changing the internal shape everything else already relies on.
+const REASONING_META_KEY = "reasoningContent";
+
+function splitProviderMeta(meta: unknown): { reasoningContent?: string; extraContent?: unknown } {
+  if (typeof meta !== "object" || meta === null) {
+    return meta === undefined ? {} : { extraContent: meta };
+  }
+  const { [REASONING_META_KEY]: reasoning, ...rest } = meta as Record<string, unknown>;
+  const reasoningContent = typeof reasoning === "string" && reasoning.length > 0 ? reasoning : undefined;
+  return {
+    ...(reasoningContent ? { reasoningContent } : {}),
+    ...(Object.keys(rest).length > 0 ? { extraContent: rest } : {}),
+  };
+}
+
+function withReasoning(meta: unknown, reasoning: string): unknown {
+  if (reasoning.length === 0) return meta;
+  const base = typeof meta === "object" && meta !== null ? meta : {};
+  return { ...base, [REASONING_META_KEY]: reasoning };
+}
+
 function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
   const result: OpenAiChatMessage[] = [];
 
@@ -61,7 +86,7 @@ function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
       });
       continue;
     }
-    // m.type === "toolCall"
+    const { reasoningContent, extraContent } = splitProviderMeta(m.content.providerMeta);
     const call = {
       id: m.toolCallId,
       type: "function" as const,
@@ -69,9 +94,7 @@ function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
         name: m.content.toolName,
         arguments: JSON.stringify(m.content.args),
       },
-      ...(m.content.providerMeta
-        ? { extra_content: m.content.providerMeta }
-        : {}),
+      ...(extraContent ? { extra_content: extraContent } : {}),
     };
     const last = result.at(-1);
     if (
@@ -81,11 +104,20 @@ function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
     ) {
       last.tool_calls.push(call);
     } else {
-      result.push({ role: "assistant", content: null, tool_calls: [call] });
+      result.push({
+        role: "assistant",
+        content: null,
+        ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+        tool_calls: [call],
+      });
     }
   }
 
-  return result;
+  return repairToolPairing(result, (toolCallId) => ({
+    role: "tool",
+    tool_call_id: toolCallId,
+    content: INTERRUPTED_TOOL_RESULT,
+  }));
 }
 
 function toOpenAiTools(tools: ToolSpec[]) {
@@ -110,14 +142,62 @@ function mapFinishReason(reason: string): "end_turn" | "tool_use" | "length" {
 // which sent `openai/gpt-oss-120b` and `qwen/qwen3.6-27b` to api.openai.com,
 // because the provider is a property of the *connection*, not a substring of
 // the label. A vendor renaming a model must not silently reroute it.
-export type ProviderId = "openai" | "groq" | "xai" | "gemini" | "deepseek";
+export type ProviderId =
+  | "openai"
+  | "groq"
+  | "xai"
+  | "gemini"
+  | "deepseek"
+  | "anthropic";
 
-const ENDPOINTS: Record<ProviderId, { url: string; envKey: string }> = {
-  openai: { url: OPENAI_CHAT_URL, envKey: "OPENAI_API_KEY" },
-  groq: { url: GROQ_CHAT_URL, envKey: "GROQ_API_KEY" },
-  xai: { url: XAI_CHAT_URL, envKey: "XAI_API_KEY" },
-  gemini: { url: GEMINI_CHAT_URL, envKey: "GEMINI_API_KEY" },
-  deepseek: { url: DEEPSEEK_CHAT_URL, envKey: "DEEPSEEK_API_KEY" },
+export type ListAuth = "bearer" | "x-api-key" | "query-key";
+
+export interface ProviderEndpoint {
+  url: string;
+  envKey: string;
+  headers?: Record<string, string>;
+  listUrl: string;
+  listAuth: ListAuth;
+}
+
+export const ENDPOINTS: Record<ProviderId, ProviderEndpoint> = {
+  openai: {
+    url: OPENAI_CHAT_URL,
+    envKey: "OPENAI_API_KEY",
+    listUrl: "https://api.openai.com/v1/models",
+    listAuth: "bearer",
+  },
+  groq: {
+    url: GROQ_CHAT_URL,
+    envKey: "GROQ_API_KEY",
+    listUrl: "https://api.groq.com/openai/v1/models",
+    listAuth: "bearer",
+  },
+  xai: {
+    url: XAI_CHAT_URL,
+    envKey: "XAI_API_KEY",
+    listUrl: "https://api.x.ai/v1/models",
+    listAuth: "bearer",
+  },
+  gemini: {
+    url: GEMINI_CHAT_URL,
+    envKey: "GEMINI_API_KEY",
+    listUrl: "https://generativelanguage.googleapis.com/v1beta/models",
+    listAuth: "query-key",
+  },
+  deepseek: {
+    url: DEEPSEEK_CHAT_URL,
+    envKey: "DEEPSEEK_API_KEY",
+    listUrl: "https://api.deepseek.com/models",
+    listAuth: "bearer",
+  },
+  anthropic: {
+    url: ANTHROPIC_CHAT_URL,
+    envKey: "ANTHROPIC_API_KEY",
+    listUrl: "https://api.anthropic.com/v1/models",
+    listAuth: "x-api-key",
+    headers: { "anthropic-version": "2023-06-01" },
+  },
 };
 
 export const MODEL_PROVIDERS: Record<string, ProviderId> = {
@@ -135,6 +215,11 @@ export const MODEL_PROVIDERS: Record<string, ProviderId> = {
   "gemini-flash-latest": "gemini",
   "deepseek-chat": "deepseek",
   "deepseek-reasoner": "deepseek",
+  "deepseek-flash": "deepseek",
+  "deepseek-v4-pro": "deepseek",
+  "claude-sonnet-5-5": "anthropic",
+  "claude-opus-5-5": "anthropic",
+  "claude-haiku-5-5": "anthropic",
 };
 
 export const DEFAULT_MODEL = process.env.DEFAULT_MODEL ?? "gpt-5.4-mini";
@@ -147,10 +232,13 @@ export function providerFor(model: string): ProviderId {
   if (known) return known;
   if (model.startsWith("grok")) return "xai";
   if (model.startsWith("deepseek")) return "deepseek";
+  if (model.startsWith("gemini")) return "gemini";
+  if (model.startsWith("claude")) return "anthropic";
   if (
     model.startsWith("llama") ||
     model.startsWith("mixtral") ||
-    model.startsWith("gemma")
+    model.startsWith("gemma") ||
+    model.startsWith("qwen/")
   ) {
     return "groq";
   }
@@ -167,6 +255,7 @@ export class OpenAiProvider implements Provider {
   readonly model: string;
 
   private readonly baseUrl: string;
+  private readonly extraHeaders: Record<string, string>;
 
   constructor(opts: OpenAiProviderOpts = {}) {
     this.model = opts.model ?? DEFAULT_MODEL;
@@ -174,6 +263,7 @@ export class OpenAiProvider implements Provider {
     const endpoint = ENDPOINTS[providerFor(this.model)];
     this.baseUrl = endpoint.url;
     this.apiKey = opts.apiKey ?? process.env[endpoint.envKey] ?? "";
+    this.extraHeaders = endpoint.headers ?? {};
 
     if (!this.apiKey) {
       throw new Error(
@@ -193,6 +283,7 @@ export class OpenAiProvider implements Provider {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.apiKey}`,
+        ...this.extraHeaders,
       },
       body: JSON.stringify({
         model: this.model,
@@ -227,6 +318,7 @@ export class OpenAiProvider implements Provider {
       { id: string; name: string; args: string; meta: unknown }
     >();
     let nextFallbackKey = 0;
+    let reasoning = "";
     let emittedStop = false;
     // Kept, not yielded immediately. OpenAI sends usage once in a final
     // chunk that carries no choices; Gemini repeats a *cumulative* total on
@@ -268,6 +360,8 @@ export class OpenAiProvider implements Provider {
 
         const delta = choice.delta ?? {};
 
+        if (typeof delta.reasoning_content === "string") reasoning += delta.reasoning_content;
+
         if (typeof delta.content === "string" && delta.content.length > 0) {
           yield { type: "text_delta", delta: delta.content };
         }
@@ -297,7 +391,7 @@ export class OpenAiProvider implements Provider {
               toolCallId: call.id,
               toolName: call.name,
               args: call.args ? JSON.parse(call.args) : {},
-              providerMeta: call.meta,
+              providerMeta: withReasoning(call.meta, reasoning),
             };
           }
           // Gemini reports finish_reason "stop" on a turn that *did* call a
@@ -328,7 +422,7 @@ export class OpenAiProvider implements Provider {
           toolCallId: call.id,
           toolName: call.name,
           args: call.args ? JSON.parse(call.args) : {},
-          providerMeta: call.meta,
+          providerMeta: withReasoning(call.meta, reasoning),
         };
       }
       yield {

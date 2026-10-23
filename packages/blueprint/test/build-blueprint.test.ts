@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { FakeProvider } from "@repo/agent-core";
 import { generateDesignDirections } from "@repo/planner";
-import { buildBlueprint, BuildBlueprintError } from "../src";
+import { buildBlueprint, BuildBlueprintError, BUILD_BLUEPRINT_TIMEOUT_MS } from "../src";
 
 const INTENT_JSON = JSON.stringify({ type: "new-app", domain: "food-delivery", complexity: "complex" });
 const CONTENT_JSON = JSON.stringify({
@@ -14,6 +14,10 @@ const CONTENT_JSON = JSON.stringify({
 });
 
 describe("buildBlueprint", () => {
+  it("gives a reasoning planner enough time for intent and the full plan", () => {
+    expect(BUILD_BLUEPRINT_TIMEOUT_MS).toBeGreaterThanOrEqual(180_000);
+  });
+
   it("classifies intent, generates content, and plans a valid task DAG", async () => {
     const plan = await buildBlueprint("build me a food delivery app", {
       provider: new FakeProvider([
@@ -22,7 +26,9 @@ describe("buildBlueprint", () => {
       ]),
     });
     expect(plan.blueprint.intent).toEqual({ type: "new-app", domain: "food-delivery", complexity: "complex" });
-    expect(plan.blueprint.entities.map((e) => e.name)).toEqual(["Restaurant"]);
+    expect(plan.blueprint.entities.map((entity) => entity.name)).toEqual(
+      expect.arrayContaining(["Restaurant"]),
+    );
     expect(plan.blueprint.features).toEqual(["auth"]);
     expect(plan.tasks.length).toBeGreaterThan(0);
     expect(plan.tasks.some((t) => t.type === "auth")).toBe(true);

@@ -1,3 +1,4 @@
+import type { PlanId } from "@repo/contracts";
 import { workspaceRoot } from "@repo/contracts/files";
 import { prisma } from "@repo/db";
 import { createLogger } from "@repo/logger";
@@ -30,6 +31,7 @@ export interface ExecuteBlueprintRunOptions {
   sessionId: string;
   projectId: string;
   model: string;
+  plan: PlanId;
   userRemainingCents: number;
   runtime: Runtime;
   onTaskStatus?: (taskId: string, status: string) => void;
@@ -52,7 +54,7 @@ export async function executeBlueprintRun(
   options: ExecuteBlueprintRunOptions,
   signal: AbortSignal,
 ): Promise<RunSummary | undefined> {
-  const { runId, sessionId, projectId, model, userRemainingCents, runtime, onTaskStatus } = options;
+  const { runId, sessionId, projectId, model, plan, userRemainingCents, runtime, onTaskStatus } = options;
   const baseStore = createPrismaRunStore({ client: prisma, modelName: model, now: () => Date.now() });
   const store = onTaskStatus ? withTaskStatusNotifications(baseStore, onTaskStatus) : baseStore;
   const run = await store.loadRun(runId);
@@ -68,7 +70,7 @@ export async function executeBlueprintRun(
     runSpentCents: run.spentCents,
   });
 
-  const generator = createRunTaskGenerator({ sessionId, model, runtime });
+  const generator = createRunTaskGenerator({ sessionId, model, plan, runtime });
   const workspaceDir = workspaceRoot(projectId, sessionId);
   const verifier = createWorkspaceVerifier(workspaceDir, verifyWorkspace);
   const ports = createPostgresPorts({ runId, store, generator, verifier, now: () => Date.now() });

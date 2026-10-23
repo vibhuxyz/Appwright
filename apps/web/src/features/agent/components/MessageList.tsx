@@ -1,7 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { Loader2, Sparkles, Square } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { AssetRequestCard, useAssetRequests } from "@/features/assets";
+
 import type { Msg } from "../schemas/agentSchemas";
 import { agentApi } from "../api/agentApi";
 import { ApprovalCard } from "./ApprovalCard";
@@ -54,7 +54,6 @@ export function MessageList({
   running,
   statusDetail,
   sessionId,
-  projectId,
   onStop,
   footer,
 }: {
@@ -63,11 +62,10 @@ export function MessageList({
   running: boolean;
   statusDetail: string;
   sessionId?: string;
-  projectId?: string;
   onStop: () => void;
   footer?: ReactNode;
 }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
   const { data: approvals = [] } = useQuery({
     queryKey: ["approvals", sessionId],
@@ -79,11 +77,15 @@ export function MessageList({
     },
   });
 
-  const { data: assetRequests = [] } = useAssetRequests(sessionId);
-
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, delta, running, approvals, assetRequests]);
+    const list = listRef.current;
+    if (!list) return;
+    // scrollIntoView also scrolls the overflow-hidden panel, which pins the
+    // composer to the top and leaves it stuck there.
+    list.scrollTop = list.scrollHeight;
+    const panel = list.parentElement;
+    if (panel) panel.scrollTop = 0;
+  }, [messages, delta, running, approvals]);
 
   const responsesByCallId = new Map(
     messages.filter((m) => m.type === "toolResponse").map((m) => [m.data?.toolCallId, m]),
@@ -92,7 +94,7 @@ export function MessageList({
   const grouped = groupItems(visible);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-auto p-4">
+    <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 [&>*]:shrink-0">
       {visible.length === 0 && !delta && !running && !footer && <EmptyState />}
 
       {grouped.map((item) =>
@@ -133,7 +135,9 @@ export function MessageList({
               {statusDetail || "Writing code…"}
             </span>
             <span className="truncate text-[11px] text-muted">
-              Building the checklist, editing files, verifying TypeScript
+              {statusDetail === "Waiting for section images…"
+                ? "The build continues when every section has an image."
+                : "Building the checklist, editing files, verifying TypeScript"}
             </span>
           </div>
           <button
@@ -154,19 +158,6 @@ export function MessageList({
           .map((a) => (
             <ApprovalCard key={a.id} approval={a} sessionId={sessionId} />
           ))}
-      {sessionId &&
-        assetRequests
-          .filter((request) => request.status === "PENDING")
-          .map((request) => (
-            <AssetRequestCard
-              key={request.id}
-              assetRequest={request}
-              sessionId={sessionId}
-              projectId={projectId}
-            />
-          ))}
-
-      <div ref={bottomRef} />
     </div>
   );
 }

@@ -38,7 +38,7 @@ const SHOWCASE_SLIDES: ShowcaseSlide[] = [
   {
     id: "food-delivery",
     tabLabel: "Food Delivery",
-    tag: "PostgreSQL + Mapbox",
+    tag: "MongoDB + Mapbox",
     title: "CRAVE FOOD PLATFORM",
     subtitle: "Multi-vendor food delivery application with live courier GPS routing, menu ordering and admin portal.",
     builtTime: "Built with Appwright in 7 mins",

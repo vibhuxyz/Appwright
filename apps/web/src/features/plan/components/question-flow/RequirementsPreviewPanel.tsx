@@ -24,7 +24,7 @@ export function RequirementsPreviewPanel({ title, questions, answered }: Require
       <div className="flex flex-col gap-4 p-4">
         <div>
           <h3 className="text-xl font-semibold text-foreground">{title}</h3>
-          <p className="mt-1 text-xs text-muted">Skipped answers keep the suggested default.</p>
+          <p className="mt-1 text-xs text-muted">Answers land here as you go.</p>
         </div>
         {questions.length === 0 && <p className="text-sm text-muted">Nothing to confirm yet.</p>}
         {questions.length > 0 && (

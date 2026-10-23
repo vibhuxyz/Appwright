@@ -1,7 +1,15 @@
-export { createAssetRequest, serializeAssetRequest } from "@repo/assets";
+export { createAssetRequest, serializeAssetRequest, waitUntilAssetRequestResolved } from "@repo/assets";
+export { applyClaim, claimSlot } from "./claim-slot";
+export type { ClaimSlotResult } from "./claim-slot";
+export { fillRemainingStockSlots, fillStockSlot } from "./fill-stock";
+export { loadOwnedAnySlot, loadOwnedAssetRequest, loadOwnedSlot } from "./load-owned-slot";
+export type { OwnedSlotError, OwnedSlotResult } from "./load-owned-slot";
 export { markSlotResolved } from "./mark-slot-resolved";
 export { MAX_UPLOAD_BYTES, parseUploadedImage } from "./parse-uploaded-image";
 export { resolveGenerate } from "./resolve-generate";
 export type { ResolveGenerateResult } from "./resolve-generate";
+export { resolveStock } from "./resolve-stock";
+export type { ResolveStockResult } from "./resolve-stock";
 export { resolveUpload } from "./resolve-upload";
+export { respondFailed } from "./respond-failed";
 export { serializeProjectAsset } from "./serialize";

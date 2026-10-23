@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import type { AssetRequestResponse } from "@repo/contracts";
 import { connectConversationStream } from "@/realtime/connectionManager";
+import { assetKeys } from "@/features/assets/api/query-keys";
 import { agentApi } from "../api/agentApi";
 import { agentStore } from "../store/agentStore";
 import type { SessionStatus } from "../schemas/agentSchemas";
@@ -20,6 +23,7 @@ export function useConversationStream(
   initialStatus: SessionStatus | undefined,
   onUsage?: (usage: SessionUsage) => void,
 ) {
+  const queryClient = useQueryClient();
   const onUsageRef = useRef(onUsage);
   useEffect(() => {
     onUsageRef.current = onUsage;
@@ -49,11 +53,24 @@ export function useConversationStream(
             }
             if (message.role === "assistant" && message.type === "text" && message.data?.intake !== true) {
               if (message.content.startsWith("Plan:\n")) {
-                agentStore.getState().setRunning(true, "Plan ready. Executing tasks…");
-              } else {
-                agentStore.getState().setRunning(false);
+                agentStore.getState().setRunning(true, "Plan ready. Asking for images…");
+              } else if (/choose an image/i.test(message.content)) {
+                agentStore.getState().setRunning(true, "Waiting for section images…");
               }
             }
+          },
+          onAssetRequest: ({ assetRequest }) => {
+            queryClient.setQueryData<AssetRequestResponse[]>(assetKeys.requests(sessionId), (current) => {
+              const list = current ?? [];
+              return [...list.filter((item) => item.id !== assetRequest.id), assetRequest];
+            });
+            if (assetRequest.status === "RESOLVED") {
+              if (agentStore.getState().statusDetail === "Waiting for section images…") {
+                agentStore.getState().setRunning(false);
+              }
+              return;
+            }
+            agentStore.getState().setRunning(true, "Waiting for section images…");
           },
           onStatus: (frame) => {
             if (frame.status === "RUNNING") {

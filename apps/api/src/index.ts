@@ -9,16 +9,22 @@ import { log } from "./log";
 import { authRouter } from "./routes/auth";
 import { blueprintRouter } from "./routes/blueprint";
 import { planRouter } from "./routes/plan";
+import { planPreviewRouter } from "./routes/plan-preview";
+import { themeRouter } from "./routes/theme";
 import { conversationRouter, streamRouter } from "./routes/conversation";
 import { filesRouter } from "./routes/files";
 import { projectRouter } from "./routes/project";
+import { projectDatabaseRouter } from "./routes/project-database";
 import { promptRouter } from "./routes/prompt";
 import { sessionRouter } from "./routes/session";
 import { vercelCallbackRouter, vercelRouter } from "./routes/vercel";
 import { gitRouter } from "./routes/git";
 import { approvalRouter } from "./routes/approval";
 import { assetsRouter } from "./routes/assets";
-import { previewRouter } from "./routes/preview";
+import { browserScreenshotsRouter } from "./routes/browser-screenshots";
+import { unsplashRouter } from "./routes/unsplash";
+import { handlePreviewUpgrade } from "./preview";
+import { previewRouter, sessionPort } from "./routes/preview";
 import { pruneAllWorktrees } from "./workspace/prune";
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -102,16 +108,21 @@ app.use((req, _res, next) => {
 
 // ── Authenticated ────────────────────────────────────────────────────────────
 app.use(projectRouter);
+app.use(projectDatabaseRouter);
 app.use(sessionRouter);
 app.use(conversationRouter);
 app.use(blueprintRouter);
 app.use(planRouter);
+app.use(planPreviewRouter);
+app.use(themeRouter);
 app.use(filesRouter);
 app.use(vercelRouter);
 app.use(promptRouter);
 app.use(gitRouter);
 app.use(approvalRouter);
 app.use(assetsRouter);
+app.use(browserScreenshotsRouter);
+app.use(unsplashRouter);
 
 app.use(
   (
@@ -136,4 +147,18 @@ pruneAllWorktrees()
   .then((projects) => log.info("worktrees pruned", { projects }))
   .catch((err) => log.error("worktree prune failed", { err: String(err) }));
 
-app.listen(PORT, () => log.info("api listening", { port: PORT }));
+const server = app.listen(PORT, () => log.info("api listening", { port: PORT }));
+
+server.on("upgrade", (request, socket, head) => {
+  handlePreviewUpgrade(request, socket, head, sessionPort)
+    .then((isHandled) => {
+      if (!isHandled) socket.destroy();
+    })
+    .catch((error: unknown) => {
+      log.error("preview upgrade failed", {
+        url: request.url,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      socket.destroy();
+    });
+});

@@ -1,3 +1,4 @@
+import { PlanIdSchema, creditsToUsd, usdToCredits } from "@repo/contracts";
 import { z } from "zod";
 
 export const creditsResponseSchema = z.object({ credits: z.number() });
@@ -5,6 +6,12 @@ export const creditsResponseSchema = z.object({ credits: z.number() });
 export const addCreditsResponseSchema = z.object({
   ok: z.boolean(),
   credits: z.number(),
+});
+
+export const upgradePlanResponseSchema = z.object({
+  ok: z.boolean(),
+  credits: z.number(),
+  plan: PlanIdSchema,
 });
 
 export const customAmountFormSchema = z.object({
@@ -29,7 +36,7 @@ export interface CreditPackage {
 }
 
 export function formatCreditsToDollars(credits: number): string {
-  const dollars = credits / 1_000_000;
+  const dollars = creditsToUsd(credits);
   if (credits > 0 && dollars < 0.01) {
     return "< $0.01";
   }
@@ -41,7 +48,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     id: "starter",
     title: "$10 Starter Pack",
     priceDollars: 10,
-    credits: 10_000_000,
+    credits: usdToCredits(10),
     dollarValue: "$10.00",
     appsEstimate: "~5 Full Apps",
     description:
@@ -52,7 +59,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     id: "builder",
     title: "$25 Builder Pack",
     priceDollars: 25,
-    credits: 25_000_000,
+    credits: usdToCredits(25),
     dollarValue: "$25.00",
     appsEstimate: "~15 Full Apps",
     description:
@@ -63,7 +70,7 @@ export const CREDIT_PACKAGES: CreditPackage[] = [
     id: "pro",
     title: "$50 Pro Scale Pack",
     priceDollars: 50,
-    credits: 50_000_000,
+    credits: usdToCredits(50),
     dollarValue: "$50.00",
     appsEstimate: "~35+ Apps / Scaled",
     description:

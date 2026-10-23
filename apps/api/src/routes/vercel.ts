@@ -1,6 +1,13 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import path from "node:path";
-import { decryptSecret, encryptSecret, prisma } from "@repo/db";
+import { templateNeedsDatabase } from "@repo/contracts";
+import {
+  decryptSecret,
+  encryptSecret,
+  getProjectRuntimeMongoUri,
+  prisma,
+  provisionProjectDatabase,
+} from "@repo/db";
 import { Router } from "express";
 import { PUBLIC_API_URL, WEB_APP_URL, requireEnv } from "../env";
 import { log } from "../log";
@@ -247,6 +254,45 @@ export function deploymentName(name: string, projectId: string): string {
 // A project has several aliases — the clean one, a `-<scope>` one, and
 // per-branch `-git-<branch>-` ones. The shortest non-git alias is the one a
 // human would type.
+const VERCEL_FETCH_MS = 15_000;
+
+async function upsertVercelEnv(input: {
+  vercelProjectId: string;
+  accessToken: string;
+  teamId: string | null;
+  key: string;
+  value: string;
+}): Promise<void> {
+  const url = new URL(
+    `https://api.vercel.com/v10/projects/${input.vercelProjectId}/env`,
+  );
+  if (input.teamId) url.searchParams.set("teamId", input.teamId);
+  url.searchParams.set("upsert", "true");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), VERCEL_FETCH_MS);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${input.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        key: input.key,
+        value: input.value,
+        type: "encrypted",
+        target: ["production"],
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Vercel env upsert failed (${response.status})`);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function pickAlias(aliases: (string | undefined)[] | undefined): string | null {
   const usable = (aliases ?? []).filter(
     (a): a is string => !!a && !a.includes("-git-"),
@@ -310,6 +356,23 @@ vercelRouter.post("/project/:id/deploy", async (req, res) => {
   const framework =
     project.templateId === "nextjs-fullstack" ? "nextjs" : "vite";
 
+  const deployEnv: Record<string, string> = {};
+  const existingDatabase = await prisma.projectDatabase.findFirst({
+    where: { projectId: project.id, status: { not: "PENDING_DELETE" } },
+    select: { id: true },
+  });
+  if (templateNeedsDatabase(project.templateId) && existingDatabase) {
+    await provisionProjectDatabase({
+      projectId: project.id,
+      environment: "production",
+      actorUserId: req.userId!,
+    });
+    deployEnv.MONGODB_URI = await getProjectRuntimeMongoUri({
+      projectId: project.id,
+      environment: "production",
+    });
+  }
+
   const deployUrl = new URL("https://api.vercel.com/v13/deployments");
   deployUrl.searchParams.set("forceNew", "1");
   deployUrl.searchParams.set("skipAutoDetectionConfirmation", "1");
@@ -334,6 +397,7 @@ vercelRouter.post("/project/:id/deploy", async (req, res) => {
         files,
         target: "production",
         projectSettings: { framework },
+        ...(Object.keys(deployEnv).length > 0 ? { env: deployEnv } : {}),
       }),
     });
 
@@ -393,6 +457,21 @@ vercelRouter.post("/project/:id/deploy", async (req, res) => {
       data: { vercelProjectId: deployment.projectId },
     });
     project.vercelProjectId = deployment.projectId;
+  }
+
+  if (project.vercelProjectId && deployEnv.MONGODB_URI) {
+    await upsertVercelEnv({
+      vercelProjectId: project.vercelProjectId,
+      accessToken,
+      teamId,
+      key: "MONGODB_URI",
+      value: deployEnv.MONGODB_URI,
+    }).catch((err) => {
+      log.error("failed to persist production MONGODB_URI on Vercel", {
+        projectId: project.id,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    });
   }
 
   const alias = await productionAlias(

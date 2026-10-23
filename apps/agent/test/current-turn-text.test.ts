@@ -1,5 +1,25 @@
 import { describe, expect, it } from "bun:test";
-import { currentTurnText } from "../src/worker/current-turn-text";
+import { currentTurnRows, currentTurnText } from "../src/worker/current-turn-text";
+
+describe("currentTurnRows", () => {
+  it("leaves out an earlier turn's theme row so it cannot force planning again", () => {
+    const rows = [
+      { role: "user", content: "Build a bakery site", data: null },
+      { role: "user", content: "Design system chosen: Soft Glow", data: { intake: true, theme: {} } },
+      { role: "assistant", content: "Plan: ...", data: null },
+      { role: "user", content: "Make the header pink", data: null },
+    ];
+    expect(currentTurnRows(rows).map((row) => row.content)).toEqual(["Make the header pink"]);
+  });
+
+  it("keeps the theme row that belongs to this turn", () => {
+    const rows = [
+      { role: "user", content: "Build a bakery site", data: null },
+      { role: "user", content: "Design system chosen: Soft Glow", data: { intake: true, theme: {} } },
+    ];
+    expect(currentTurnRows(rows)).toHaveLength(2);
+  });
+});
 
 describe("currentTurnText", () => {
   it("returns a single prompt as-is", () => {

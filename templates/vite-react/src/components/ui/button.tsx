@@ -4,6 +4,7 @@
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/components/ui/utils";
 
 // Every value here comes off the token scale — `h-9`, `px-4`, `rounded-md`,
@@ -40,6 +41,9 @@ export interface ButtonProps
   /** Render the child element instead of a <button> — use it to style a
    *  link without nesting an <a> inside a <button>, which is invalid HTML. */
   asChild?: boolean;
+  /** Shows a spinner, disables the button and sets aria-busy. Use it on any
+   *  button that triggers a request, so a second click cannot resubmit. */
+  isLoading?: boolean;
 }
 
 export function Button({
@@ -47,6 +51,9 @@ export function Button({
   variant,
   size,
   asChild = false,
+  isLoading = false,
+  disabled,
+  children,
   ...props
 }: ButtonProps) {
   const Comp = asChild ? Slot : "button";
@@ -54,8 +61,19 @@ export function Button({
     <Comp
       data-slot="button"
       className={cn(buttonVariants({ variant, size }), className)}
+      disabled={disabled || isLoading}
+      aria-busy={isLoading || undefined}
       {...props}
-    />
+    >
+      {asChild ? (
+        children
+      ) : (
+        <>
+          {isLoading && <Spinner size="sm" decorative />}
+          {children}
+        </>
+      )}
+    </Comp>
   );
 }
 

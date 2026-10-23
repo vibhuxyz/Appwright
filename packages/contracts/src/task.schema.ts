@@ -17,6 +17,12 @@ export const TaskType = z.enum([
   "layout",
   "responsive",
   "visual-verification",
+  "admin",
+  "media",
+  "seo",
+  "security",
+  "testing",
+  "deploy",
 ]);
 export type TaskType = z.infer<typeof TaskType>;
 
@@ -40,6 +46,12 @@ export const RISK_TIER_BY_TASK_TYPE: Record<TaskType, RiskTier> = {
   layout: "low",
   responsive: "low",
   "visual-verification": "low",
+  admin: "high",
+  media: "medium",
+  seo: "low",
+  security: "high",
+  testing: "low",
+  deploy: "medium",
 };
 
 export const Capability = z.enum([

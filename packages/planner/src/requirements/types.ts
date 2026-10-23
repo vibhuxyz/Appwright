@@ -32,4 +32,8 @@ export interface IntakeQuestion {
   label: string;
   options: readonly string[];
   defaultOptionIndex: number;
+  inputType?: "single" | "multiple" | "short-text" | "date" | "images" | "contacts";
+  importance?: "required" | "optional";
+  why?: string;
+  prefill?: Readonly<Record<string, string>>;
 }

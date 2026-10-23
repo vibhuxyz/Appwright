@@ -91,4 +91,8 @@ export type DecisionStatus =
 export interface DecisionResult {
   status: DecisionStatus;
   decision: Decision;
+  // Only set when status is "provider_error" — the raw message classify()
+  // caught before falling open, so a caller can log what actually broke
+  // instead of just the fact that something did.
+  errorMessage?: string;
 }

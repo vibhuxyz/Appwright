@@ -1,12 +1,17 @@
-import type { Runtime } from "@repo/agent-core";
-import { createAssetRequest } from "@repo/assets";
+import { OpenAiProvider, plannerModel, type Runtime } from "@repo/agent-core";
+import { createAssetRequest, waitUntilAssetRequestResolved } from "@repo/assets";
+import { creditsToCents, creditsToUsd, type PlanId, type ThemeOption } from "@repo/contracts";
 import {
   buildBlueprint,
   executeBlueprintRun,
+  loadApprovedBlueprint,
   persistBlueprint,
   startBlueprintRun,
+  type ApprovedBlueprint,
 } from "@repo/blueprint";
 import { publishChannel, sessionChannel, type SseAssetRequestFrame } from "@repo/cache";
+import { provisionProjectDatabase } from "@repo/db";
+import { injectProjectRuntimeEnv } from "./inject-project-env";
 import { publishStatus } from "./persist";
 import type { PersistFields } from "./persist";
 
@@ -22,21 +27,57 @@ export interface RunBlueprintPathOptions {
   projectId: string;
   sessionId: string;
   model: string;
+  credits: number;
+  userId: string;
+  userPlan: PlanId;
+  theme?: ThemeOption;
   runtime: Runtime;
   signal: AbortSignal;
   persist: (fields: PersistFields) => Promise<unknown>;
+  approvedBlueprintId?: string;
 }
 
-const UNLIMITED_BUDGET_CENTS = Number.POSITIVE_INFINITY;
+async function approvedPlan(blueprintId: string, theme: ThemeOption | undefined): Promise<ApprovedBlueprint> {
+  const approved = await loadApprovedBlueprint(blueprintId, theme);
+  if (!approved) throw new Error(`Could not load the approved plan ${blueprintId}`);
+  return approved;
+}
+
+async function freshPlan(
+  sessionId: string,
+  prompt: string,
+  theme: ThemeOption | undefined,
+  userPlan: PlanId,
+): Promise<ApprovedBlueprint> {
+  const plan = await buildBlueprint(prompt, {
+    theme,
+    provider: new OpenAiProvider({ model: plannerModel(userPlan) }),
+  });
+  return { plan, persisted: await persistBlueprint(sessionId, plan) };
+}
 
 export async function runBlueprintPath(options: RunBlueprintPathOptions): Promise<string> {
-  const { prompt, projectId, sessionId, model, runtime, signal, persist } = options;
+  const { prompt, projectId, sessionId, model, credits, userId, userPlan, theme, runtime, signal, persist } = options;
 
-  const plan = await buildBlueprint(prompt);
-  const persisted = await persistBlueprint(sessionId, plan);
-  const runId = await startBlueprintRun(sessionId, persisted.blueprintVersion);
+  const { plan, persisted } = options.approvedBlueprintId
+    ? await approvedPlan(options.approvedBlueprintId, theme)
+    : await freshPlan(sessionId, prompt, theme, userPlan);
+  if (plan.blueprint.stack.db === "mongodb") {
+    await provisionProjectDatabase({
+      projectId,
+      environment: "development",
+      actorUserId: userId,
+    });
+    await injectProjectRuntimeEnv({ projectId, sessionId, runtime });
+  }
 
-  const assetRequest = await createAssetRequest(sessionId, persisted.blueprintId, plan.blueprint);
+  const runId = await startBlueprintRun({
+    sessionId,
+    blueprintVersion: persisted.blueprintVersion,
+    budgetUsd: creditsToUsd(credits),
+  });
+
+  const assetRequest = await createAssetRequest(sessionId, projectId, persisted.blueprintId, plan.blueprint);
   if (assetRequest) {
     const frame: SseAssetRequestFrame = { kind: "assetRequest", assetRequest };
     await publishChannel(sessionChannel(sessionId), frame);
@@ -47,6 +88,23 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
     type: "text",
     content: `Plan:\n${persisted.tasks.map((task, i) => `${i + 1}. ${task.title}`).join("\n")}`,
   });
+
+  if (assetRequest && assetRequest.status !== "RESOLVED") {
+    await persist({
+      role: "assistant",
+      type: "text",
+      content:
+        "Choose an image for each section: upload your own, generate one, or decide for me and I will pick a matching photo for that section and this business.",
+    });
+    publishStatus(sessionId, "RUNNING", "Waiting for section images…");
+    try {
+      await waitUntilAssetRequestResolved(assetRequest.id, signal);
+    } catch {
+      if (signal.aborted) return "cancelled";
+      throw new Error("Waiting for section images failed");
+    }
+  }
+
   publishStatus(sessionId, "RUNNING", "Plan formulated. Building tasks…");
 
   const titleById = new Map(persisted.tasks.map((task) => [task.id, task.title]));
@@ -58,7 +116,8 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
       sessionId,
       projectId,
       model,
-      userRemainingCents: UNLIMITED_BUDGET_CENTS,
+      plan: userPlan,
+      userRemainingCents: creditsToCents(credits),
       runtime,
       onTaskStatus: (taskId, status) => {
         const title = titleById.get(taskId) ?? taskId;

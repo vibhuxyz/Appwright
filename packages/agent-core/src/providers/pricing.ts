@@ -21,6 +21,13 @@ const PRICES: Record<string, Price> = {
   "gemini-3.7-flash": { in: 0.3, out: 2.5 },
   "gemini-3.1-pro-preview": { in: 1.25, out: 10 },
   "gemini-flash-latest": { in: 0.3, out: 2.5 },
+  "claude-sonnet-5-5": { in: 2, out: 10 },
+  "claude-opus-5-5": { in: 4, out: 20 },
+  "claude-haiku-5-5": { in: 0.1, out: 0.5 },
+  "deepseek-chat": { in: 0.28, out: 0.42 },
+  "deepseek-reasoner": { in: 0.28, out: 0.42 },
+  "deepseek-flash": { in: 0.3, out: 1.2 },
+  "deepseek-v4-pro": { in: 0.66, out: 1.98 },
 };
 
 // An unpriced model must not read as free. A run that costs nothing can
@@ -33,6 +40,8 @@ const FALLBACKS: Record<string, Price> = {
   gemini: { in: 1.25, out: 10 },
   groq: { in: 0.59, out: 0.79 },
   xai: { in: 3, out: 15 },
+  anthropic: { in: 4, out: 20 },
+  deepseek: { in: 0.3, out: 1.2 },
 };
 
 export function priceFor(model: string): Price {

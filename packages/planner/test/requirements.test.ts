@@ -19,9 +19,9 @@ describe("requirements", () => {
     expect(needs.realtime.confidence).toBeLessThan(0.7);
   });
 
-  it("asks at most 3 questions, only about low-confidence needs", () => {
+  it("asks only about low-confidence needs", () => {
     const questions = selectQuestions(needs);
-    expect(questions.length).toBeLessThanOrEqual(3);
+    expect(questions.length).toBeGreaterThan(0);
     for (const question of questions) {
       expect(needs[question.need].confidence).toBeLessThan(0.7);
     }

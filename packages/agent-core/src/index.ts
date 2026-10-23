@@ -15,17 +15,35 @@ export { truncate } from "./engine/truncate";
 export { consoleSink } from "./engine/sink";
 export {
   DEFAULT_MODEL,
+  ENDPOINTS,
   MODEL_PROVIDERS,
   providerFor,
   OpenAiProvider,
 } from "./providers/openai";
+export { listAvailableModels } from "./providers/list-models";
+export { bestAvailableModel, bestAvailableModels } from "./providers/best-available-model";
+export {
+  bestModelForPlan,
+  plannerModel,
+  bestModelsForPlan,
+  modelAllowedForPlan,
+  resolveModelForPlan,
+} from "./providers/model-for-plan";
 export { costUsd, priceFor } from "./providers/pricing";
+export {
+  isProviderCreditsDepleted,
+  classifyProviderFailure,
+  isRetryableProviderFailure,
+  PROVIDER_CREDITS_DEPLETED_NOTICE,
+  type ProviderFailureKind,
+} from "./providers/provider-errors";
 export {
   readProviderText,
   isAbortError,
   ProviderOutputTooLargeError,
 } from "./providers/read-provider-text";
 export { buildSystemPrompt } from "./prompt";
+export { loadStackStandards } from "./standards";
 export { planTasks, formatPlanForAgent } from "./planner";
 export { verifyTypeScript, type VerifyResult } from "./verify";
 export { serializeRow, toCoreMessage, type MessageRow } from "./transcript";

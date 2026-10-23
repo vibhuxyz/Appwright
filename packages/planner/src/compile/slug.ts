@@ -18,3 +18,7 @@ export function routeToPageFile(route: string): string {
   const directory = route.replace(/^\/+|\/+$/g, "");
   return directory ? `src/app/${directory}/page.tsx` : "src/app/page.tsx";
 }
+
+export function routeToLoadingFile(route: string): string {
+  return routeToPageFile(route).replace(/page\.tsx$/, "loading.tsx");
+}

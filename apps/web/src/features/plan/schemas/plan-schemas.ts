@@ -48,7 +48,7 @@ export type PlanQuestion = z.infer<typeof planQuestionSchema>;
 export const SKIP_ANSWER = "skip" as const;
 export type SkipAnswer = typeof SKIP_ANSWER;
 
-export const answerValueSchema = z.union([z.string().min(1).max(200), z.literal(SKIP_ANSWER)]);
+export const answerValueSchema = z.union([z.string().min(1).max(1000), z.literal(SKIP_ANSWER)]);
 export type AnswerValue = z.infer<typeof answerValueSchema>;
 
 export const planAnswersSchema = z.record(z.string(), answerValueSchema);

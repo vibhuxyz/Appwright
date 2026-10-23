@@ -47,22 +47,28 @@ export const UNKNOWN_DECISION: Decision = {
 // failing open rather than blocking login over an auxiliary dependency.
 // "Falls open" means classify() always resolves, never throws — resolvePolicy()
 // is what actually closes the gate to "review" on a non-"accepted" status.
+export const CLASSIFY_TIMEOUT_MS = 10_000;
+
 export async function classify(
   message: string,
   provider: Provider,
+  signal: AbortSignal = AbortSignal.timeout(CLASSIFY_TIMEOUT_MS),
 ): Promise<DecisionResult> {
   let text = "";
-  const controller = new AbortController();
   try {
     for await (const chunk of provider.stream(
       [{ role: "user", type: "text", content: `${PROMPT}${message}` }],
       [],
-      { signal: controller.signal },
+      { signal },
     )) {
       if (chunk.type === "text_delta") text += chunk.delta;
     }
-  } catch {
-    return { status: "provider_error", decision: UNKNOWN_DECISION };
+  } catch (error) {
+    return {
+      status: "provider_error",
+      decision: UNKNOWN_DECISION,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    };
   }
 
   const jsonMatch = text.match(/\{[\s\S]*\}/);

@@ -1,5 +1,7 @@
+import { CREDITS_PER_USD } from "@repo/contracts";
 import { Coins } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
+import { useCredits } from "../hooks/useAddCredits";
 import { formatCreditsToDollars } from "../schemas/billingSchemas";
 
 export function CreditsBadge({
@@ -11,10 +13,14 @@ export function CreditsBadge({
   onClick?: () => void;
   className?: string;
 }) {
+  // Keeps the auth-store balance (this prop, and generation gating) on the
+  // server value after a top-up or a failed attempt.
+  useCredits();
+
   const tone =
     credits <= 0
       ? "border-danger/40 bg-danger/10 text-danger hover:bg-danger/20"
-      : credits < 1_000_000 // Less than $1.00 balance
+      : credits < CREDITS_PER_USD // Less than $1.00 balance
         ? "border-warning/40 bg-warning/10 text-warning hover:bg-warning/20"
         : "border-border-soft bg-surface text-foreground-secondary hover:border-border hover:bg-surface-2";
 

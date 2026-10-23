@@ -108,6 +108,7 @@ describe("classify", () => {
     expect(result).toEqual({
       status: "provider_error",
       decision: UNKNOWN_DECISION,
+      errorMessage: "FakeProvider: script exhausted",
     });
   });
 });

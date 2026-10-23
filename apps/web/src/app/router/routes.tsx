@@ -1,7 +1,20 @@
+import { lazy, Suspense } from "react";
 import { createRootRoute, createRoute, createRouter, redirect } from "@tanstack/react-router";
 import { RootLayout } from "@/app/layouts/RootLayout";
 import { DashboardPage } from "@/routes/DashboardPage";
 import { ProjectPage } from "@/routes/ProjectPage";
+
+const SectionCatalogPage = lazy(() =>
+  import("@/features/section-catalog").then((module) => ({ default: module.SectionCatalogPage })),
+);
+
+function SectionCatalogRoute() {
+  return (
+    <Suspense fallback={<p className="p-6 text-sm text-muted">Loading sections</p>}>
+      <SectionCatalogPage />
+    </Suspense>
+  );
+}
 
 const rootRoute = createRootRoute({ component: RootLayout });
 
@@ -36,10 +49,17 @@ const projectRoute = createRoute({
   },
 });
 
+const sectionCatalogRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/sections",
+  component: SectionCatalogRoute,
+});
+
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   dashboardRedirectRoute,
   projectRoute,
+  sectionCatalogRoute,
 ]);
 
 export const router = createRouter({ routeTree });

@@ -4,7 +4,7 @@ import {
   type ResourceKind,
 } from "./types";
 
-const RESOURCE_DECLARATION = /^(db|port|prisma|env):(.+)$/;
+const RESOURCE_DECLARATION = /^(db|port|env):(.+)$/;
 const GLOB_SUFFIX = /\/\*\*$/;
 
 // D37: declare -> normalise -> expand -> canonicalise -> overlap check.

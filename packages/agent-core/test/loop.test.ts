@@ -119,6 +119,68 @@ describe("runAgentLoop — the six exits", () => {
     expect(stopReason).toBe("fatalError");
   });
 
+  test("retries a transient 429 then completes without marking the phase done early", async () => {
+    let calls = 0;
+    const provider = {
+      model: "fake-model",
+      async *stream() {
+        calls += 1;
+        if (calls === 1) throw new Error("OpenAI request failed: 429 rate limit");
+        yield { type: "text_delta" as const, delta: "recovered" };
+        yield { type: "stop" as const, reason: "end_turn" as const };
+      },
+    };
+    const stopReason = await runAgentLoop(
+      baseParams({ provider, providerRetryDelayMs: 0 }),
+    );
+    expect(stopReason).toBe("completed");
+    expect(calls).toBe(2);
+  });
+
+  test("does not retry a non-transient provider explosion", async () => {
+    let calls = 0;
+    const provider = {
+      model: "fake-model",
+      async *stream(): AsyncIterable<never> {
+        calls += 1;
+        throw new Error("provider exploded");
+      },
+    };
+    const stopReason = await runAgentLoop(
+      baseParams({ provider, providerRetryDelayMs: 0 }),
+    );
+    expect(stopReason).toBe("fatalError");
+    expect(calls).toBe(1);
+  });
+
+  test("falls back to the next configured provider after transient failures", async () => {
+    let primaryCalls = 0;
+    const primary = {
+      model: "gpt-4o-mini",
+      async *stream(): AsyncIterable<never> {
+        primaryCalls += 1;
+        throw new Error("OpenAI request failed: 503 unavailable");
+      },
+    };
+    const fallback = new FakeProvider([{ kind: "text", text: "from fallback" }], "deepseek-chat");
+    const events: AgentEvent[] = [];
+    const stopReason = await runAgentLoop(
+      baseParams({
+        provider: primary,
+        fallbackProviders: [fallback],
+        providerRetryDelayMs: 0,
+        emit: async (event) => {
+          events.push(event);
+        },
+      }),
+    );
+    expect(stopReason).toBe("completed");
+    expect(primaryCalls).toBe(3);
+    expect(events.some((event) => event.type === "text_delta" && event.delta === "from fallback")).toBe(
+      true,
+    );
+  });
+
   test("every run emits agent_start then agent_end with a matching stopReason", async () => {
     const provider = new FakeProvider([{ kind: "text", text: "done" }]);
     const events: AgentEvent[] = [];

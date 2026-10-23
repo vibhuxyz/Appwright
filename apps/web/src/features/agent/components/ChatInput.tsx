@@ -154,7 +154,7 @@ export function ChatInput({
 
             <SubmitButton
               running={running}
-              disabled={!trimmed || isEnhancing}
+              disabled={!trimmed || isEnhancing || !model}
               onSubmit={onSubmit}
               onStop={onStop}
             />

@@ -1,5 +1,7 @@
 import { prisma, type Capability, type Prisma, type RiskTier, type TaskType } from "@repo/db";
 import type { Plan } from "@repo/planner";
+import { taskTypeToPrisma } from "./map-task-row";
+import { assignTaskIds, newTaskId } from "./task-ids";
 
 export interface PersistedBlueprint {
   blueprintId: string;
@@ -9,11 +11,17 @@ export interface PersistedBlueprint {
 
 export async function persistBlueprint(sessionId: string, plan: Plan): Promise<PersistedBlueprint> {
   const { blueprint, tasks, graph } = plan;
+  const tasksWithIds = assignTaskIds(tasks, graph.dependsOn, newTaskId);
+  const latest = await prisma.blueprint.findFirst({
+    where: { sessionId },
+    orderBy: { blueprintVersion: "desc" },
+    select: { blueprintVersion: true },
+  });
 
   const row = await prisma.blueprint.create({
     data: {
       sessionId,
-      blueprintVersion: blueprint.blueprintVersion,
+      blueprintVersion: (latest?.blueprintVersion ?? 0) + 1,
       intent: blueprint.intent as Prisma.InputJsonValue,
       stack: blueprint.stack as Prisma.InputJsonValue,
       entities: blueprint.entities as Prisma.InputJsonValue,
@@ -23,12 +31,14 @@ export async function persistBlueprint(sessionId: string, plan: Plan): Promise<P
       design: blueprint.design as Prisma.InputJsonValue,
       layout: blueprint.layout as Prisma.InputJsonValue,
       responsive: blueprint.responsive as Prisma.InputJsonValue,
+      projectType: blueprint.projectType ?? null,
+      requirements: (blueprint.requirements ?? []) as Prisma.InputJsonValue,
       tasks: {
-        create: tasks.map((task) => ({
-          id: task.id,
-          type: task.type.toUpperCase() as TaskType,
+        create: tasksWithIds.map(({ task, id, dependsOn }) => ({
+          id,
+          type: taskTypeToPrisma(task.type) as TaskType,
           title: task.title,
-          dependsOn: (graph.dependsOn.get(task.id) ?? []) as Prisma.InputJsonValue,
+          dependsOn: dependsOn as Prisma.InputJsonValue,
           owns: task.owns as Prisma.InputJsonValue,
           reads: task.reads as Prisma.InputJsonValue,
           riskTier: task.riskTier.toUpperCase() as RiskTier,

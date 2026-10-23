@@ -16,6 +16,17 @@ services:
       interval: 5s
       retries: 10
 
+  mongo:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      retries: 10
+
   redis:
     image: redis:8-alpine
     ports:
@@ -46,3 +57,4 @@ services:
 
 volumes:
   pgdata:
+  mongodata:

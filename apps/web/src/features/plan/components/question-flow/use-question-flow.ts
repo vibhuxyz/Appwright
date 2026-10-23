@@ -24,7 +24,10 @@ function toPlanAnswers(answered: readonly AnsweredQuestion[]): PlanAnswers {
   return answers;
 }
 
-export function useQuestionFlow({ questions, onComplete }: UseQuestionFlowOptions): UseQuestionFlowResult {
+export function useQuestionFlow({
+  questions,
+  onComplete,
+}: UseQuestionFlowOptions): UseQuestionFlowResult {
   const [answered, setAnswered] = useState<readonly AnsweredQuestion[]>([]);
   const hasCompletedRef = useRef(false);
   const currentQuestion = questions[answered.length];
@@ -49,7 +52,10 @@ export function useQuestionFlow({ questions, onComplete }: UseQuestionFlowOption
       question,
       value: SKIP_ANSWER,
     }));
-    commit([...answered, ...rest]);
+    const next = [...answered, ...rest];
+    setAnswered(next);
+    hasCompletedRef.current = true;
+    onComplete(toPlanAnswers(next));
   }
 
   return {

@@ -43,7 +43,7 @@ export function PaneComposer({
   onStop: () => void;
 }) {
   return (
-    <>
+    <div className="mt-auto shrink-0">
       {trimmed.length > 0 && (
         <PromptSuggestionBar
           tip={tip}
@@ -67,6 +67,6 @@ export function PaneComposer({
         onEnhance={onEnhance}
         onStop={onStop}
       />
-    </>
+    </div>
   );
 }

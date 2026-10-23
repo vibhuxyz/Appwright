@@ -4,8 +4,8 @@ import { LandingHeader } from "./LandingHeader";
 import { PromptComposer } from "./PromptComposer";
 import { ShowcaseStrip } from "./ShowcaseStrip";
 import { ModelsSection } from "./ModelsSection";
-import { PlatformSection } from "./PlatformSection";
 import { TemplatesSection } from "./TemplatesSection";
+import { PlatformSection } from "./PlatformSection";
 import { WorkspacePreviewSection } from "./WorkspacePreviewSection";
 import { PricingSection } from "./PricingSection";
 import { FinalCtaSection } from "./FinalCtaSection";
@@ -29,8 +29,8 @@ export function LandingPage({ onLoginClick, onGetStartedClick }: LandingPageProp
       <PromptComposer onSubmit={onGetStartedClick} />
       <ShowcaseStrip />
       <ModelsSection />
-      <PlatformSection />
       <TemplatesSection />
+      <PlatformSection />
       <WorkspacePreviewSection />
       <PricingSection onFreeClick={onGetStartedClick} onProClick={onGetStartedClick} />
       <FinalCtaSection onCtaClick={onGetStartedClick} />

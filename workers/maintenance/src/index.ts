@@ -1,10 +1,9 @@
+import { reapDueDatabaseDeletions } from "@repo/db";
 import { createLogger } from "@repo/logger";
 
 // Periodic housekeeping — not event-driven, so it doesn't touch
 // @repo/events. Register real jobs in `jobs` as they're needed (expired
-// session sweep, stale `.workspaces/` cleanup, ...). Empty today: nothing in
-// the schema has a TTL yet, and a job list with no jobs is the honest state,
-// not a reason to invent placeholder cleanup work.
+// session sweep, stale `.workspaces/` cleanup, ...).
 
 const log = createLogger("worker-maintenance");
 
@@ -14,7 +13,18 @@ interface Job {
   run: () => Promise<void>;
 }
 
-const jobs: Job[] = [];
+const jobs: Job[] = [
+  {
+    name: "reap-project-databases",
+    intervalMs: 60 * 60 * 1000,
+    run: async () => {
+      const result = await reapDueDatabaseDeletions();
+      if (result.completed > 0 || result.failed > 0) {
+        log.info("reaped project databases", result);
+      }
+    },
+  },
+];
 
 function schedule(job: Job) {
   log.info("job scheduled", { job: job.name, intervalMs: job.intervalMs });

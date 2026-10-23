@@ -1,4 +1,5 @@
 import {
+  assetRequestFrameSchema,
   deltaFrameSchema,
   messageFrameSchema,
   statusFrameSchema,
@@ -32,6 +33,11 @@ export function connectConversationStream(
   source.addEventListener("usage", (e) => {
     const frame = usageFrameSchema.parse(JSON.parse((e as MessageEvent).data));
     handlers.onUsage(frame);
+  });
+
+  source.addEventListener("assetRequest", (e) => {
+    const frame = assetRequestFrameSchema.parse(JSON.parse((e as MessageEvent).data));
+    handlers.onAssetRequest?.(frame);
   });
 
   return () => source.close();

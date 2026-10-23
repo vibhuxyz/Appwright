@@ -1,3 +1,5 @@
+import { AGENT_LOOP_LIMITS, LOOP_DEADLINE_MINUTES } from "@repo/contracts";
+
 export interface StopNotice {
   stopReason: string;
   detail: string;
@@ -33,9 +35,9 @@ export function resolveStopNotice(
       }
       return {
         stopReason: "budgetExceeded",
-        detail: "Out of tokens / budget ceiling reached",
+        detail: "Run spending limit reached",
         content:
-          "⚠️ Run paused: Out of tokens or budget ceiling reached. Click 'Continue Building' to proceed.",
+          "⚠️ Run paused: This run reached its spending limit. Your credit balance is unaffected. Click 'Continue Building' to proceed.",
       };
     case "outOfCredits":
       return {
@@ -49,14 +51,14 @@ export function resolveStopNotice(
         stopReason: "maxIterations",
         detail: "Maximum iterations reached",
         content:
-          "⚠️ Run paused: Maximum turn limit reached (60 steps). Click 'Continue Building' to work on remaining tasks.",
+          `⚠️ Run paused: Maximum turn limit reached (${AGENT_LOOP_LIMITS.maxIterations} steps). Click 'Continue Building' to work on remaining tasks.`,
       };
     case "timeout":
       return {
         stopReason: "timeout",
         detail: "Execution timed out",
         content:
-          "⏱️ Run paused: The execution timed out after 10 minutes. Click 'Continue Building' to resume.",
+          `⏱️ Run paused: The execution timed out after ${LOOP_DEADLINE_MINUTES} minutes. Click 'Continue Building' to resume.`,
       };
     case "fatalError":
     default:

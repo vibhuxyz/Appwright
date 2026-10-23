@@ -1,0 +1,196 @@
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type * as React from "react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/components/ui/utils";
+
+interface CarouselContextValue {
+  scrollerRef: React.RefObject<HTMLDivElement | null>;
+  canScrollPrev: boolean;
+  canScrollNext: boolean;
+  scrollPage: (direction: -1 | 1) => void;
+  syncEdges: () => void;
+}
+
+const CarouselContext = createContext<CarouselContextValue | null>(null);
+
+function useCarousel(): CarouselContextValue {
+  const context = useContext(CarouselContext);
+  if (!context) throw new Error("Carousel parts must be used inside <Carousel>");
+  return context;
+}
+
+function prefersReducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+export interface CarouselProps extends React.ComponentProps<"div"> {
+  autoPlayMs?: number;
+}
+
+export function Carousel({
+  className,
+  children,
+  autoPlayMs,
+  ...props
+}: CarouselProps) {
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [edges, setEdges] = useState({ prev: false, next: false });
+  const [isPaused, setIsPaused] = useState(false);
+
+  const syncEdges = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const maxScroll = scroller.scrollWidth - scroller.clientWidth;
+    setEdges({ prev: scroller.scrollLeft > 1, next: scroller.scrollLeft < maxScroll - 1 });
+  }, []);
+
+  const scrollPage = useCallback((direction: -1 | 1) => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const behavior = prefersReducedMotion() ? "auto" : "smooth";
+    scroller.scrollBy({ left: direction * scroller.clientWidth, behavior });
+  }, []);
+
+  useEffect(() => {
+    if (!autoPlayMs || isPaused || prefersReducedMotion()) return;
+    const timer = setInterval(() => {
+      const scroller = scrollerRef.current;
+      if (!scroller) return;
+      const isAtEnd = scroller.scrollLeft >= scroller.scrollWidth - scroller.clientWidth - 1;
+      if (isAtEnd) scroller.scrollTo({ left: 0, behavior: "smooth" });
+      else scrollPage(1);
+    }, autoPlayMs);
+    return () => clearInterval(timer);
+  }, [autoPlayMs, isPaused, scrollPage]);
+
+  const value = useMemo(
+    () => ({
+      scrollerRef,
+      canScrollPrev: edges.prev,
+      canScrollNext: edges.next,
+      scrollPage,
+      syncEdges,
+    }),
+    [edges.prev, edges.next, scrollPage, syncEdges],
+  );
+
+  return (
+    <CarouselContext.Provider value={value}>
+      <div
+        data-slot="carousel"
+        role="region"
+        aria-roledescription="carousel"
+        className={cn("relative overflow-x-clip", className)}
+        onMouseEnter={() => setIsPaused(true)}
+        onMouseLeave={() => setIsPaused(false)}
+        onFocus={() => setIsPaused(true)}
+        onBlur={() => setIsPaused(false)}
+        {...props}
+      >
+        {children}
+      </div>
+    </CarouselContext.Provider>
+  );
+}
+
+export function CarouselContent({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  const { scrollerRef, syncEdges, scrollPage } = useCarousel();
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    syncEdges();
+    const observer = new ResizeObserver(syncEdges);
+    observer.observe(scroller);
+    return () => observer.disconnect();
+  }, [scrollerRef, syncEdges]);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "ArrowLeft") scrollPage(-1);
+    if (event.key === "ArrowRight") scrollPage(1);
+  };
+
+  return (
+    <div
+      ref={scrollerRef}
+      data-slot="carousel-content"
+      tabIndex={0}
+      onScroll={syncEdges}
+      onKeyDown={handleKeyDown}
+      className={cn(
+        "-mx-2 flex snap-x snap-mandatory overflow-x-auto scroll-smooth [scrollbar-width:none] focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:scroll-auto",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function CarouselItem({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="carousel-item"
+      role="group"
+      aria-roledescription="slide"
+      className={cn("min-w-0 shrink-0 grow-0 basis-full snap-start px-2", className)}
+      {...props}
+    />
+  );
+}
+
+export function CarouselPrevious({
+  className,
+  ...props
+}: React.ComponentProps<typeof Button>) {
+  const { canScrollPrev, scrollPage } = useCarousel();
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      aria-label="Previous slide"
+      disabled={!canScrollPrev}
+      onClick={() => scrollPage(-1)}
+      className={cn("rounded-full", className)}
+      {...props}
+    >
+      <ChevronLeft />
+    </Button>
+  );
+}
+
+export function CarouselNext({
+  className,
+  ...props
+}: React.ComponentProps<typeof Button>) {
+  const { canScrollNext, scrollPage } = useCarousel();
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      aria-label="Next slide"
+      disabled={!canScrollNext}
+      onClick={() => scrollPage(1)}
+      className={cn("rounded-full", className)}
+      {...props}
+    >
+      <ChevronRight />
+    </Button>
+  );
+}

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Activity,
   ChevronDown,
+  Coins,
   Crown,
   Database,
   FileCode2,
@@ -9,6 +11,7 @@ import {
   KeyRound,
   LayoutDashboard,
   MessageSquare,
+  Plus,
   Radio,
   ScrollText,
   Settings,
@@ -17,9 +20,12 @@ import {
   Webhook,
 } from "lucide-react";
 import { cn } from "@/shared/lib/cn";
+import { useAuthStore } from "@/stores/authStore";
+import { useProjects } from "@/features/projects/hooks/useProjects";
+import { formatCreditsToDollars } from "@/features/billing/schemas/billingSchemas";
 
 const NAV_ITEMS = [
-  { id: "overview", label: "Overview", icon: LayoutDashboard, active: true },
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "auth", label: "Authentication", icon: Users },
   { id: "databases", label: "Databases", icon: Database },
   { id: "storage", label: "Storage", icon: HardDrive },
@@ -43,14 +49,22 @@ export function ProjectConsoleSidebar({
   activeTab,
   onSelectTab,
   onOpenUpgrade,
+  onOpenAddCredits,
 }: {
   projectName: string;
   activeTab: string;
   onSelectTab: (tab: string) => void;
   onOpenUpgrade?: () => void;
+  onOpenAddCredits?: () => void;
 }) {
+  const [isProjectsOpen, setIsProjectsOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
+  const plan = user?.plan ?? "FREE";
+  const credits = user?.credits ?? 0;
+  const { data: projects = [] } = useProjects();
+
   return (
-    <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-border/80 bg-[#0C0F16] text-muted select-none">
+    <aside className="relative flex h-screen w-60 shrink-0 flex-col border-r border-border/80 bg-[#0C0F16] text-muted select-none">
       {/* Brand header */}
       <div className="flex h-16 shrink-0 items-center border-b border-border/60 px-5">
         <Link to="/" className="flex items-center gap-2.5 text-foreground hover:opacity-90">
@@ -64,9 +78,10 @@ export function ProjectConsoleSidebar({
       </div>
 
       {/* Project selector dropdown button */}
-      <div className="border-b border-border/40 p-3">
+      <div className="relative border-b border-border/40 p-3">
         <button
           type="button"
+          onClick={() => setIsProjectsOpen((prev) => !prev)}
           className="flex w-full items-center justify-between rounded-xl border border-border/70 bg-[#121622] p-2 text-left text-xs transition-colors hover:border-border hover:bg-[#181D2C]"
         >
           <div className="flex min-w-0 items-center gap-2.5">
@@ -79,6 +94,35 @@ export function ProjectConsoleSidebar({
           </div>
           <ChevronDown className="size-3.5 shrink-0 text-muted" />
         </button>
+
+        {isProjectsOpen && (
+          <div className="absolute top-full left-3 z-50 mt-1 w-54 rounded-xl border border-border bg-[#121622] p-1.5 shadow-xl">
+            <div className="max-h-48 overflow-y-auto space-y-0.5">
+              {projects.map((p) => (
+                <Link
+                  key={p.id}
+                  to="/p/$projectId"
+                  params={{ projectId: p.id }}
+                  search={{ view: "console" }}
+                  onClick={() => setIsProjectsOpen(false)}
+                  className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-foreground transition-colors hover:bg-surface-2"
+                >
+                  <span className="truncate">{p.name}</span>
+                </Link>
+              ))}
+            </div>
+            <div className="mt-1 border-t border-border/60 pt-1">
+              <Link
+                to="/"
+                onClick={() => setIsProjectsOpen(false)}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold text-lime hover:bg-surface-2"
+              >
+                <Plus className="size-3" />
+                <span>All Projects / New</span>
+              </Link>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Navigation list */}
@@ -143,27 +187,26 @@ export function ProjectConsoleSidebar({
         </div>
       </div>
 
-      {/* Bottom Pro Plan Card */}
+      {/* Bottom Real User Plan & Credits Card */}
       <div className="border-t border-border/60 p-3">
         <div className="rounded-2xl border border-border/80 bg-[#121622] p-3">
-          <div className="flex items-center gap-2">
-            <Crown className="size-4 text-lime" />
-            <span className="text-xs font-bold text-foreground">Pro Plan</span>
-          </div>
-          <div className="mt-2.5">
-            <div className="flex items-center justify-between text-[10px] text-muted">
-              <span>12.5K / 100K requests</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Crown className="size-4 text-lime" />
+              <span className="text-xs font-bold text-foreground">{plan} Plan</span>
             </div>
-            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
-              <div className="h-full w-[15%] rounded-full bg-lime" />
+            <div className="flex items-center gap-1 text-[11px] font-mono text-emerald-400">
+              <Coins className="size-3 text-amber-400" />
+              <span>{formatCreditsToDollars(credits)}</span>
             </div>
           </div>
+          <p className="mt-1.5 text-[10px] text-muted">Available AI balance</p>
           <button
             type="button"
-            onClick={onOpenUpgrade}
+            onClick={plan === "FREE" ? onOpenUpgrade : (onOpenAddCredits ?? onOpenUpgrade)}
             className="mt-3 w-full rounded-xl border border-border/90 bg-surface-2 py-1.5 text-xs font-bold text-foreground transition-colors hover:bg-surface-3"
           >
-            Upgrade
+            {plan === "FREE" ? "Upgrade to Pro" : "+ Add Credits"}
           </button>
         </div>
       </div>

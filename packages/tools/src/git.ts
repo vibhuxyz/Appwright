@@ -159,3 +159,39 @@ export async function revertSession(worktreeDir: string): Promise<boolean> {
     return false;
   }
 }
+
+export interface GitCommitInfo {
+  sha: string;
+  shortSha: string;
+  message: string;
+  author: string;
+  date: string;
+}
+
+export async function getRecentCommits(
+  repoDir: string,
+  limit = 5,
+): Promise<GitCommitInfo[]> {
+  try {
+    const raw = await $`git -C ${repoDir} log -n ${limit} --format=%H|%h|%s|%an|%aI`
+      .quiet()
+      .text();
+    return raw
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => {
+        const parts = line.split("|");
+        return {
+          sha: parts[0] ?? "",
+          shortSha: parts[1] ?? "",
+          message: parts[2] ?? "",
+          author: parts[3] ?? "",
+          date: parts[4] ?? "",
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+

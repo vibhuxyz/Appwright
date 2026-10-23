@@ -5,9 +5,10 @@ import {
   verifyPassword,
 } from "@repo/auth";
 import { increment } from "@repo/cache";
-import { AddCreditsRequest } from "@repo/contracts";
+import { AddCreditsRequest, UpgradePlanRequest, usdToCredits } from "@repo/contracts";
 import { prisma } from "@repo/db";
 import { Router } from "express";
+import { upgradePlan } from "../billing";
 import { log } from "../log";
 
 export const authRouter = Router();
@@ -15,8 +16,7 @@ export const authRouter = Router();
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const MIN_PASSWORD = 8;
 
-// Initial free credits granted on first signup: .00 in AI balance (10,000,000 tokens)
-export const INITIAL_USER_CREDITS = 10_000_000;
+export const INITIAL_USER_CREDITS = usdToCredits(10);
 
 const LOGIN_RATE_LIMIT_WINDOW_SECONDS = 15 * 60;
 const LOGIN_RATE_LIMIT_MAX_ATTEMPTS = 10;
@@ -82,7 +82,7 @@ authRouter.post("/auth/register", async (req, res) => {
     .status(201)
     .json({
       token: signToken(user.id),
-      user: { id: user.id, email: user.email, credits: user.credits },
+      user: { id: user.id, email: user.email, credits: user.credits, plan: user.plan },
     });
 });
 
@@ -107,26 +107,33 @@ authRouter.post("/auth/login", async (req, res) => {
 
   res.json({
     token: signToken(user.id),
-    user: { id: user.id, email: user.email, credits: user.credits },
+    user: { id: user.id, email: user.email, credits: user.credits, plan: user.plan },
   });
 });
 
 authRouter.get("/auth/me", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) return res.status(401).json({ error: "unauthorized" });
-  res.json({ id: user.id, email: user.email, credits: user.credits });
+  res.json({ id: user.id, email: user.email, credits: user.credits, plan: user.plan });
 });
 
 authRouter.get("/user/credits", requireAuth, async (req, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.userId! },
-    select: { credits: true },
+    select: { credits: true, plan: true },
   });
   if (!user) return res.status(401).json({ error: "unauthorized" });
-  res.json({ credits: user.credits });
+  res.json({ credits: user.credits, plan: user.plan });
 });
 
+function isDevOnlyBlocked(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
 authRouter.post("/user/credits/add", requireAuth, async (req, res) => {
+  if (isDevOnlyBlocked()) {
+    return res.status(404).json({ error: "not found" });
+  }
   const parsed = AddCreditsRequest.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: "Invalid amount. Must be a positive integer." });
@@ -147,4 +154,26 @@ authRouter.post("/user/credits/add", requireAuth, async (req, res) => {
   });
 
   res.json({ ok: true, credits: user.credits });
+});
+
+authRouter.post("/user/plan", requireAuth, async (req, res) => {
+  if (isDevOnlyBlocked()) {
+    return res.status(404).json({ error: "not found" });
+  }
+  const parsed = UpgradePlanRequest.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "Invalid plan or credit amount." });
+  }
+  const result = await upgradePlan({ userId: req.userId!, ...parsed.data });
+  if (!result.ok) {
+    return result.code === "USER_NOT_FOUND"
+      ? res.status(401).json({ error: "unauthorized" })
+      : res.status(422).json({ error: "You are already on a higher plan." });
+  }
+  log.info("User upgraded plan", {
+    userId: req.userId,
+    plan: result.plan,
+    creditsAddedUsd: parsed.data.creditsUsd,
+  });
+  res.json({ ok: true, plan: result.plan, credits: result.credits });
 });

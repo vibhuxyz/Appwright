@@ -1,6 +1,8 @@
+import type { ElementSelection, ThemeOption } from "@repo/contracts";
 import { enqueueJob, prisma, type Job, type Prisma } from "@repo/db";
 import {
   requirementTurns,
+  themeTurn,
   type IntakeQuestion,
   type PromptAnswer,
 } from "@repo/planner";
@@ -14,6 +16,9 @@ export interface EnqueueConversationOptions {
   prompt: string;
   answers?: Readonly<Record<string, PromptAnswer>>;
   questions?: readonly IntakeQuestion[];
+  theme?: ThemeOption;
+  selection?: ElementSelection;
+  blueprintId?: string;
 }
 
 export async function recordRequirementTurns<T>(
@@ -40,15 +45,13 @@ export async function recordRequirementTurns<T>(
   return rows;
 }
 
-// The flag-gated V3 path: persist + enqueue, then return. apps/agent (a
-// separate process) claims the Job from Postgres and runs it inside a
-// sandbox, publishing to the same session:<id> channel the synchronous
-// V0-V2 path (runConversation) does — the browser's /stream connection
-// can't tell which one produced an event.
+// Persist + enqueue, then return. apps/agent (a separate process) claims
+// the Job from Postgres and runs it inside a sandbox, publishing to the
+// same session:<id> channel the browser's /stream connection reads from.
 export async function enqueueConversation(
   opts: EnqueueConversationOptions,
 ): Promise<Job> {
-  const { sessionId, projectId, prompt, answers, questions } = opts;
+  const { sessionId, projectId, prompt, answers, questions, theme, selection, blueprintId } = opts;
 
   const lastMessage = await prisma.message.findFirst({
     where: { sessionId },
@@ -78,8 +81,17 @@ export async function enqueueConversation(
     return row;
   };
 
-  await persistTurn({ role: "user", type: "text", content: prompt });
+  await persistTurn({
+    role: "user",
+    type: "text",
+    content: prompt,
+    ...(selection ? { data: { selection } } : {}),
+  });
   await recordRequirementTurns(answers, questions, persistTurn);
+  if (theme) {
+    const turn = themeTurn(theme);
+    await persistTurn({ type: "text", ...turn, data: { ...turn.data, ...(blueprintId ? { blueprintId } : {}) } });
+  }
   await createSessionWorktree(projectId, sessionId);
   return enqueueJob({ sessionId, projectId });
 }

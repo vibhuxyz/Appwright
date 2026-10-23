@@ -1,0 +1,121 @@
+import { Star } from "lucide-react";
+import { useId } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
+import { cn } from "@/components/ui/utils";
+
+export interface Testimonial {
+  quote: string;
+  name: string;
+  role?: string;
+  rating?: 1 | 2 | 3 | 4 | 5;
+}
+
+const MAX_RATING = 5;
+const RATING_POSITIONS = [1, 2, 3, 4, 5] as const;
+const MAX_INITIALS = 2;
+const DEFAULT_AUTOPLAY_MS = 7000;
+
+function initialsOf(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, MAX_INITIALS)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
+}
+
+function Stars({ rating }: { rating: number }) {
+  return (
+    <div role="img" aria-label={`${rating} out of ${MAX_RATING} stars`} className="flex gap-0.5">
+      {RATING_POSITIONS.map((position) => (
+        <Star
+          key={position}
+          aria-hidden="true"
+          className={cn(
+            "size-4",
+            position <= rating ? "fill-warning text-warning" : "text-muted-foreground",
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function TestimonialCard({ quote, name, role, rating }: Testimonial) {
+  return (
+    <Card className="h-full">
+      <CardContent className="flex h-full flex-col gap-4 pt-6">
+        {rating !== undefined && <Stars rating={rating} />}
+        <blockquote className="flex-1 text-base leading-relaxed text-card-foreground">
+          &ldquo;{quote}&rdquo;
+        </blockquote>
+        <figcaption className="flex items-center gap-3">
+          <span
+            aria-hidden="true"
+            className="grid size-10 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+          >
+            {initialsOf(name)}
+          </span>
+          <span className="flex flex-col">
+            <span className="text-sm font-medium">{name}</span>
+            {role && <span className="text-xs text-muted-foreground">{role}</span>}
+          </span>
+        </figcaption>
+      </CardContent>
+    </Card>
+  );
+}
+
+export interface TestimonialsProps {
+  items: readonly Testimonial[];
+  title?: string;
+  description?: string;
+  autoPlayMs?: number;
+  className?: string;
+}
+
+export function Testimonials({
+  items,
+  title = "What our customers say",
+  description,
+  autoPlayMs = DEFAULT_AUTOPLAY_MS,
+  className,
+}: TestimonialsProps) {
+  const headingId = useId();
+  if (items.length === 0) return null;
+  return (
+    <section
+      aria-labelledby={headingId}
+      className={cn("w-full py-16", className)}
+    >
+      <div className="mb-8 flex items-end justify-between gap-4">
+        <div className="space-y-2">
+          <h2 id={headingId} className="text-3xl font-semibold tracking-tight">
+            {title}
+          </h2>
+          {description && <p className="text-muted-foreground">{description}</p>}
+        </div>
+      </div>
+      <Carousel autoPlayMs={autoPlayMs} aria-label={title}>
+        <CarouselContent>
+          {items.map((item) => (
+            <CarouselItem key={`${item.name}-${item.quote.slice(0, 24)}`} className="md:basis-1/2 lg:basis-1/3">
+              <TestimonialCard {...item} />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <div className="mt-6 flex justify-end gap-2">
+          <CarouselPrevious />
+          <CarouselNext />
+        </div>
+      </Carousel>
+    </section>
+  );
+}

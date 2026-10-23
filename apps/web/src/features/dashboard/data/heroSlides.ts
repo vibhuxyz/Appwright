@@ -42,7 +42,7 @@ export const HERO_SLIDES: HeroSlideData[] = [
     titleHighlight: "minutes, not days.",
     highlightClass: "text-sky-400",
     description:
-      "Next.js, Vite, Tailwind CSS, PostgreSQL, Stripe, and authentication — pre-wired, tested and live instantly.",
+      "Next.js, Vite, Tailwind CSS, MongoDB, Stripe, and authentication — pre-wired, tested and live instantly.",
     glowColor1: "bg-sky-600/20",
     glowColor2: "bg-cyan-500/15",
     activeStage: "DEPLOY",

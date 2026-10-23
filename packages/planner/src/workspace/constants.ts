@@ -1,14 +1,14 @@
-export const STACK_TEMPLATE_ID = "next-prisma-postgres-tailwind";
+export const STACK_TEMPLATE_ID = "next-mongoose-tailwind";
 export const THEME_TOKENS_PATH = "src/theme/tokens.css";
 export const BASE_DEPENDENCIES = [
-  "@prisma/client",
+  "mongoose",
   "next",
   "react",
   "react-dom",
   "tailwindcss",
 ] as const;
 export const DEPENDENCIES_BY_FEATURE: Readonly<Record<string, readonly string[]>> = {
-  auth: ["next-auth"],
+  auth: ["next-auth", "bcryptjs"],
   payments: ["stripe"],
   fileUpload: ["uploadthing"],
 };

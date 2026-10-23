@@ -1,9 +1,11 @@
 import type { Provider } from "@repo/agent-core";
 import {
   ALLOWED_PACKAGES,
+  BlueprintSchema,
   DEFAULT_DESIGN_BLOCK,
   DEFAULT_LAYOUT_BLOCK,
   DEFAULT_RESPONSIVE_BLOCK,
+  type ThemeOption,
 } from "@repo/contracts";
 import {
   classifyIntent,
@@ -11,13 +13,17 @@ import {
   detectNeeds,
   generateDesignDirections,
   planBlueprint,
+  resolveRequirements,
   validateArchitectureDecisions,
   type Plan,
 } from "@repo/planner";
+import { designWithTheme } from "./approved-plan";
 import { createIntentClassifier } from "./classify-intent-llm";
 import { generateBlueprintContent } from "./generate-content-llm";
 
-export const BUILD_BLUEPRINT_TIMEOUT_MS = 30_000;
+// Two sequential planner calls (intent, then the full plan). deepseek-v4-pro
+// was still running when 30s aborted the request.
+export const BUILD_BLUEPRINT_TIMEOUT_MS = 180_000;
 
 export class BuildBlueprintError extends Error {
   readonly code: "INTENT_FAILED" | "CONTENT_FAILED" | "PLAN_INVALID" | "TIMEOUT";
@@ -36,6 +42,7 @@ export interface BuildBlueprintOptions {
   // review step (see @repo/planner's generateDesignDirections). Falls back
   // to the default direction when absent or unrecognised.
   directionId?: string;
+  theme?: ThemeOption;
 }
 
 function isAbortError(error: unknown): boolean {
@@ -52,7 +59,7 @@ export async function buildBlueprint(
   prompt: string,
   options: BuildBlueprintOptions = {},
 ): Promise<Plan> {
-  const { provider, directionId } = options;
+  const { provider, directionId, theme } = options;
   const signal = options.signal ?? AbortSignal.timeout(BUILD_BLUEPRINT_TIMEOUT_MS);
   try {
     const intentResult = await classifyIntent(createIntentClassifier(provider), prompt, signal);
@@ -76,18 +83,27 @@ export async function buildBlueprint(
     const content = await generateBlueprintContent(prompt, signal, provider);
     const direction = resolveDesignDirection(directionId);
 
-    const plan = planBlueprint({
+    const draft = BlueprintSchema.safeParse({
       blueprintVersion: 1,
       intent: intentResult.value,
       stack: architecture.stack,
       entities: content.entities,
       pages: content.pages,
       features: content.features,
-      theme: content.theme,
-      design: direction?.design ?? DEFAULT_DESIGN_BLOCK,
+      theme: theme ? { ...content.theme, primary: theme.palette.primary } : content.theme,
+      design: designWithTheme(direction?.design ?? DEFAULT_DESIGN_BLOCK, theme),
       layout: direction?.layout ?? DEFAULT_LAYOUT_BLOCK,
       responsive: DEFAULT_RESPONSIVE_BLOCK,
     });
+    if (!draft.success) {
+      throw new BuildBlueprintError(
+        "PLAN_INVALID",
+        draft.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; "),
+      );
+    }
+
+    const resolved = resolveRequirements({ blueprint: draft.data, prompt, needs });
+    const plan = planBlueprint(resolved.blueprint);
     if (!plan.ok) {
       throw new BuildBlueprintError(
         "PLAN_INVALID",

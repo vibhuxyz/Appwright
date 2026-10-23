@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { UnsplashPhoto } from "@repo/contracts";
 import { assetsApi } from "../api/assets-api";
 import { assetKeys } from "../api/query-keys";
+import { unsplashApi } from "../api/unsplash-api";
 
 export function useResolveSlot(sessionId: string, projectId?: string) {
   const queryClient = useQueryClient();
@@ -35,5 +37,24 @@ export function useResolveSlot(sessionId: string, projectId?: string) {
     onSuccess: invalidate,
   });
 
-  return { upload, generate, skip };
+  const fillRemaining = useMutation({
+    mutationFn: ({ assetRequestId }: { assetRequestId: string }) =>
+      assetsApi.fillRemainingStock(assetRequestId),
+    onSuccess: invalidate,
+  });
+
+  const selectPhoto = useMutation({
+    mutationFn: ({
+      assetRequestId,
+      slotId,
+      photo,
+    }: {
+      assetRequestId: string;
+      slotId: string;
+      photo: UnsplashPhoto;
+    }) => unsplashApi.selectForSlot(assetRequestId, slotId, photo),
+    onSuccess: invalidate,
+  });
+
+  return { upload, generate, skip, fillRemaining, selectPhoto };
 }

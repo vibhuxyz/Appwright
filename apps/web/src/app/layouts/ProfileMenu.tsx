@@ -20,12 +20,12 @@ export function ProfileMenu({ onAddCredits }: { onAddCredits?: () => void }) {
 
   const username = user?.email?.split("@")[0] ?? "account";
   const initial = username.charAt(0).toLowerCase();
-  const plan = user?.plan ?? "free";
-  const isPaid = plan !== "free";
+  const plan = user?.plan ?? "FREE";
+  const isPaid = plan !== "FREE";
   // MAX gets the same pink-for-premium treatment as its pricing card;
   // PRO keeps the lime "current plan" styling used everywhere else.
   const planBadgeClass =
-    plan === "max"
+    plan === "MAX"
       ? "border-pink/30 bg-pink/10 text-pink-light"
       : "border-lime/30 bg-lime/10 text-lime";
 

@@ -1,8 +1,11 @@
+import type { ThemeOption } from "@repo/contracts";
 import { QuestionFlow, type PlanAnswers } from "@/features/plan";
+import { flattenThemeAnswers, flattenThemeQuestions, ThemePicker } from "@/features/theme";
 import { Button } from "@/shared/components/ui/Button";
 import { UserMessageItem } from "../components/UserMessageItem";
 import type { Msg } from "../schemas/agentSchemas";
 import { intakeLanded, profileTitleFromPrompt, promptIsInChat, questionsAreInChat } from "./chat-echo";
+import { PlanReview } from "./PlanReview";
 import type { IntakeGate } from "./use-intake";
 
 function pendingMessage(prompt: string): Msg {
@@ -17,6 +20,21 @@ function pendingMessage(prompt: string): Msg {
   };
 }
 
+function dockFlags(gate: IntakeGate, messages: readonly Msg[]) {
+  return {
+    showPrompt: !promptIsInChat(messages, gate.prompt, gate.afterSeq),
+    showQuestions:
+      gate.status === "asking" &&
+      gate.questions.length > 0 &&
+      !questionsAreInChat(messages, gate.questions, gate.afterSeq),
+    showChecking: gate.status === "checking" && !gate.error,
+    showPlanning: gate.status === "planning" && !gate.error,
+    showPlan: gate.status === "reviewing-plan" && Boolean(gate.plan),
+    showThemes: gate.status === "choosing-theme",
+    showError: Boolean(gate.error),
+  };
+}
+
 export function IntakeDock({
   gate,
   messages,
@@ -25,6 +43,9 @@ export function IntakeDock({
   onRetry,
   onContinue,
   onAskAgain,
+  onChooseTheme,
+  onApprovePlan,
+  onRevisePlan,
 }: {
   gate: IntakeGate;
   messages: readonly Msg[];
@@ -33,21 +54,26 @@ export function IntakeDock({
   onRetry: () => void;
   onContinue: () => void;
   onAskAgain: () => void;
+  onChooseTheme: (theme: ThemeOption) => void;
+  onApprovePlan: () => void;
+  onRevisePlan: (feedback: string) => void;
 }) {
   if (intakeLanded(messages, gate)) return null;
-  const showPrompt = !promptIsInChat(messages, gate.prompt, gate.afterSeq);
-  const showQuestions =
-    gate.questions.length > 0 && !questionsAreInChat(messages, gate.questions, gate.afterSeq);
-  const showChecking = gate.status === "checking" && !gate.error;
-  if (!showPrompt && !showQuestions && !showChecking && !gate.error) return null;
+  const flags = dockFlags(gate, messages);
+  const { showPrompt, showQuestions, showChecking, showPlanning, showPlan, showThemes, showError } = flags;
+  if (!Object.values(flags).some(Boolean)) return null;
 
   return (
     <div className="flex flex-col gap-3">
       {showPrompt && <UserMessageItem msg={pendingMessage(gate.prompt)} />}
       {showChecking && (
-        <p className="text-sm text-muted">Choosing questions for this app…</p>
+        <p className="text-sm text-muted">
+          {gate.asked.length > 0
+            ? "Checking your answers for anything still open…"
+            : "Choosing questions for this app…"}
+        </p>
       )}
-      {gate.error && !showQuestions && (
+      {showError && !showQuestions && (
         <div className="flex flex-col gap-2 rounded-xl border border-border-soft p-3">
           <p className="text-sm text-danger">{gate.error}</p>
           <div className="flex gap-2">
@@ -60,8 +86,29 @@ export function IntakeDock({
           </div>
         </div>
       )}
+      {showPlanning && (
+        <p className="text-sm text-muted">
+          Planning every page, section and image from your answers…
+        </p>
+      )}
+      {showPlan && gate.plan && (
+        <PlanReview plan={gate.plan} onApprove={onApprovePlan} onRevise={onRevisePlan} />
+      )}
+      {showThemes && (
+        <ThemePicker
+          request={{
+            prompt: gate.prompt,
+            answers: flattenThemeAnswers(gate.answers),
+            questions: flattenThemeQuestions(gate.asked),
+            ...(gate.plan ? { plan: { pages: gate.plan.pages, features: gate.plan.features } } : {}),
+          }}
+          isSubmitting={isSubmitting}
+          onChoose={onChooseTheme}
+        />
+      )}
       {showQuestions && (
         <QuestionFlow
+          key={gate.questions.map((question) => question.need).join("|")}
           questions={gate.questions}
           profileTitle={profileTitleFromPrompt(gate.prompt)}
           isSubmitting={isSubmitting}

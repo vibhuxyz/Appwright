@@ -1,7 +1,9 @@
+import type { UpgradePlanRequest } from "@repo/contracts";
 import { httpClient } from "@/shared/lib/httpClient";
 import {
   addCreditsResponseSchema,
   creditsResponseSchema,
+  upgradePlanResponseSchema,
 } from "../schemas/billingSchemas";
 
 export const billingApi = {
@@ -11,4 +13,6 @@ export const billingApi = {
     httpClient
       .post("/user/credits/add", { amount })
       .then(addCreditsResponseSchema.parse),
+  upgradePlan: (request: UpgradePlanRequest) =>
+    httpClient.post("/user/plan", request).then(upgradePlanResponseSchema.parse),
 };

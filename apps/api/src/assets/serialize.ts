@@ -1,4 +1,4 @@
-import { ProjectAssetResponse } from "@repo/contracts";
+import { ProjectAssetResponse, UnsplashAttribution } from "@repo/contracts";
 
 export function serializeProjectAsset(row: {
   id: string;
@@ -10,8 +10,11 @@ export function serializeProjectAsset(row: {
   cloudinaryUrl: string;
   localPath: string;
   altText: string;
+  externalId: string | null;
+  attribution: unknown;
   createdAt: Date;
 }): ProjectAssetResponse {
+  const attribution = UnsplashAttribution.safeParse(row.attribution);
   return ProjectAssetResponse.parse({
     id: row.id,
     projectId: row.projectId,
@@ -22,6 +25,8 @@ export function serializeProjectAsset(row: {
     url: row.cloudinaryUrl,
     localPath: row.localPath,
     altText: row.altText,
+    externalId: row.externalId,
+    attribution: attribution.success ? attribution.data : null,
     createdAt: row.createdAt.toISOString(),
   });
 }

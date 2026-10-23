@@ -2,8 +2,8 @@ import type { NavLink, QuickPrompt, ShowcaseItem } from "../types";
 
 export const NAV_LINKS: NavLink[] = [
   { label: "Product", href: "#how" },
-  { label: "Platform", href: "#platform" },
   { label: "Templates", href: "#templates" },
+  { label: "Platform", href: "#platform" },
   { label: "Workspace", href: "#workspace" },
   { label: "Pricing", href: "#pricing" },
   { label: "Agents", href: "#platform", badge: { label: "NEW", tone: "accent" } },
@@ -35,7 +35,7 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
   },
 ];
 
-export const STACK_BADGES = ["Next.js", "Postgres", "Stripe"] as const;
+export const STACK_BADGES = ["Next.js", "MongoDB", "Stripe"] as const;
 
 export const SHOWCASE_ITEMS: ShowcaseItem[] = [
   {

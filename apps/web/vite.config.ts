@@ -33,5 +33,6 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
+  envDir: path.resolve(import.meta.dirname, "../.."),
   server: { port: 3000, strictPort: true },
 });

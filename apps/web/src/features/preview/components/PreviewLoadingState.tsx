@@ -1,11 +1,14 @@
+import type { ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 
 export function PreviewLoadingState({
   title = "Waking up your project…",
   subtitle = "Restoring workspace from git and starting dev server (30–90s on cold start)",
+  action,
 }: {
   title?: string;
   subtitle?: string;
+  action?: ReactNode;
 }) {
   return (
     <div className="relative flex size-full flex-col items-center justify-center overflow-hidden bg-background px-4 py-8 text-center">
@@ -31,15 +34,17 @@ export function PreviewLoadingState({
           <div className="size-full origin-left -translate-x-full animate-pulse rounded-full bg-lime" />
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
-          <span className="inline-flex items-center gap-1 rounded-full border border-border-soft bg-surface px-2.5 py-0.5 text-[10px] text-muted">
-            <span className="size-1.5 animate-pulse rounded-full bg-lime" />
-            Live Sandbox
-          </span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-border-soft bg-surface px-2.5 py-0.5 text-[10px] text-muted">
-            Lazy Boot
-          </span>
-        </div>
+        {action ?? (
+          <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+            <span className="inline-flex items-center gap-1 rounded-full border border-border-soft bg-surface px-2.5 py-0.5 text-[10px] text-muted">
+              <span className="size-1.5 animate-pulse rounded-full bg-lime" />
+              Live Sandbox
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-border-soft bg-surface px-2.5 py-0.5 text-[10px] text-muted">
+              Lazy Boot
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -17,6 +17,14 @@ export function lowercaseEnum<T extends string>(value: string): T {
   return value.toLowerCase() as T;
 }
 
+export function taskTypeToPrisma(type: TaskType): string {
+  return type.toUpperCase().replaceAll("-", "_");
+}
+
+export function taskTypeFromPrisma(type: string): TaskType {
+  return type.toLowerCase().replaceAll("_", "-") as TaskType;
+}
+
 export interface MappedTask {
   id: string;
   type: TaskType;
@@ -42,7 +50,7 @@ export function mapTaskRow(row: {
 }): MappedTask {
   return {
     id: row.id,
-    type: lowercaseEnum<TaskType>(row.type),
+    type: taskTypeFromPrisma(row.type),
     title: row.title,
     status: taskStatusFromPrisma(row.status),
     dependsOn: row.dependsOn as string[],

@@ -4,17 +4,20 @@ interface TurnRow {
   data: unknown;
 }
 
-function isIntakeTurn(row: TurnRow): boolean {
+export function isIntakeTurn(row: TurnRow): boolean {
   return Boolean(row.data && typeof row.data === "object" && (row.data as { intake?: boolean }).intake === true);
 }
 
-export function currentTurnText(rows: readonly TurnRow[]): string {
-  const turn: string[] = [];
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const row = rows[i];
-    if (!row) break;
-    turn.unshift(row.content);
-    if (row.role === "user" && !isIntakeTurn(row)) break;
+export function currentTurnRows<T extends TurnRow>(rows: readonly T[]): readonly T[] {
+  for (let index = rows.length - 1; index >= 0; index--) {
+    const row = rows[index];
+    if (row && row.role === "user" && !isIntakeTurn(row)) return rows.slice(index);
   }
-  return turn.join("\n\n");
+  return rows;
+}
+
+export function currentTurnText(rows: readonly TurnRow[]): string {
+  return currentTurnRows(rows)
+    .map((row) => row.content)
+    .join("\n\n");
 }

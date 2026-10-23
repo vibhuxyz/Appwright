@@ -46,7 +46,7 @@ function checkImportRegistry(
     if (fileTarget) {
       const pascalName = fileTarget.charAt(0).toUpperCase() + fileTarget.slice(1);
       const isKnown = Object.keys(registry).some(
-        (key) => key.toLowerCase() === fileTarget.toLowerCase(),
+        (key) => key.toLowerCase() === fileTarget.replaceAll("-", "").toLowerCase(),
       );
       if (!isKnown) {
         issues.push({

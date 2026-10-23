@@ -1,17 +1,22 @@
 {
   "packages": [
-    "@prisma/client",
+    "@hookform/resolvers",
+    "@tanstack/react-query",
+    "bcryptjs",
     "clsx",
     "lucide-react",
+    "mongoose",
     "next",
     "next-auth",
     "react",
     "react-dom",
+    "react-hook-form",
     "stripe",
     "tailwind-merge",
     "tailwindcss",
     "uploadthing",
     "ws",
-    "zod"
+    "zod",
+    "zustand"
   ]
 }

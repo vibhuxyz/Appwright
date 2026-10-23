@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test";
+import type { Requirement } from "@repo/contracts";
 import {
+  MAX_TASKS_PER_PLAN,
   planBlueprint,
   riskTierFor,
   validateTaskGraph,
   type TaskSpec,
 } from "../src";
+import { MAX_TOTAL_ENTITIES, MAX_TOTAL_PAGES } from "../src/universal/constants";
 
 const FOOD_DELIVERY = {
   blueprintVersion: 1,
@@ -124,7 +127,7 @@ describe("planBlueprint", () => {
   });
 
   it("accepts a plan whose packages are all in the allowlist", () => {
-    const result = planBlueprint(FOOD_DELIVERY, undefined, ["next-auth"]);
+    const result = planBlueprint(FOOD_DELIVERY, undefined, ["next-auth", "bcryptjs"]);
     expect(result.ok).toBe(true);
   });
 });
@@ -157,6 +160,72 @@ describe("validateTaskGraph", () => {
     const result = validateTaskGraph([spec("a", ["src/**"], [])]);
     if (!result.ok) throw new Error("expected ok");
     expect(result.value.warnings[0]?.code).toBe("broad_ownership");
+  });
+
+  it("accepts a 45-task plan (universal blueprints exceed the old 40 cap)", () => {
+    const result = validateTaskGraph(manyTasks(45));
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.levels.flat()).toHaveLength(45);
+  });
+
+  it("rejects a plan above the compiled-blueprint ceiling", () => {
+    const result = validateTaskGraph(manyTasks(MAX_TASKS_PER_PLAN + 1));
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.issues).toEqual([
+      {
+        code: "too_many_tasks",
+        message: `Plan has ${MAX_TASKS_PER_PLAN + 1} tasks, limit is ${MAX_TASKS_PER_PLAN}`,
+      },
+    ]);
+  });
+});
+
+const REQUIRED_AREAS: readonly Requirement["area"][] = [
+  "security",
+  "admin",
+  "media",
+  "seo",
+  "testing",
+  "deploy",
+];
+
+function maxUniversalBlueprint() {
+  return {
+    ...FOOD_DELIVERY,
+    features: ["auth", "payments"],
+    entities: Array.from({ length: MAX_TOTAL_ENTITIES }, (_, index) => ({
+      name: `Entity${index + 1}`,
+      fields: [{ name: "name", type: "String", required: true }],
+      relations: [],
+    })),
+    pages: Array.from({ length: MAX_TOTAL_PAGES }, (_, index) => ({
+      route: index === 0 ? "/" : `/page-${index}`,
+      purpose: `page ${index}`,
+      components: [],
+    })),
+    requirements: REQUIRED_AREAS.map((area) => ({
+      id: area,
+      area,
+      level: "required" as const,
+      reason: "coverage",
+      acceptance: [],
+    })),
+  };
+}
+
+function manyTasks(count: number): TaskSpec[] {
+  return Array.from({ length: count }, (_, index) =>
+    spec(`t${index}`, [`src/t${index}/**`], []),
+  );
+}
+
+describe("universal plan size", () => {
+  it("plans a max-size blueprint that compiles to more than 40 tasks", () => {
+    const result = planBlueprint(maxUniversalBlueprint());
+    if (!result.ok) throw new Error(JSON.stringify(result.issues));
+    expect(result.value.tasks.length).toBeGreaterThan(40);
+    expect(result.value.tasks.length).toBeLessThanOrEqual(MAX_TASKS_PER_PLAN);
   });
 });
 

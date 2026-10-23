@@ -1,4 +1,4 @@
-import { DEFAULT_MODEL, OpenAiProvider, readProviderText, type Provider } from "@repo/agent-core";
+import { bestAvailableModel, OpenAiProvider, readProviderText, type Provider } from "@repo/agent-core";
 import {
   buildContentPrompt,
   parseGeneratedContent,
@@ -22,7 +22,7 @@ export async function generateBlueprintContent(
   signal: AbortSignal,
   provider?: Provider,
 ): Promise<BlueprintContent> {
-  const resolved = provider ?? new OpenAiProvider({ model: DEFAULT_MODEL });
+  const resolved = provider ?? new OpenAiProvider({ model: bestAvailableModel() });
   const raw = await readProviderText(resolved, buildContentPrompt(prompt), signal, MAX_OUTPUT_BYTES);
   const parsed = parseGeneratedContent(raw);
   if (!parsed.ok) throw new BlueprintContentError(parsed.reason);

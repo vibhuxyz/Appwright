@@ -6,7 +6,7 @@ export type CapabilityChoice =
   | "websockets"
   | "stripe"
   | "local-uploads"
-  | "postgres-fulltext";
+  | "mongodb-text-index";
 
 export interface ArchitectureDecision {
   capability: Capability;

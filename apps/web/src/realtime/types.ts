@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AssetRequestResponse } from "@repo/contracts";
 import { msgSchema } from "@/features/agent/schemas/agentSchemas";
 
 // The backend streams over SSE (EventSource), not a raw WebSocket — the
@@ -18,15 +19,20 @@ export const usageFrameSchema = z.object({
   tokenOut: z.number(),
   creditsRemaining: z.number().optional(),
 });
+export const assetRequestFrameSchema = z.object({
+  assetRequest: AssetRequestResponse,
+});
 
 export type MessageFrame = z.infer<typeof messageFrameSchema>;
 export type StatusFrame = z.infer<typeof statusFrameSchema>;
 export type DeltaFrame = z.infer<typeof deltaFrameSchema>;
 export type UsageFrame = z.infer<typeof usageFrameSchema>;
+export type AssetRequestFrame = z.infer<typeof assetRequestFrameSchema>;
 
 export interface ConversationStreamHandlers {
   onMessage: (frame: MessageFrame) => void;
   onStatus: (frame: StatusFrame) => void;
   onDelta: (frame: DeltaFrame) => void;
   onUsage: (frame: UsageFrame) => void;
+  onAssetRequest?: (frame: AssetRequestFrame) => void;
 }

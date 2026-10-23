@@ -1,5 +1,6 @@
 import z from "zod";
 import { ElementSelectionSchema } from "./element-selection.schema";
+import { ThemeOptionSchema } from "./theme";
 
 export const SessionStatus = z.enum([
   "IDLE",
@@ -58,35 +59,67 @@ export const SessionPreviewResponse = z.object({
   previewUrl: z.string().min(1),
 });
 
-export const PromptAnswerValue = z.union([z.string().min(1).max(200), z.literal("skip")]);
+export const PromptAnswerValue = z.union([z.string().min(1).max(1000), z.literal("skip")]);
+
+export const PromptQuestionInputType = z.enum([
+  "single",
+  "multiple",
+  "short-text",
+  "date",
+  "images",
+  "contacts",
+]);
+export type PromptQuestionInputType = z.infer<typeof PromptQuestionInputType>;
 
 export const PromptQuestionSchema = z
   .object({
     need: z.string().min(1).max(40),
-    text: z.string().min(1).max(200),
+    text: z.string().min(1).max(280),
     label: z.string().min(1).max(40),
-    options: z.array(z.string().min(1).max(60)).min(2).max(4),
-    defaultOptionIndex: z.number().int().min(0),
+    options: z.array(z.string().min(1).max(60)).max(12).default([]),
+    defaultOptionIndex: z.number().int().min(0).default(0),
+    inputType: PromptQuestionInputType.default("single"),
+    importance: z.enum(["required", "optional"]).default("required"),
+    why: z.string().min(1).max(280).optional(),
+    prefill: z.record(z.string().min(1).max(40), z.string().min(1).max(200)).optional(),
   })
-  .refine((question) => question.defaultOptionIndex < question.options.length, {
-    message: "defaultOptionIndex must index into options",
-    path: ["defaultOptionIndex"],
+  .superRefine((question, ctx) => {
+    const needsOptions = question.inputType === "single" || question.inputType === "multiple";
+    if (needsOptions && question.options.length < 2) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Choice questions need at least two options",
+        path: ["options"],
+      });
+    }
+    if (question.options.length > 0 && question.defaultOptionIndex >= question.options.length) {
+      ctx.addIssue({
+        code: "custom",
+        message: "defaultOptionIndex must index into options",
+        path: ["defaultOptionIndex"],
+      });
+    }
   });
 
 export const SendMessageRequest = z.object({
   sessionId: z.string(),
   prompt: z.string().min(1),
   answers: z.record(z.string(), PromptAnswerValue).optional(),
-  questions: z.array(PromptQuestionSchema).max(3).optional(),
+  questions: z.array(PromptQuestionSchema).max(24).optional(),
   selection: ElementSelectionSchema.optional(),
+  theme: ThemeOptionSchema.optional(),
+  blueprintId: z.string().min(1).max(40).optional(),
 });
 
 export const PromptQuestionsRequest = z.object({
   prompt: z.string().trim().min(1),
+  sessionId: z.string().min(1).optional(),
+  answers: z.record(z.string(), PromptAnswerValue).optional(),
 });
 
 export const PromptQuestionsResponse = z.object({
-  questions: z.array(PromptQuestionSchema).max(3),
+  questions: z.array(PromptQuestionSchema).max(8),
+  action: z.enum(["plan", "send"]).default("send"),
 });
 
 export const EnhancePromptRequest = z.object({
@@ -99,11 +132,15 @@ export const EnhancePromptResponse = z.object({
   suggestions: z.array(z.string()).optional(),
 });
 
+export const ModelCategorySchema = z.enum(["efficient", "standard", "frontier"]);
+export type ModelCategory = z.infer<typeof ModelCategorySchema>;
+
 export const AvailableModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   provider: z.string(),
   description: z.string(),
+  category: ModelCategorySchema.optional(),
   badge: z.string().optional(),
   isDefault: z.boolean().optional(),
 });
@@ -170,7 +207,7 @@ export type VerificationError = z.infer<typeof VerificationErrorSchema>;
 
 export const VerificationResultSchema = z.object({
   ok: z.boolean(),
-  check: z.enum(["tsc", "build", "lint"]),
+  check: z.enum(["install", "tsc", "build", "lint"]),
   errors: z.array(VerificationErrorSchema),
 });
 export type VerificationResult = z.infer<typeof VerificationResultSchema>;

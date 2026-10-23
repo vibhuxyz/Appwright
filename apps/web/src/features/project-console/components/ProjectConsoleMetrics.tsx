@@ -1,52 +1,80 @@
-import { ArrowUpRight, Database, FileCode2, Users, Zap } from "lucide-react";
+import { Database, FileCode2, HardDrive, MessageSquare } from "lucide-react";
+import type {
+  ProjectOverviewDatabase,
+  ProjectOverviewMetrics,
+} from "../schemas/projectConsoleSchemas";
 
-const METRICS = [
-  {
-    id: "requests",
-    title: "Total Requests",
-    value: "12,548",
-    change: "↑ 12% from last week",
-    icon: Zap,
-    iconStyle: "bg-purple-500/15 border-purple-500/30 text-purple-400",
-    strokeColor: "#A855F7",
-    points: "0,25 20,20 40,22 60,14 80,18 100,5 120,8",
-  },
-  {
-    id: "users",
-    title: "Active Users",
-    value: "892",
-    change: "↑ 8% from last week",
-    icon: Users,
-    iconStyle: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
-    strokeColor: "#10B981",
-    points: "0,22 20,18 40,25 60,16 80,10 100,12 120,4",
-  },
-  {
-    id: "storage",
-    title: "Storage Used",
-    value: "2.4 GB",
-    change: "↑ 4% from last week",
-    icon: Database,
-    iconStyle: "bg-sky-500/15 border-sky-500/30 text-sky-400",
-    strokeColor: "#38BDF8",
-    points: "0,18 20,22 40,15 60,18 80,24 100,12 120,10",
-  },
-  {
-    id: "functions",
-    title: "Function Invocations",
-    value: "1,204",
-    change: "↑ 18% from last week",
-    icon: FileCode2,
-    iconStyle: "bg-pink-500/15 border-pink-500/30 text-pink-400",
-    strokeColor: "#F43F5E",
-    points: "0,24 20,16 40,18 60,10 80,15 100,8 120,4",
-  },
-] as const;
+interface ProjectConsoleMetricsProps {
+  metrics?: ProjectOverviewMetrics;
+  database?: ProjectOverviewDatabase | null;
+  templateId?: string;
+  isLoading?: boolean;
+}
 
-export function ProjectConsoleMetrics() {
+export function ProjectConsoleMetrics({
+  metrics,
+  database,
+  templateId,
+  isLoading,
+}: ProjectConsoleMetricsProps) {
+  if (isLoading || !metrics) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {[1, 2, 3, 4].map((id) => (
+          <div
+            key={id}
+            className="flex h-32 animate-pulse flex-col justify-between rounded-2xl border border-border/70 bg-[#121622]/90 p-5 shadow-xs"
+          >
+            <div className="h-4 w-28 rounded-md bg-surface-3" />
+            <div className="h-8 w-20 rounded-md bg-surface-3" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const cards = [
+    {
+      id: "files",
+      title: "Codebase Files",
+      value: `${metrics.fileCount} Files`,
+      subtext: `${templateId === "nextjs-fullstack" ? "Next.js Fullstack" : "Vite + React"} workspace`,
+      status: "Ready in workspace",
+      icon: FileCode2,
+      iconStyle: "bg-purple-500/15 border-purple-500/30 text-purple-400",
+    },
+    {
+      id: "sessions",
+      title: "AI Agent Sessions",
+      value: `${metrics.sessionCount} Sessions`,
+      subtext: `${metrics.messageCount} messages · ${metrics.totalTokens.toLocaleString()} tokens`,
+      status: metrics.sessionCount > 0 ? "Active sessions" : "No sessions yet",
+      icon: MessageSquare,
+      iconStyle: "bg-emerald-500/15 border-emerald-500/30 text-emerald-400",
+    },
+    {
+      id: "database",
+      title: "Project Database",
+      value: database?.status ?? (templateId === "vite-react" ? "Client Only" : "MongoDB"),
+      subtext: database?.databaseName ?? (templateId === "vite-react" ? "Frontend application" : "Pending provisioning"),
+      status: database?.status === "READY" ? "Connected" : (database?.status ?? "Not required"),
+      icon: Database,
+      iconStyle: "bg-amber-500/15 border-amber-500/30 text-amber-400",
+    },
+    {
+      id: "assets",
+      title: "Media Assets",
+      value: `${metrics.assetCount} Assets`,
+      subtext: "Cloudinary media storage",
+      status: metrics.assetCount > 0 ? "Assets resolved" : "Library ready",
+      icon: HardDrive,
+      iconStyle: "bg-sky-500/15 border-sky-500/30 text-sky-400",
+    },
+  ];
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {METRICS.map((item) => {
+      {cards.map((item) => {
         const Icon = item.icon;
         return (
           <div
@@ -60,27 +88,11 @@ export function ProjectConsoleMetrics() {
               <span className="text-xs font-semibold text-muted">{item.title}</span>
             </div>
 
-            <div className="mt-4 flex items-end justify-between">
-              <div>
-                <p className="text-2xl font-black text-white">{item.value}</p>
-                <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
-                  <ArrowUpRight className="size-3" />
-                  <span>{item.change.replace("↑ ", "")}</span>
-                </div>
-              </div>
-
-              {/* Sparkline curve */}
-              <div className="h-8 w-24">
-                <svg className="size-full overflow-visible" viewBox="0 0 120 30">
-                  <polyline
-                    fill="none"
-                    stroke={item.strokeColor}
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    points={item.points}
-                  />
-                </svg>
+            <div className="mt-4">
+              <p className="text-2xl font-black text-white">{item.value}</p>
+              <div className="mt-1 flex items-center justify-between text-[11px]">
+                <span className="truncate text-muted">{item.subtext}</span>
+                <span className="shrink-0 font-medium text-emerald-400">{item.status}</span>
               </div>
             </div>
           </div>

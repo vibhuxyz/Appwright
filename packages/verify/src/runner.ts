@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { $ } from "bun";
 import type { VerificationResult } from "@repo/contracts";
+import { runInstall } from "./install";
 import { parseBuildErrors, parseLintErrors, parseTscErrors } from "./parser";
 
 function hasScript(cwd: string, script: string): boolean {
@@ -90,6 +91,10 @@ export async function runLint(cwd: string): Promise<VerificationResult> {
 }
 
 export async function verifyWorkspace(cwd: string): Promise<VerificationResult[]> {
+  const installResult = await runInstall(cwd);
+  if (!installResult.ok) {
+    return [installResult];
+  }
   const tscResult = await runTsc(cwd);
   if (!tscResult.ok) {
     return [tscResult];

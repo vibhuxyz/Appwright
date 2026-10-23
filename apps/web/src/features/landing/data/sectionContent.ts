@@ -67,8 +67,8 @@ export const PLATFORM_FEATURES: PlatformFeature[] = [
   {
     tag: "DATA",
     name: "Databases",
-    copy: "Postgres with migrations the agent writes, reviews and rolls back safely.",
-    meta: "schema · migrations",
+    copy: "MongoDB with Mongoose models the agent writes, validates and seeds for you.",
+    meta: "schema · models",
   },
   {
     tag: "FILES",

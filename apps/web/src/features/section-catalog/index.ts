@@ -1,0 +1,1 @@
+export { SectionCatalogPage } from "./components";

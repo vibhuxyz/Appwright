@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { collectTurn, type PendingToolCall } from "./collect-turn";
+import { collectTurn, type CollectedTurn, type PendingToolCall } from "./collect-turn";
+import { classifyProviderFailure, isRetryableProviderFailure } from "./providers/provider-errors";
 import { costUsd } from "./providers/pricing";
 import type { Provider, ToolSpec } from "./providers/types";
 import type { Runtime } from "./runtime";
@@ -30,6 +31,8 @@ export interface RunAgentLoopParams {
   signal: AbortSignal;
   sessionId: string;
   onApprovalRequired?: ApprovalHook;
+  fallbackProviders?: Provider[];
+  providerRetryDelayMs?: number;
 }
 
 function toToolSpecs(tools: Tool[]): ToolSpec[] {
@@ -42,10 +45,63 @@ function toToolSpecs(tools: Tool[]): ToolSpec[] {
 
 // runAgentLoop — THE loop. Pure function of its params: no printing, no HTTP,
 // no node:fs. Returns a StopReason, never void (D26).
+const PROVIDER_ATTEMPTS = 3;
+const UNFINISHED_TOOL_RESULT = "Error: this tool call did not finish because the run stopped.";
+
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+async function collectTurnWithRetry(
+  providers: Provider[],
+  messages: Message[],
+  toolSpecs: ToolSpec[],
+  signal: AbortSignal,
+  emit: AgentEventSink,
+  sessionId: string,
+  nextSeq: () => number,
+  retryDelayMs: number,
+): Promise<{ turn: CollectedTurn; billedModel: string }> {
+  let lastError: unknown = new Error("No model provider available");
+  for (const [providerIndex, active] of providers.entries()) {
+    for (let attempt = 0; attempt < PROVIDER_ATTEMPTS; attempt++) {
+      try {
+        const turn = await collectTurn(active, messages, toolSpecs, signal, emit, sessionId, nextSeq);
+        return { turn, billedModel: active.model };
+      } catch (error) {
+        lastError = error;
+        const message = error instanceof Error ? error.message : String(error);
+        const kind = classifyProviderFailure(message);
+        if (signal.aborted || !isRetryableProviderFailure(kind)) throw error;
+        const hasLaterProvider = providerIndex < providers.length - 1;
+        const hasLaterAttempt = attempt < PROVIDER_ATTEMPTS - 1;
+        if (!hasLaterAttempt && !hasLaterProvider) throw error;
+        if (hasLaterAttempt && retryDelayMs > 0) await sleep(retryDelayMs * 2 ** attempt, signal);
+      }
+    }
+  }
+  throw lastError;
+}
+
 export async function runAgentLoop(
   params: RunAgentLoopParams,
 ): Promise<StopReason> {
   const { tools, provider, runtime, emit, budget, signal, sessionId, onApprovalRequired } = params;
+  const providers = [provider, ...(params.fallbackProviders ?? [])];
   const messages = [...params.messages];
   const toolSpecs = toToolSpecs(tools);
   const toolsByName = new Map(tools.map((t) => [t.name, t]));
@@ -53,14 +109,26 @@ export async function runAgentLoop(
   let seq = 0;
   const nextSeq = () => seq++;
   let iterations = 0;
-  // Real counts when the provider reports them, a response-size estimate
-  // when it does not (FakeProvider never does). The distinction matters for
-  // money, not for the loop: budgetExceeded has to stay reachable either
-  // way, or a provider that goes quiet silently removes the ceiling.
-  let totalTokens = 0;
+  let estimatedTokens = 0;
   let totalCostUsd = 0;
 
+  const openCallIds = new Set<string>();
+
+  const closeOpenCalls = async (): Promise<void> => {
+    for (const toolCallId of [...openCallIds]) {
+      openCallIds.delete(toolCallId);
+      await emit({
+        type: "tool_error",
+        seq: nextSeq(),
+        sessionId,
+        toolCallId,
+        error: UNFINISHED_TOOL_RESULT,
+      });
+    }
+  };
+
   const end = async (stopReason: StopReason): Promise<StopReason> => {
+    await closeOpenCalls();
     await emit({ type: "agent_end", seq: nextSeq(), sessionId, stopReason });
     return stopReason;
   };
@@ -73,39 +141,42 @@ export async function runAgentLoop(
       if (signal.aborted) return end("cancelled");
       if (Date.now() > budget.deadline) return end("timeout");
       if (iterations >= budget.maxIterations) return end("maxIterations");
-      if (totalTokens >= budget.maxTokens) return end("budgetExceeded");
+      if (estimatedTokens >= budget.maxTokens) return end("budgetExceeded");
       if (totalCostUsd >= budget.maxCostUsd) return end("budgetExceeded");
       iterations++;
 
-      const { text, toolCalls, stopReason, usage } = await collectTurn(
-        provider,
+      const {
+        turn: { text, toolCalls, stopReason, usage },
+        billedModel,
+      } = await collectTurnWithRetry(
+        providers,
         messages,
         toolSpecs,
         signal,
         emit,
         sessionId,
         nextSeq,
+        params.providerRetryDelayMs ?? 200,
       );
 
       if (usage) {
         const costUsdThisTurn = costUsd(
-          provider.model,
+          billedModel,
           usage.inputTokens,
           usage.outputTokens,
         );
-        totalTokens += usage.inputTokens + usage.outputTokens;
         totalCostUsd += costUsdThisTurn;
         await emit({
           type: "usage",
           seq: nextSeq(),
           sessionId,
-          model: provider.model,
+          model: billedModel,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           costUsd: costUsdThisTurn,
         });
       } else {
-        totalTokens += Math.ceil(
+        estimatedTokens += Math.ceil(
           (text.length + JSON.stringify(toolCalls).length) / 4,
         );
       }
@@ -178,6 +249,7 @@ export async function runAgentLoop(
           args: call.args as Record<string, unknown>,
           providerMeta: call.providerMeta,
         });
+        openCallIds.add(call.toolCallId);
 
         const tool = toolsByName.get(call.toolName);
         let resultText = "";
@@ -227,6 +299,7 @@ export async function runAgentLoop(
           });
         }
 
+        openCallIds.delete(call.toolCallId);
         messages.push({
           role: "tool",
           type: "toolResponse",

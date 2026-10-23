@@ -1,3 +1,4 @@
+import { usdToCredits } from "@repo/contracts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import {
@@ -25,12 +26,12 @@ export function CustomAmountForm({
 
   const handleQuickAdd = (dollars: number) => {
     setValue("amount", String(dollars));
-    onSubmit(dollars * 1_000_000);
+    onSubmit(usdToCredits(dollars));
   };
 
   const onFormSubmit = (values: CustomAmountFormValues) => {
     const dollars = Number(values.amount);
-    onSubmit(Math.round(dollars * 1_000_000));
+    onSubmit(usdToCredits(dollars));
   };
 
   return (

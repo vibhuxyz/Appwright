@@ -1,5 +1,6 @@
 import { uiSystemPromptSection } from "@repo/ui-system";
 import type { Runtime } from "./runtime";
+import { loadStackStandards } from "./standards";
 
 const systemPromptPath = new URL("../prompts/system.md", import.meta.url);
 
@@ -44,6 +45,7 @@ export async function buildSystemPrompt(runtime: Runtime): Promise<string> {
   // added and nobody remembers the paragraph exists.
   return [
     template,
+    await loadStackStandards(),
     uiSystemPromptSection(),
     `Project file tree (top ${TREE_LIMIT}):\n${treeForPrompt(fileTree).join("\n")}`,
   ].join("\n\n");

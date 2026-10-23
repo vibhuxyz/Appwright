@@ -8,7 +8,7 @@ const PACKAGES_BY_CHOICE: Record<CapabilityChoice, readonly string[]> = {
   websockets: ["ws"],
   stripe: ["stripe"],
   "local-uploads": [],
-  "postgres-fulltext": [],
+  "mongodb-text-index": [],
 };
 
 export function validateArchitectureDecisions(

@@ -1,6 +1,6 @@
 const FOOTER_LINKS = [
-  { label: "Platform", href: "#platform" },
   { label: "Templates", href: "#templates" },
+  { label: "Platform", href: "#platform" },
   { label: "Pricing", href: "#pricing" },
   { label: "Changelog", href: "#how" },
   { label: "Docs", href: "#top" },

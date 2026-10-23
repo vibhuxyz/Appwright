@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   ExternalLink,
-  MoreHorizontal,
   Copy,
   Check,
   Rocket,
@@ -13,10 +12,12 @@ export function ProjectConsoleProjectHeader({
   projectName,
   project,
   onOpenSandbox,
+  onOpenDeploy,
 }: {
   projectName: string;
   project?: Project;
   onOpenSandbox: () => void;
+  onOpenDeploy?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -30,6 +31,11 @@ export function ProjectConsoleProjectHeader({
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const subtitle =
+    project?.templateId === "nextjs-fullstack"
+      ? "Fullstack Next.js application with MongoDB and Tailwind CSS"
+      : "Vite and React application with Tailwind CSS";
 
   return (
     <div className="border-b border-border/60 bg-[#0E1119] px-8 py-6">
@@ -78,22 +84,12 @@ export function ProjectConsoleProjectHeader({
               </button>
             </div>
 
-            <p className="mt-1 text-xs text-muted">
-              A modern fullstack web platform built with Appwright.
-            </p>
+            <p className="mt-1 text-xs text-muted">{subtitle}</p>
           </div>
         </div>
 
         {/* Top actions */}
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            type="button"
-            className="grid size-9 place-items-center rounded-xl border border-border/80 bg-surface/80 text-muted transition-colors hover:bg-surface hover:text-foreground"
-            aria-label="More options"
-          >
-            <MoreHorizontal className="size-4" />
-          </button>
-
           <a
             href={project?.previewUrl ?? `https://${domain}`}
             target="_blank"
@@ -115,6 +111,7 @@ export function ProjectConsoleProjectHeader({
 
           <button
             type="button"
+            onClick={onOpenDeploy}
             className="flex cursor-pointer items-center gap-1.5 rounded-xl bg-lime px-4 py-2 text-xs font-black text-black shadow-lg shadow-lime/20 transition-all hover:bg-lime/90"
           >
             <Rocket className="size-3.5 fill-black" />

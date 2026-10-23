@@ -4,6 +4,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { SpecialOfferTicket } from "./SpecialOfferTicket";
 import { PricingProCard } from "./PricingProCard";
 import { PricingMaxCard } from "./PricingMaxCard";
+import { billingApi } from "../api/billingApi";
 import { useOfferCountdown } from "../hooks/useOfferCountdown";
 
 export function UpgradeModal({
@@ -15,12 +16,12 @@ export function UpgradeModal({
   onClose: () => void;
   onOpenAddCredits?: () => void;
 }) {
-  const user = useAuthStore((s) => s.user);
-  const setUpgraded = useAuthStore((s) => s.setUpgraded);
+  const setPlan = useAuthStore((s) => s.setPlan);
   const updateCredits = useAuthStore((s) => s.updateCredits);
 
   const [loadingTier, setLoadingTier] = useState<"pro" | "max" | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAnnual, setIsAnnual] = useState(true);
 
   const [proCredits, setProCredits] = useState<number>(50);
@@ -49,20 +50,16 @@ export function UpgradeModal({
 
   const handleSelectOffer = async (tier: "pro" | "max") => {
     setLoadingTier(tier);
+    setErrorMessage(null);
+    const creditsUsd = tier === "pro" ? proCredits : maxCredits;
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600));
-      setUpgraded(tier);
-      const creditsToAdd = (tier === "pro" ? proCredits : maxCredits) * 1_000_000;
-      const newCredits = (user?.credits ?? 0) + creditsToAdd;
-      updateCredits(newCredits);
-      setSuccessMessage(
-        tier === "pro"
-          ? `🎉 Upgraded to Appwright PRO! +$${proCredits}.00 building balance added.`
-          : `🎉 Upgraded to Appwright MAX! +$${maxCredits}.00 building balance added.`
-      );
-      setTimeout(() => {
-        handleClose();
-      }, 1400);
+      const result = await billingApi.upgradePlan({ plan: tier === "pro" ? "PRO" : "MAX", creditsUsd });
+      setPlan(result.plan);
+      updateCredits(result.credits);
+      setSuccessMessage(`🎉 Upgraded to Appwright ${result.plan}! +$${creditsUsd}.00 building balance added.`);
+      setTimeout(handleClose, 1400);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Upgrade failed. Try again.");
     } finally {
       setLoadingTier(null);
     }
@@ -136,6 +133,11 @@ export function UpgradeModal({
           <div className="mx-auto mt-4 flex max-w-lg items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/60 p-3 text-xs font-medium text-emerald-200">
             <Check className="size-4 shrink-0 text-emerald-400" />
             <span>{successMessage}</span>
+          </div>
+        )}
+        {errorMessage && (
+          <div role="alert" className="mx-auto mt-4 max-w-lg rounded-xl border border-danger/40 bg-danger/10 p-3 text-xs font-medium text-danger">
+            {errorMessage}
           </div>
         )}
 

@@ -51,6 +51,8 @@ describe("usage accounting", () => {
     // A zero here would silently delete maxCostUsd for every model nobody
     // remembered to add to the table.
     expect(priceFor("gpt-9-not-released-yet").in).toBeGreaterThan(0);
+    expect(priceFor("claude-not-in-table-yet").in).toBeGreaterThan(0);
+    expect(priceFor("deepseek-not-in-table-yet").in).toBeGreaterThan(0);
     expect(costUsd("gpt-5.4-mini", 1_000_000, 0)).toBeCloseTo(0.25, 6);
     expect(costUsd("gpt-5.4-mini", 0, 1_000_000)).toBeCloseTo(2, 6);
   });
@@ -104,5 +106,23 @@ describe("usage accounting", () => {
     // Turn one costs 0.25 + 2.00 = $2.25, which is over this ceiling.
     const { stopReason } = await run(provider, { maxCostUsd: 1 });
     expect(stopReason).toBe("budgetExceeded");
+  });
+
+  test("reported usage is limited by cost, not by the token ceiling", async () => {
+    const provider = new FakeProvider(
+      [
+        {
+          kind: "toolCall",
+          toolCallId: "c1",
+          toolName: "echo",
+          args: {},
+          usage: { inputTokens: 500_000, outputTokens: 1_000 },
+        },
+        { kind: "text", text: "finished" },
+      ],
+      "gpt-5.4-mini",
+    );
+    const { stopReason } = await run(provider, { maxTokens: 100_000, maxCostUsd: 5 });
+    expect(stopReason).toBe("completed");
   });
 });

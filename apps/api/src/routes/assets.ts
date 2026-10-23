@@ -1,26 +1,25 @@
-import {
-  AssetSlotSchema,
-  GenerateAssetRequest,
-  ListProjectAssetsResponse,
-  type AssetSlot,
-} from "@repo/contracts";
+import { GenerateAssetRequest, ListProjectAssetsResponse } from "@repo/contracts";
 import { prisma } from "@repo/db";
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import {
-  markSlotResolved,
+  claimSlot,
+  fillRemainingStockSlots,
+  fillStockSlot,
+  loadOwnedAssetRequest,
+  loadOwnedSlot,
   parseUploadedImage,
   resolveGenerate,
   resolveUpload,
+  respondFailed,
   serializeAssetRequest,
   serializeProjectAsset,
 } from "../assets";
-import { ownedAssetRequestSessionId, ownedProjectId, ownedSessionProjectId } from "../ownership";
+import { ownedProjectId, ownedSessionProjectId } from "../ownership";
 import { publishAssetRequest } from "../stream/sse";
 
 export const assetsRouter = Router();
 
-const SlotsSchema = z.array(AssetSlotSchema);
 const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 100;
 
@@ -31,33 +30,6 @@ function requestIdOf(res: { getHeader(name: string): unknown }): string {
 
 function errorResponse(code: string, message: string, res: { getHeader(name: string): unknown }) {
   return { error: { code, message, details: {}, requestId: requestIdOf(res) } };
-}
-
-type OwnedSlotError = "NOT_FOUND" | "SLOT_NOT_FOUND" | "ALREADY_RESOLVED";
-type OwnedSlotResult =
-  | { readonly error: OwnedSlotError }
-  | { readonly sessionId: string; readonly projectId: string; readonly slot: AssetSlot };
-
-async function loadOwnedSlot(
-  assetRequestId: string,
-  slotId: string,
-  userId: string,
-): Promise<OwnedSlotResult> {
-  const sessionId = await ownedAssetRequestSessionId(assetRequestId, userId);
-  if (!sessionId) return { error: "NOT_FOUND" };
-
-  const projectId = await ownedSessionProjectId(sessionId, userId);
-  if (!projectId) return { error: "NOT_FOUND" };
-
-  const row = await prisma.assetRequest.findUniqueOrThrow({ where: { id: assetRequestId } });
-  const slots = SlotsSchema.parse(row.slots);
-  const slot = slots.find((candidate) => candidate.id === slotId);
-  if (!slot) return { error: "SLOT_NOT_FOUND" };
-  if (slot.status === "RESOLVED" || slot.status === "SKIPPED") {
-    return { error: "ALREADY_RESOLVED" };
-  }
-
-  return { sessionId, projectId, slot };
 }
 
 assetsRouter.get("/asset-requests/:sessionId", async (req, res) => {
@@ -83,21 +55,45 @@ assetsRouter.post("/asset-requests/:id/slots/:slotId/upload", async (req, res) =
   const upload = await parseUploadedImage(req);
   if (!upload.ok) {
     const status = upload.code === "TOO_LARGE" ? 413 : 400;
-    return res.status(status).json(errorResponse(upload.code, "Could not read the uploaded image", res));
+    const message =
+      upload.code === "TOO_LARGE"
+        ? "That file is over 5 MB. Upload a PNG, JPEG, or JPG under 5 MB."
+        : "Upload a PNG, JPEG, or JPG under 5 MB.";
+    return res.status(status).json(errorResponse(upload.code, message, res));
   }
 
-  const { asset, assetRequest } = await resolveUpload({
-    userId: req.userId!,
-    projectId: owned.projectId,
-    sessionId: owned.sessionId,
+  const claimed = await claimSlot({
     assetRequestId: req.params.id,
-    slot: owned.slot,
-    bytes: upload.bytes,
-    mimeType: upload.mimeType,
+    slotId: req.params.slotId,
+    status: "UPLOADING",
   });
+  if (!claimed.ok) {
+    return res.status(409).json(errorResponse(claimed.reason, "Asset slot is already being resolved", res));
+  }
 
-  publishAssetRequest(owned.sessionId, serializeAssetRequest(assetRequest));
-  res.status(201).json(serializeProjectAsset(asset));
+  try {
+    const { asset, assetRequest } = await resolveUpload({
+      userId: req.userId!,
+      projectId: owned.projectId,
+      sessionId: owned.sessionId,
+      assetRequestId: req.params.id,
+      slot: claimed.slot,
+      bytes: upload.bytes,
+      mimeType: upload.mimeType,
+    });
+    publishAssetRequest(owned.sessionId, serializeAssetRequest(assetRequest));
+    return res.status(201).json(serializeProjectAsset(asset));
+  } catch {
+    return respondFailed({
+      res,
+      sessionId: owned.sessionId,
+      assetRequestId: req.params.id,
+      slotId: req.params.slotId,
+      code: "UPLOAD_FAILED",
+      message: "Could not finalize the uploaded image",
+      status: 502,
+    });
+  }
 });
 
 assetsRouter.post("/asset-requests/:id/slots/:slotId/generate", async (req, res) => {
@@ -111,33 +107,97 @@ assetsRouter.post("/asset-requests/:id/slots/:slotId/generate", async (req, res)
     return res.status(400).json(errorResponse("INVALID_REQUEST", "A prompt is required", res));
   }
 
-  const generated = await resolveGenerate({
-    userId: req.userId!,
-    projectId: owned.projectId,
-    sessionId: owned.sessionId,
+  const claimed = await claimSlot({
     assetRequestId: req.params.id,
-    slot: owned.slot,
-    prompt: parsed.data.prompt,
+    slotId: req.params.slotId,
+    status: "GENERATING",
   });
+  if (!claimed.ok) {
+    return res.status(409).json(errorResponse(claimed.reason, "Asset slot is already being resolved", res));
+  }
+
+  let generated: Awaited<ReturnType<typeof resolveGenerate>>;
+  try {
+    generated = await resolveGenerate({
+      userId: req.userId!,
+      projectId: owned.projectId,
+      sessionId: owned.sessionId,
+      assetRequestId: req.params.id,
+      slot: claimed.slot,
+      prompt: parsed.data.prompt,
+    });
+  } catch {
+    return respondFailed({
+      res,
+      sessionId: owned.sessionId,
+      assetRequestId: req.params.id,
+      slotId: req.params.slotId,
+      code: "GENERATION_FAILED",
+      message: "Could not finalize the generated image",
+      status: 502,
+    });
+  }
 
   if (!generated.ok) {
     const status = generated.error.code === "PROVIDER_TIMEOUT" ? 503 : 502;
-    return res.status(status).json(errorResponse(generated.error.code, generated.error.message, res));
+    return respondFailed({
+      res,
+      sessionId: owned.sessionId,
+      assetRequestId: req.params.id,
+      slotId: req.params.slotId,
+      code: generated.error.code,
+      message: generated.error.message,
+      status,
+    });
   }
 
   publishAssetRequest(owned.sessionId, serializeAssetRequest(generated.result.assetRequest));
   res.status(201).json(serializeProjectAsset(generated.result.asset));
 });
 
-assetsRouter.post("/asset-requests/:id/slots/:slotId/skip", async (req, res) => {
-  const owned = await loadOwnedSlot(req.params.id, req.params.slotId, req.userId!);
+const SlotParams = z.object({ id: z.string().min(1), slotId: z.string().min(1) });
+
+async function stockSlot(req: Request, res: Response) {
+  const parsed = SlotParams.safeParse(req.params);
+  if (!parsed.success) {
+    return res.status(400).json(errorResponse("INVALID_REQUEST", "Asset slot not found", res));
+  }
+  const owned = await loadOwnedSlot(parsed.data.id, parsed.data.slotId, req.userId!);
   if ("error" in owned) {
     return res.status(404).json(errorResponse(owned.error, "Asset slot not found", res));
   }
+  const filled = await fillStockSlot({
+    userId: req.userId!,
+    projectId: owned.projectId,
+    sessionId: owned.sessionId,
+    assetRequestId: parsed.data.id,
+    slot: owned.slot,
+  });
+  if (!filled.ok) {
+    return res.status(filled.status).json(errorResponse(filled.code, filled.message, res));
+  }
+  return res.status(201).json(filled.assetRequest);
+}
 
-  const assetRequest = await markSlotResolved(req.params.id, req.params.slotId, null, "SKIPPED");
-  publishAssetRequest(owned.sessionId, serializeAssetRequest(assetRequest));
-  res.json(serializeAssetRequest(assetRequest));
+assetsRouter.post("/asset-requests/:id/slots/:slotId/skip", stockSlot);
+assetsRouter.post("/asset-requests/:id/slots/:slotId/stock", stockSlot);
+
+assetsRouter.post("/asset-requests/:id/stock", async (req, res) => {
+  const owned = await loadOwnedAssetRequest(req.params.id, req.userId!);
+  if ("error" in owned) {
+    return res.status(404).json(errorResponse(owned.error, "Asset request not found", res));
+  }
+  const filled = await fillRemainingStockSlots({
+    userId: req.userId!,
+    projectId: owned.projectId,
+    sessionId: owned.sessionId,
+    assetRequestId: req.params.id,
+    slots: owned.slots,
+  });
+  if (!filled.ok) {
+    return res.status(filled.status).json(errorResponse(filled.code, filled.message, res));
+  }
+  res.status(201).json(filled.assetRequest);
 });
 
 assetsRouter.get("/projects/:projectId/assets", async (req, res) => {

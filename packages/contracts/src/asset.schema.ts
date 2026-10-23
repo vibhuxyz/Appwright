@@ -1,4 +1,5 @@
 import z from "zod";
+import { UnsplashAttribution } from "./unsplash.schema";
 
 export const AssetPurpose = z.enum([
   "hero",
@@ -9,6 +10,7 @@ export const AssetPurpose = z.enum([
   "background",
   "icon",
   "photo",
+  "social",
   "other",
 ]);
 export type AssetPurpose = z.infer<typeof AssetPurpose>;
@@ -19,6 +21,7 @@ export const AssetSlotStatus = z.enum([
   "GENERATING",
   "RESOLVED",
   "SKIPPED",
+  "FAILED",
 ]);
 export type AssetSlotStatus = z.infer<typeof AssetSlotStatus>;
 
@@ -31,6 +34,10 @@ export const AssetSlotSchema = z.object({
   suggestedPrompt: z.string().min(1).max(500),
   status: AssetSlotStatus,
   assetId: z.string().nullable().optional(),
+  required: z.boolean().default(false),
+  aspectRatio: z.string().min(1).optional(),
+  finalPath: z.string().min(1).optional(),
+  attribution: UnsplashAttribution.optional(),
 });
 export type AssetSlot = z.infer<typeof AssetSlotSchema>;
 
@@ -53,7 +60,7 @@ export const GenerateAssetRequest = z.object({
 });
 export type GenerateAssetRequest = z.infer<typeof GenerateAssetRequest>;
 
-export const AssetSource = z.enum(["UPLOADED", "GENERATED"]);
+export const AssetSource = z.enum(["UPLOADED", "GENERATED", "SEARCHED"]);
 export type AssetSource = z.infer<typeof AssetSource>;
 
 export const ProjectAssetResponse = z.object({
@@ -66,6 +73,8 @@ export const ProjectAssetResponse = z.object({
   url: z.string(),
   localPath: z.string(),
   altText: z.string(),
+  externalId: z.string().nullable().optional(),
+  attribution: UnsplashAttribution.nullable().optional(),
   createdAt: z.string(),
 });
 export type ProjectAssetResponse = z.infer<typeof ProjectAssetResponse>;

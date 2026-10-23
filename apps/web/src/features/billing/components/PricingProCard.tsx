@@ -150,7 +150,7 @@ export function PricingProCard({
         </div>
         <div className="flex items-center gap-2 text-white">
           <Check className="size-3.5 shrink-0 text-[#E3FC18]" />
-          <span>PostgreSQL & Prisma database sandboxes</span>
+          <span>MongoDB & Mongoose database sandboxes</span>
         </div>
         <div className="flex items-center gap-2 text-white">
           <Check className="size-3.5 shrink-0 text-[#E3FC18]" />

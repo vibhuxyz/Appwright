@@ -1,8 +1,10 @@
+import { isRepairPrompt } from "@repo/contracts";
 import { useMemo, useState } from "react";
 import type { Session } from "../schemas/agentSchemas";
 import { useAgentStore, agentStore } from "../store/agentStore";
 import { useCreateSession, useUpdateSessionModel } from "../hooks/useSession";
 import { useEnhancePrompt, useStopConversation } from "../hooks/useSendMessage";
+import { AssetRequestCard, useAssetRequests } from "@/features/assets";
 import { IntakeDock, useIntake } from "../intake";
 import { deriveActiveStopNotice } from "../utils/deriveStopNotice";
 import { evaluatePrompt } from "../utils/evaluatePrompt";
@@ -34,6 +36,8 @@ export function ChatPane({
   const liveStopNotice = useAgentStore((s) => s.stopNotice);
 
   const intake = useIntake(sessionId, messages);
+  const { data: assetRequests = [] } = useAssetRequests(sessionId, running);
+  const pendingAssetRequests = assetRequests.filter((request) => request.status === "PENDING");
   const stopConversation = useStopConversation(sessionId);
   const enhancePrompt = useEnhancePrompt();
   const createSession = useCreateSession(projectId);
@@ -53,15 +57,16 @@ export function ChatPane({
   );
 
   const send = () => {
-    if (!trimmed || running || enhancePrompt.isPending || intake.holdsComposer) return;
+    if (!sessionId || !trimmed || running || enhancePrompt.isPending || intake.holdsComposer) return;
     const prompt = trimmed;
     setInput("");
     setPrevInput(null);
     setEnhancedSuccess(false);
     const selection = selectionStore.getState().selection;
-    if (selection) {
-      selectionStore.getState().clearSelection();
-      intake.sendNow(prompt, selection);
+    const alreadyTalking = messages.some((message) => message.role === "user");
+    if (selection) selectionStore.getState().clearSelection();
+    if (selection || alreadyTalking || isRepairPrompt(prompt)) {
+      intake.sendNow(prompt, selection ?? undefined);
       return;
     }
     intake.ask(prompt);
@@ -103,7 +108,6 @@ export function ChatPane({
         running={running}
         statusDetail={statusDetail}
         sessionId={sessionId}
-        projectId={projectId}
         onStop={() => stopConversation.mutate()}
         footer={
           intake.gate ? (
@@ -115,10 +119,26 @@ export function ChatPane({
               onRetry={intake.retry}
               onContinue={intake.continueWithoutQuestions}
               onAskAgain={intake.askAgain}
+              onChooseTheme={intake.chooseTheme}
+              onApprovePlan={intake.approvePlan}
+              onRevisePlan={intake.revisePlan}
             />
           ) : null
         }
       />
+
+      {sessionId && pendingAssetRequests.length > 0 && (
+        <div className="shrink-0 px-3 pt-1">
+          {pendingAssetRequests.map((request) => (
+            <AssetRequestCard
+              key={request.id}
+              assetRequest={request}
+              sessionId={sessionId}
+              projectId={projectId}
+            />
+          ))}
+        </div>
+      )}
 
       {activeStopNotice && !running && (
         <StopNoticeCard

@@ -1,0 +1,125 @@
+import { useState } from "react";
+import type * as React from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+export interface ModalProps {
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  title: string;
+  description?: string;
+  footer?: React.ReactNode;
+  className?: string;
+  children?: React.ReactNode;
+}
+
+export function Modal({
+  trigger,
+  open,
+  onOpenChange,
+  title,
+  description,
+  footer,
+  className,
+  children,
+}: ModalProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+      <DialogContent className={className}>
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className={description ? undefined : "sr-only"}>
+            {description ?? title}
+          </DialogDescription>
+        </DialogHeader>
+        {children}
+        {footer && <DialogFooter>{footer}</DialogFooter>}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export interface ConfirmModalProps {
+  trigger: React.ReactNode;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  isDestructive?: boolean;
+  onConfirm: () => void | Promise<void>;
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong. Please try again.";
+}
+
+export function ConfirmModal({
+  trigger,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  isDestructive = false,
+  onConfirm,
+}: ConfirmModalProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleConfirm = async () => {
+    setIsPending(true);
+    setError(null);
+    try {
+      await onConfirm();
+      setIsOpen(false);
+    } catch (caught) {
+      setError(errorMessage(caught));
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <Modal
+      trigger={trigger}
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      title={title}
+      description={description}
+      footer={
+        <>
+          <DialogClose asChild>
+            <Button type="button" variant="outline" disabled={isPending}>
+              {cancelLabel}
+            </Button>
+          </DialogClose>
+          <Button
+            type="button"
+            variant={isDestructive ? "destructive" : "default"}
+            isLoading={isPending}
+            onClick={handleConfirm}
+          >
+            {confirmLabel}
+          </Button>
+        </>
+      }
+    >
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </Modal>
+  );
+}

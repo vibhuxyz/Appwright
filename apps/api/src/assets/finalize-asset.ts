@@ -28,7 +28,8 @@ export interface FinalizeAssetInput {
 
 export async function finalizeAsset(input: FinalizeAssetInput) {
   const extension = EXTENSION_BY_MIME[input.mimeType] ?? DEFAULT_EXTENSION;
-  const sourceFolder = input.source === "UPLOADED" ? "uploads" : "generated";
+  const sourceFolder =
+    input.source === "UPLOADED" ? "uploads" : input.source === "SEARCHED" ? "stock" : "generated";
   const folder = buildAssetFolder(input.userId, input.projectId, sourceFolder, input.purpose);
   const publicId = input.slotId.replace(/[^a-zA-Z0-9_-]/g, "_");
 
@@ -62,7 +63,13 @@ export async function finalizeAsset(input: FinalizeAssetInput) {
     },
   });
 
-  const assetRequest = await markSlotResolved(input.assetRequestId, input.slotId, asset.id, "RESOLVED");
+  const assetRequest = await markSlotResolved({
+    assetRequestId: input.assetRequestId,
+    slotId: input.slotId,
+    status: "RESOLVED",
+    assetId: asset.id,
+    finalPath: localPath,
+  });
 
   return { asset, assetRequest };
 }

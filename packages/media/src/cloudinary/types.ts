@@ -1,4 +1,4 @@
-export type AssetSourceFolder = "uploads" | "generated";
+export type AssetSourceFolder = "uploads" | "generated" | "stock";
 
 export interface UploadAssetInput {
   readonly bytes: Uint8Array;

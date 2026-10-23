@@ -13,6 +13,7 @@ model User {
   hashPassword String
   // Starting credits granted on registration: .00 in AI balance (10,000,000 tokens)
   credits      Int       @default(10000000)
+  plan         Plan      @default(FREE)
   projects     Project[]
   // One Vercel account link per user, not per project. Connecting is a
   // property of the person, deploying is a property of the app.
@@ -58,6 +59,7 @@ model Project {
   sessions      Session[]
   secret        Secret[]
   assets        ProjectAsset[]
+  databases     ProjectDatabase[]
   // Deleting a project cleans up its sessions/messages/secrets too — there's
   // no route that deletes a session or secret on its own in V1.
   createdAt     DateTime      @default(now())
@@ -151,6 +153,8 @@ model Blueprint {
   design           Json?
   layout           Json?
   responsive       Json?
+  projectType      String?
+  requirements     Json?
   tasks            Task[]
   changeRequests   ChangeRequest[]
   assetRequests    AssetRequest[]
@@ -158,6 +162,12 @@ model Blueprint {
 
   @@unique([sessionId, blueprintVersion])
   @@index([sessionId])
+}
+
+enum Plan {
+  FREE
+  PRO
+  MAX
 }
 
 enum AssetRequestStatus {
@@ -168,6 +178,7 @@ enum AssetRequestStatus {
 enum AssetSource {
   UPLOADED
   GENERATED
+  SEARCHED
 }
 
 // Ephemeral per-blueprint Q&A gate: one row per Blueprint, `slots` holds
@@ -206,6 +217,8 @@ model ProjectAsset {
   cloudinaryUrl      String
   localPath          String
   altText            String
+  externalId         String?
+  attribution        Json?
   createdAt          DateTime    @default(now())
 
   @@index([projectId])
@@ -223,6 +236,18 @@ enum TaskType {
   PAGE
   COMPONENT
   THEME
+  DESIGN_SYSTEM
+  APP_SHELL
+  TYPOGRAPHY
+  LAYOUT
+  RESPONSIVE
+  VISUAL_VERIFICATION
+  ADMIN
+  MEDIA
+  SEO
+  SECURITY
+  TESTING
+  DEPLOY
 }
 
 enum RiskTier {
@@ -448,4 +473,72 @@ enum JobStatus {
   SUCCEEDED
   FAILED
   CANCELLED
+}
+
+// One logical MongoDB database per generated project + environment on the
+// shared cluster (D15/D61). The URI lives in Secret; this row is metadata
+// only. secretRef is Secret.id as a string — never the credential.
+enum ProjectDatabaseStatus {
+  PENDING
+  PROVISIONING
+  READY
+  FAILED
+  PENDING_DELETE
+}
+
+enum ProjectDatabaseEnvironment {
+  DEVELOPMENT
+  PREVIEW
+  PRODUCTION
+}
+
+enum ProjectDatabaseProvider {
+  MONGODB
+}
+
+enum ProjectDatabaseIsolation {
+  SCOPED_USER
+  SHARED_CLUSTER_USER
+}
+
+model ProjectDatabase {
+  id               String                      @id @default(cuid()) @db.VarChar(30)
+  projectId        String
+  project          Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment      ProjectDatabaseEnvironment
+  provider         ProjectDatabaseProvider     @default(MONGODB)
+  databaseName     String
+  isolationMode    ProjectDatabaseIsolation
+  status           ProjectDatabaseStatus       @default(PENDING)
+  secretRef        String?
+  migrationVersion Int                         @default(0)
+  lastErrorCode    String?
+  retryCount       Int                         @default(0)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @default(now()) @updatedAt
+
+  @@unique([projectId, environment], map: "uq_project_databases__project_id_environment")
+  @@unique([databaseName], map: "uq_project_databases__database_name")
+  @@index([projectId], map: "idx_project_databases__project_id")
+  @@index([status], map: "idx_project_databases__status")
+}
+
+// Survives Project cascade so a user-initiated delete cannot drop Mongo
+// data immediately. The maintenance worker reaps rows whose deleteAfter
+// has passed.
+model DatabaseDeletion {
+  id           String                     @id @default(cuid()) @db.VarChar(30)
+  databaseName String
+  username     String
+  provider     ProjectDatabaseProvider    @default(MONGODB)
+  projectId    String
+  environment  ProjectDatabaseEnvironment
+  deleteAfter  DateTime
+  status       String                     @default("scheduled")
+  lastErrorCode String?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @default(now()) @updatedAt
+
+  @@unique([databaseName], map: "uq_database_deletions__database_name")
+  @@index([deleteAfter, status], map: "idx_database_deletions__delete_after_status")
 }

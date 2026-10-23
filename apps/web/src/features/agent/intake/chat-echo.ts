@@ -7,6 +7,13 @@ interface TranscriptMessage {
 }
 
 export function profileTitleFromPrompt(prompt: string): string {
+  const named = prompt.match(
+    /(?:my\s+)?business(?:'s)?\s+name\s*(?:is|:)\s+(.+?)(?:\s+where\b|[.!?,;]|$)/i,
+  );
+  const businessName = named?.[1]?.replace(/\s+/g, " ").trim() ?? "";
+  if (businessName.length >= 2 && businessName.length <= MAX_PROFILE_TITLE_CHARS) {
+    return businessName;
+  }
   const sentence = prompt.replace(/\s+/g, " ").trim().split(/[.!?]/)[0]?.trim() ?? "";
   const title = sentence.length > 0 ? sentence : "Your app";
   if (title.length <= MAX_PROFILE_TITLE_CHARS) return title;

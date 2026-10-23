@@ -15,7 +15,7 @@ export {
   type DecisionStatus,
   type DecisionResult,
 } from "./types";
-export { classify, UNKNOWN_DECISION } from "./classify";
+export { classify, CLASSIFY_TIMEOUT_MS, UNKNOWN_DECISION } from "./classify";
 export { resolvePolicy, needsDetailedPlan } from "./policy";
 export { shouldRetryVerification, type VerifyOutcome } from "./verify";
 export {

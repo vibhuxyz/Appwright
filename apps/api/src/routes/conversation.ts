@@ -1,29 +1,30 @@
+import { OpenAiProvider, plannerModel, providerFor } from "@repo/agent-core";
 import { cancelFlagKey, CANCEL_FLAG_TTL_SECONDS, set as cacheSet } from "@repo/cache";
-import { PromptQuestionsRequest, SendMessageRequest } from "@repo/contracts";
+import {
+  PromptQuestionsRequest,
+  PromptQuestionsResponse,
+  SendMessageRequest,
+} from "@repo/contracts";
 import { prisma } from "@repo/db";
 import { Router } from "express";
 import { requireAuthAllowingQueryToken } from "@repo/auth";
 import { setTraceContext } from "@repo/logger";
-import { generateIntakeQuestions, IntakeQuestionsError, shouldPlanInDetail } from "../intake";
+import {
+  generateIntakeQuestions,
+  IntakeQuestionsError,
+  QUESTIONS_TIMEOUT_MS,
+  intakeAction,
+  isRepairPrompt,
+  projectHasBuiltApp,
+  shouldPlanInDetail,
+} from "../intake";
 import { log } from "../log";
-import { ownedSessionProjectId } from "../ownership";
+import { ownedBlueprintSessionId, ownedSessionProjectId } from "../ownership";
 import { attachSseClient, publishStatus } from "../stream/sse";
 import { hasRunCapacity } from "../workflow/run-limit";
-import {
-  activeControllers,
-  runConversation,
-} from "../workflow/conversation-runner";
 import { enqueueConversation } from "../workflow/enqueue-conversation";
 import { serializeRow } from "../workflow/message-mapper";
 import { conversationRateLimitOk, hasUserSandboxCapacity } from "../workflow/rate-limit";
-
-// Additive V3 path, off by default. The synchronous in-process path
-// (runConversation) stays the default so existing behavior doesn't change
-// underfoot; flip this once apps/web opens /stream before posting here in
-// sandboxed mode (not done yet — see the V3 doc's open items).
-const EXECUTION_MODE_SANDBOXED = process.env.EXECUTION_MODE === "sandboxed";
-
-export { activeControllers };
 
 export const conversationRouter = Router();
 
@@ -58,13 +59,6 @@ conversationRouter.post("/conversation/:sessionId/stop", async (req, res) => {
       error: { code: "NOT_FOUND", message: "session not found" },
     });
   }
-  const controller = activeControllers.get(req.params.sessionId);
-  if (controller) {
-    controller.abort();
-    activeControllers.delete(req.params.sessionId);
-  }
-  // Harmless when the in-process path handled it above; load-bearing when
-  // a sandboxed worker in another process owns this run instead.
   await cacheSet(cancelFlagKey(req.params.sessionId), true, CANCEL_FLAG_TTL_SECONDS).catch(() => {});
   await prisma.session.update({
     where: { id: req.params.sessionId },
@@ -111,21 +105,57 @@ conversationRouter.post("/conversation/questions", async (req, res) => {
       },
     });
   }
+  const user = await prisma.user.findUnique({ where: { id: req.userId! }, select: { credits: true, plan: true } });
+  if (!user || user.credits <= 0) {
+    return res.status(402).json({
+      error: { code: "OUT_OF_CREDITS", message: "Out of credits", details: {}, requestId: requestIdOf(res) },
+    });
+  }
   try {
-    const planInDetail = await shouldPlanInDetail(parsed.data.prompt);
-    const questions = planInDetail ? await generateIntakeQuestions(parsed.data.prompt) : [];
-    res.json({ questions });
+    const provider = new OpenAiProvider({ model: plannerModel(user.plan) });
+    log.info("intake questions model", { userId: req.userId, model: provider.model, provider: providerFor(provider.model) });
+    const sessionId = parsed.data.sessionId;
+    const projectId = sessionId ? await ownedSessionProjectId(sessionId, req.userId!) : null;
+    const isFollowUp = projectId !== null && (await projectHasBuiltApp(projectId));
+    const skipPlan = isFollowUp || isRepairPrompt(parsed.data.prompt);
+    const action = intakeAction({
+      prompt: parsed.data.prompt,
+      isFollowUp,
+      planInDetail: skipPlan ? false : await shouldPlanInDetail(parsed.data.prompt, provider),
+    });
+    const answers = parsed.data.answers ?? {};
+    const questions =
+      action === "plan"
+        ? await generateIntakeQuestions(
+            parsed.data.prompt,
+            provider,
+            AbortSignal.timeout(QUESTIONS_TIMEOUT_MS),
+            answers,
+          )
+        : [];
+    const body = PromptQuestionsResponse.safeParse({ questions, action });
+    if (!body.success) {
+      throw new IntakeQuestionsError(
+        "GENERATION_FAILED",
+        "Could not generate questions for this prompt",
+      );
+    }
+    res.json(body.data);
   } catch (error) {
     const timeout = error instanceof IntakeQuestionsError && error.code === "TIMEOUT";
+    const message =
+      error instanceof IntakeQuestionsError
+        ? error.message
+        : "Could not generate questions. Try again.";
     log.error("intake questions failed", {
+      userId: req.userId,
       code: timeout ? "GENERATION_TIMEOUT" : "GENERATION_FAILED",
+      message: error instanceof IntakeQuestionsError ? message : String(error),
     });
     return res.status(503).json({
       error: {
         code: timeout ? "GENERATION_TIMEOUT" : "GENERATION_FAILED",
-        message: timeout
-          ? "Timed out while choosing questions"
-          : "Could not generate questions. Try again.",
+        message,
         details: {},
         requestId: requestIdOf(res),
       },
@@ -143,6 +173,12 @@ conversationRouter.post("/conversation", async (req, res) => {
   if (!session) {
     return res.status(404).json({
       error: { code: "NOT_FOUND", message: "session not found" },
+    });
+  }
+
+  if (body.blueprintId && (await ownedBlueprintSessionId(body.blueprintId, req.userId!)) !== session.id) {
+    return res.status(404).json({
+      error: { code: "NOT_FOUND", message: "plan not found for this session" },
     });
   }
 
@@ -173,25 +209,15 @@ conversationRouter.post("/conversation", async (req, res) => {
     });
   }
 
-  if (EXECUTION_MODE_SANDBOXED) {
-    const job = await enqueueConversation({
-      sessionId: session.id,
-      projectId: session.projectId,
-      prompt,
-      answers,
-      questions: body.questions,
-    });
-    res.status(202).json({ jobId: job.id, sessionId: session.id });
-    return;
-  }
-
-  await runConversation({
+  const job = await enqueueConversation({
     sessionId: session.id,
-    userId: req.userId!,
+    projectId: session.projectId,
     prompt,
     answers,
     questions: body.questions,
+    theme: body.theme,
     selection: body.selection,
-    res,
+    blueprintId: body.blueprintId,
   });
+  res.status(202).json({ jobId: job.id, sessionId: session.id });
 });

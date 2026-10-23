@@ -20,11 +20,11 @@ describe("validateArchitectureDecisions", () => {
     expect(issues[0]?.message).toContain("stripe");
   });
 
-  it("needs no package for local-uploads or postgres-fulltext", () => {
+  it("needs no package for local-uploads or mongodb-text-index", () => {
     const issues = validateArchitectureDecisions(
       [
         { capability: "fileStorage", choice: "local-uploads", reason: "needs.fileUpload" },
-        { capability: "search", choice: "postgres-fulltext", reason: "needs.search" },
+        { capability: "search", choice: "mongodb-text-index", reason: "needs.search" },
       ],
       [],
     );

@@ -1,18 +1,19 @@
-import { useRef, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { isBrowserCheckStatus } from "@repo/contracts";
 import type { Project } from "@/features/projects/schemas/projectSchemas";
 import type { Session } from "@/features/agent/schemas/agentSchemas";
-import { Panel, PanelHeader } from "@/shared/components/ui/Panel";
+import { Panel } from "@/shared/components/ui/Panel";
 import { useAgentStore } from "@/features/agent/store/agentStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
-import { cn } from "@/shared/lib/cn";
 import { useInspector } from "../hooks/useInspector";
 import { useSessionPreview } from "../hooks/useSessionPreview";
-import { EditModeToggle } from "./EditModeToggle";
-import { PreviewLoadingState } from "./PreviewLoadingState";
-import { DeviceFrame } from "./DeviceFrame";
-import { DeviceSwitcher } from "./DeviceSwitcher";
+import { badgeTextFor, previewErrorMessage, previewView } from "../lib/preview-view";
+import { useSelectionStore } from "../store/selection-store";
 import { PreviewAddressBar } from "./PreviewAddressBar";
+import { PreviewCanvas } from "./PreviewCanvas";
+import { PreviewPaneHeader } from "./PreviewPaneHeader";
+
+const PREVIEW_LOAD_TIMEOUT_MS = 90_000;
 
 interface PreviewPaneProps {
   project: Project | null | undefined;
@@ -22,127 +23,78 @@ interface PreviewPaneProps {
 export function PreviewPane({ project, session }: PreviewPaneProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   const device = useWorkspaceStore((s) => s.previewDevice);
   const setDevice = useWorkspaceStore((s) => s.setPreviewDevice);
+  const isEditMode = useSelectionStore((s) => s.isEditMode);
   const working = useAgentStore((s) => s.running);
-  const preview = useSessionPreview(session?.id, working);
+  const statusDetail = useAgentStore((s) => s.statusDetail);
+  const checking = isBrowserCheckStatus(statusDetail);
+  const hasSessionPreview = Boolean(session?.previewUrl);
+  const preview = useSessionPreview(session?.id, working || hasSessionPreview);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
+  const view = previewView({
+    sessionUrl: preview.data?.previewUrl ?? session?.previewUrl ?? null,
+    projectUrl: project?.previewUrl ?? null,
+    hasSession: session !== null && session !== undefined,
+    working,
+    pending: preview.isPending,
+    failed: preview.isError,
+    reloadKey,
+    loadedKey,
+    failedKey,
+  });
 
-  const url = working
-    ? (preview.data?.previewUrl ?? session?.previewUrl ?? null)
-    : (project?.previewUrl ?? null);
-  const isStarting = working && preview.isPending && !url;
-  const isError = working && preview.isError && !url;
-  const isRunning = Boolean(url);
-  const currentKey = `${url ?? ""}:${reloadKey}`;
-  const isLoading = url ? loadedKey !== currentKey : isStarting;
-
-  useInspector(frameRef, currentKey);
+  useInspector(frameRef, view.currentKey);
 
   const reload = () => {
     setReloadKey((k) => k + 1);
     void preview.refetch();
   };
 
-  const badgeText = isRunning
-    ? "Running"
-    : isError
-      ? "Error"
-      : isStarting
-        ? "Waking up…"
-        : "Sleeping";
+  useEffect(() => {
+    if (!view.url || loadedKey === view.currentKey) return;
+    const timer = setTimeout(() => setFailedKey(view.currentKey), PREVIEW_LOAD_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [view.url, view.currentKey, loadedKey]);
+
+  const badgeText = badgeTextFor({
+    checking,
+    running: view.isRunning,
+    failed: view.isError,
+    starting: view.isStarting,
+  });
 
   return (
     <Panel className="flex-1">
-      <PanelHeader
-        title="Live Preview"
-        badge={
-          <span
-            className={cn(
-              "flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
-              isRunning
-                ? "border-success/30 bg-success/10 text-success"
-                : "border-border-soft bg-surface-2 text-muted",
-            )}
-          >
-            <span
-              className={cn(
-                "size-1.5 rounded-full",
-                isRunning ? "bg-success" : "animate-pulse bg-muted",
-              )}
-            />
-            {badgeText}
-          </span>
-        }
-        actions={
-          <>
-            <a
-              href={url ?? undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open preview in a new tab"
-              aria-label="Open preview in a new tab"
-              className={cn(
-                "grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-foreground",
-                !url && "pointer-events-none opacity-40",
-              )}
-            >
-              <ExternalLink className="size-4" />
-            </a>
-            <EditModeToggle disabled={!url || working} />
-            <DeviceSwitcher device={device} onSelect={setDevice} />
-          </>
-        }
+      <PreviewPaneHeader
+        url={view.url}
+        working={working}
+        running={view.isRunning}
+        checking={checking}
+        badgeText={badgeText}
+        device={device}
+        onDevice={setDevice}
       />
-
-      <PreviewAddressBar url={url} onReload={reload} />
-
-      <div className="relative min-h-0 flex-1 overflow-auto bg-background-deep p-0">
-        <DeviceFrame device={device}>
-          {isError ? (
-            <PreviewLoadingState
-              title="Preview failed to start"
-              subtitle={
-                preview.error instanceof Error
-                  ? preview.error.message
-                  : "Could not start the session preview server."
-              }
-            />
-          ) : url ? (
-            <div className="relative size-full">
-              {isLoading && (
-                <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">
-                  <PreviewLoadingState
-                    title="Rendering application…"
-                    subtitle="Rendering the session worktree via the preview proxy"
-                  />
-                </div>
-              )}
-              <iframe
-                ref={frameRef}
-                key={reloadKey}
-                title="preview"
-                src={url}
-                onLoad={() => setLoadedKey(currentKey)}
-                className={cn(
-                  "size-full border-0 bg-transparent transition-opacity duration-300",
-                  isLoading ? "pointer-events-none opacity-0" : "opacity-100",
-                )}
-              />
-            </div>
-          ) : isStarting ? (
-            <PreviewLoadingState
-              title="Waking up your project…"
-              subtitle="Restoring workspace from git and starting development server. Cold boots take 30–90s."
-            />
-          ) : (
-            <PreviewLoadingState
-              title="Project is sleeping"
-              subtitle="Opening a project reads from Postgres and git without booting a sandbox. Send a message to wake it up."
-            />
-          )}
-        </DeviceFrame>
-      </div>
+      <PreviewAddressBar url={checking ? statusDetail : view.url} onReload={reload} />
+      <PreviewCanvas
+        device={device}
+        frameRef={frameRef}
+        url={view.url}
+        reloadKey={reloadKey}
+        isEditMode={isEditMode}
+        isError={view.isError}
+        errorMessage={previewErrorMessage(preview.error)}
+        isLoading={view.isLoading}
+        loadStuck={view.loadStuck}
+        isStarting={view.isStarting}
+        checking={checking}
+        sessionId={session?.id}
+        statusDetail={statusDetail}
+        onReload={reload}
+        onLoad={() => setLoadedKey(view.currentKey)}
+        onFail={() => setFailedKey(view.currentKey)}
+      />
     </Panel>
   );
 }

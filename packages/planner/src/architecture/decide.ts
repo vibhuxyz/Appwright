@@ -4,8 +4,8 @@ import type { ArchitectureDecision, FrozenArchitecture } from "./types";
 
 const FIXED_STACK = StackSchema.parse({
   framework: "next",
-  db: "postgres",
-  orm: "prisma",
+  db: "mongodb",
+  orm: "mongoose",
   auth: "authjs",
   styling: "tailwind",
 });
@@ -42,8 +42,8 @@ const RULES: readonly {
     isTriggered: (needs) => needs.search.required,
     decision: {
       capability: "search",
-      choice: "postgres-fulltext",
-      reason: "needs.search is served by the single Postgres database",
+      choice: "mongodb-text-index",
+      reason: "needs.search is served by a MongoDB text index",
     },
   },
 ];

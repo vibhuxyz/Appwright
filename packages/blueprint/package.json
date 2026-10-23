@@ -17,12 +17,14 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@repo/admin-crud": "workspace:*",
     "@repo/agent-core": "workspace:*",
     "@repo/contracts": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/logger": "workspace:*",
     "@repo/planner": "workspace:*",
     "@repo/tools": "workspace:*",
+    "@repo/ui-system": "workspace:*",
     "@repo/verify": "workspace:*",
     "orchestrator": "workspace:*",
     "zod": "^4.4.3"

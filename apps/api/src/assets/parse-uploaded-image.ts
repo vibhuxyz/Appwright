@@ -1,8 +1,9 @@
 import busboy from "busboy";
 import type { Request } from "express";
+import { sniffImageMime } from "@repo/media";
 
-export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg"]);
 
 export type ParseUploadedImageResult =
   | { readonly ok: true; readonly bytes: Uint8Array; readonly mimeType: string }
@@ -10,22 +11,25 @@ export type ParseUploadedImageResult =
 
 export function parseUploadedImage(req: Request): Promise<ParseUploadedImageResult> {
   return new Promise((resolve) => {
-    const parser = busboy({ headers: req.headers, limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
     let settled = false;
-
     const settle = (result: ParseUploadedImageResult): void => {
       if (settled) return;
       settled = true;
       resolve(result);
     };
 
-    parser.on("file", (_fieldName, file, info) => {
-      if (!ALLOWED_MIME_TYPES.has(info.mimeType)) {
-        file.resume();
-        settle({ ok: false, code: "INVALID_TYPE" });
-        return;
-      }
+    let parser: ReturnType<typeof busboy>;
+    try {
+      parser = busboy({ headers: req.headers, limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 } });
+    } catch {
+      settle({ ok: false, code: "MISSING_FILE" });
+      return;
+    }
 
+    let sawFile = false;
+
+    parser.on("file", (_fieldName, file) => {
+      sawFile = true;
       const chunks: Buffer[] = [];
       let tooLarge = false;
 
@@ -33,16 +37,25 @@ export function parseUploadedImage(req: Request): Promise<ParseUploadedImageResu
       file.on("limit", () => {
         tooLarge = true;
       });
-      file.on("close", () => {
+      file.on("error", () => settle({ ok: false, code: "MISSING_FILE" }));
+      file.on("end", () => {
         if (tooLarge) {
           settle({ ok: false, code: "TOO_LARGE" });
           return;
         }
-        settle({ ok: true, bytes: Buffer.concat(chunks), mimeType: info.mimeType });
+        const bytes = Buffer.concat(chunks);
+        const sniffed = sniffImageMime(bytes);
+        if (!sniffed || !ALLOWED_MIME_TYPES.has(sniffed)) {
+          settle({ ok: false, code: "INVALID_TYPE" });
+          return;
+        }
+        settle({ ok: true, bytes, mimeType: sniffed });
       });
     });
 
-    parser.on("finish", () => settle({ ok: false, code: "MISSING_FILE" }));
+    parser.on("finish", () => {
+      if (!sawFile) settle({ ok: false, code: "MISSING_FILE" });
+    });
     parser.on("error", () => settle({ ok: false, code: "MISSING_FILE" }));
 
     req.pipe(parser);

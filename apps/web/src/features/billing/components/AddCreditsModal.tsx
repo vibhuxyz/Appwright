@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Coins, Check, AlertCircle, X, Crown, Sparkles } from "lucide-react";
-import { useAddCredits } from "../hooks/useAddCredits";
+import { useAddCredits, useCredits } from "../hooks/useAddCredits";
 import { CREDIT_PACKAGES, formatCreditsToDollars } from "../schemas/billingSchemas";
 import { useBillingModalStore } from "../store/billingModalStore";
 import { CreditPackageRow } from "./CreditPackageRow";
@@ -20,7 +20,11 @@ export function AddCreditsModal({
   onOpenUpgrade?: () => void;
 }) {
   const addCredits = useAddCredits();
+  const creditsQuery = useCredits();
   const openSpecialOffer = useBillingModalStore((s) => s.openSpecialOffer);
+  // Prefer the refetch over the prop so an in-flight top-up or a failed
+  // generation cannot leave this dialog on a stale balance.
+  const balance = creditsQuery.data?.credits ?? currentCredits;
 
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -96,9 +100,9 @@ export function AddCreditsModal({
               <div className="mt-1 flex items-center gap-2 text-xs text-muted">
                 <span>Current balance:</span>
                 <span className="font-mono font-semibold text-foreground">
-                  {formatCreditsToDollars(currentCredits)}
+                  {formatCreditsToDollars(balance)}
                 </span>
-                {currentCredits <= 0 && (
+                {balance <= 0 && (
                   <span className="rounded-full bg-danger/10 px-2 py-0.5 font-medium text-danger">
                     $0.00 remaining
                   </span>
@@ -115,6 +119,14 @@ export function AddCreditsModal({
           <div className="mb-4 flex items-center gap-2 rounded-xl border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
             <AlertCircle className="size-4 shrink-0" />
             <span>{addCredits.error.message}</span>
+          </div>
+        )}
+        {creditsQuery.isError && balance > 0 && (
+          <div className="mb-4 flex items-center gap-2 rounded-xl border border-border-soft bg-surface-2 p-3 text-xs text-foreground-secondary">
+            <AlertCircle className="size-4 shrink-0" />
+            <span>
+              Could not refresh the balance. Your last known balance is unchanged.
+            </span>
           </div>
         )}
         {successMessage && (

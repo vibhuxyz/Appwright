@@ -17,7 +17,7 @@ import { emitTokensCss } from "../src/emit/css";
 // letting two design systems quietly appear, which is the exact failure
 // V1.1 exists to prevent.
 
-const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
+const REPO_ROOT = path.resolve(import.meta.dir, "../../..");
 
 interface Target {
   /** Where the generated tokens stylesheet goes. */
@@ -64,7 +64,7 @@ async function sync(rel: string, contents: string): Promise<void> {
 }
 
 const css = emitTokensCss();
-const componentSrc = path.join(REPO_ROOT, "libs/ts/ui-system/components");
+const componentSrc = path.join(REPO_ROOT, "packages/ui-system/components");
 
 for (const target of TARGETS) {
   await sync(target.tokensCss, css);

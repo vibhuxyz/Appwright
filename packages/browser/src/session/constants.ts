@@ -1,0 +1,9 @@
+export const NAVIGATION_TIMEOUT_MS = 20_000;
+export const NETWORK_IDLE_TIMEOUT_MS = 3_000;
+export const ACTION_TIMEOUT_MS = 8_000;
+export const MAX_SCROLL_STEPS = 30;
+export const MAX_OBSERVED_EVENTS = 20;
+export const MAX_LINKS = 60;
+export const RESOURCE_FAILURE_PREFIX = "Failed to load resource";
+export const ABORTED_REQUEST_ERROR = "net::ERR_ABORTED";
+export const IGNORED_RESPONSE_PATHS: readonly string[] = ["/favicon.ico"];

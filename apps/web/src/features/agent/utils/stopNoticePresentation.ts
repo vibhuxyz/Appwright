@@ -1,3 +1,4 @@
+import { AGENT_LOOP_LIMITS, creditsToUsd } from "@repo/contracts";
 import type { StopNotice } from "../schemas/agentSchemas";
 
 export function stopNoticeIcon(reason: string): string {
@@ -46,17 +47,17 @@ export function stopNoticeCardClass(reason: string): string {
 export function stopNoticeShortLabel(notice: StopNotice, userCredits: number): string {
   switch (notice.reason) {
     case "outOfCredits":
-      return `Paused: Out of Balance ($${(userCredits / 1_000_000).toFixed(2)} remaining)`;
+      return `Paused: Out of Balance ($${creditsToUsd(userCredits).toFixed(2)} remaining)`;
     case "budgetExceeded":
-      return "Paused: Out of tokens / budget ceiling";
+      return "Paused: Run spending limit reached";
     case "cancelled":
       return "Stopped by user";
     case "maxIterations":
-      return "Paused: Step limit reached (60 steps)";
+      return `Paused: Step limit reached (${AGENT_LOOP_LIMITS.maxIterations} steps)`;
     case "timeout":
       return "Paused: Execution timed out";
     default:
-      return "Stopped: Model error";
+      return "Stopped: Unexpected error";
   }
 }
 
@@ -65,15 +66,15 @@ export function stopNoticeTitle(notice: StopNotice): string {
     case "outOfCredits":
       return "Run Paused: Out of Balance";
     case "budgetExceeded":
-      return "Run Paused: Out of Tokens / Budget Ceiling Reached";
+      return "Run Paused: Spending Limit Reached";
     case "cancelled":
       return "Run Cancelled: Stopped by User";
     case "maxIterations":
-      return "Run Paused: Step Limit Reached (60 iterations)";
+      return `Run Paused: Step Limit Reached (${AGENT_LOOP_LIMITS.maxIterations} iterations)`;
     case "timeout":
       return "Run Paused: Execution Timed Out";
     default:
-      return "Run Stopped: Model Provider Error";
+      return "Run Stopped: Unexpected Error";
   }
 }
 
@@ -82,12 +83,12 @@ export function stopNoticeDescription(notice: StopNotice, userCredits: number): 
     case "outOfCredits":
       return userCredits <= 0
         ? "You have used your $10.00 free credit balance. Top up your balance in dollars or upgrade to Pro to continue building."
-        : `You have $${(userCredits / 1_000_000).toFixed(2)} balance available. Click Continue Building to proceed.`;
+        : `You have $${creditsToUsd(userCredits).toFixed(2)} balance available. Click Continue Building to proceed.`;
     case "budgetExceeded":
       return "The AI stopped because the token budget limit was reached. Click below to continue building.";
     case "cancelled":
       return "Execution was stopped. Click below to resume where the AI left off.";
     default:
-      return "The model run was interrupted by an unexpected error. Click below to retry.";
+      return "The run was interrupted by an unexpected error. Click below to retry.";
   }
 }

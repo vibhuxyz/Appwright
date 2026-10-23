@@ -30,6 +30,8 @@ describe("buildSystemPrompt", () => {
 
     // But the agent still knows they exist — that is the whole point.
     expect(prompt).toContain("Button");
+    expect(prompt).toContain("Testimonials");
+    expect(prompt).toContain("Carousel");
     expect(prompt).toContain("src/components/ui/");
   });
 

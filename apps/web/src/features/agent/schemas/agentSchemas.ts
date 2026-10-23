@@ -55,11 +55,15 @@ export const msgSchema = z.object({
 });
 export type Msg = z.infer<typeof msgSchema>;
 
+export const modelCategorySchema = z.enum(["efficient", "standard", "frontier"]);
+export type ModelCategory = z.infer<typeof modelCategorySchema>;
+
 export const availableModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   provider: z.string(),
   description: z.string(),
+  category: modelCategorySchema.optional(),
   badge: z.string().optional(),
   isDefault: z.boolean().optional(),
 });

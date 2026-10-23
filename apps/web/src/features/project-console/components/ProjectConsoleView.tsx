@@ -11,6 +11,13 @@ import { useBillingModalStore } from "@/features/billing/store/billingModalStore
 import { UpgradeModal } from "@/features/billing/components/UpgradeModal";
 import { AddCreditsModal } from "@/features/billing/components/AddCreditsModal";
 import { useAuthStore } from "@/stores/authStore";
+import { useProjectConsoleOverview } from "../hooks/useProjectConsoleOverview";
+import {
+  useConnectVercel,
+  useDeploy,
+  useVercelStatus,
+} from "@/features/deployments/hooks/useDeployment";
+import { ProjectDatabaseView } from "@/features/database";
 
 export function ProjectConsoleView({
   projectName,
@@ -37,56 +44,93 @@ export function ProjectConsoleView({
     closeUpgrade,
   } = useBillingModalStore();
 
+  const { data: overview, isLoading } = useProjectConsoleOverview(project?.id);
+  const { data: vercelStatus } = useVercelStatus();
+  const connectVercel = useConnectVercel();
+  const deploy = useDeploy(project?.id ?? "");
+
+  const handleDeploy = () => {
+    if (!project?.id) return;
+    if (!vercelStatus?.connected) {
+      connectVercel.mutate(project.id);
+    } else {
+      deploy.mutate();
+    }
+  };
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#0A0D14] text-foreground">
-      {/* Sidebar */}
       <ProjectConsoleSidebar
         projectName={projectName}
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         onOpenUpgrade={openUpgrade}
+        onOpenAddCredits={openAddCredits}
       />
 
-      {/* Main content column */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Header */}
         <ProjectConsoleHeader
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onOpenAddCredits={openAddCredits}
         />
 
-        {/* Scrollable Project Space */}
         <div className="flex-1 overflow-y-auto">
-          {/* Project Details Banner */}
           <ProjectConsoleProjectHeader
             projectName={projectName}
             project={project}
             onOpenSandbox={onOpenSandbox}
+            onOpenDeploy={handleDeploy}
           />
 
-          {/* Main Dashboard Overview Area */}
-          <div className="space-y-6 px-8 py-6">
-            {/* 4 Stat Cards */}
-            <ProjectConsoleMetrics />
+          {activeTab === "overview" && (
+            <div className="space-y-6 px-8 py-6">
+              <ProjectConsoleMetrics
+                metrics={overview?.metrics}
+                database={overview?.database}
+                templateId={project?.templateId}
+                isLoading={isLoading}
+              />
 
-            {/* Middle 2 Columns: App Health & Live Preview */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <ProjectConsoleHealth />
-              <ProjectConsoleLivePreview
-                projectName={projectName}
-                project={project}
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <ProjectConsoleHealth
+                  projectId={project?.id}
+                  templateId={project?.templateId}
+                  health={overview?.health}
+                  database={overview?.database}
+                  previewUrl={project?.previewUrl ?? overview?.previewUrl}
+                  onOpenDatabase={() => setActiveTab("databases")}
+                />
+                <ProjectConsoleLivePreview
+                  projectName={projectName}
+                  project={project}
+                  onOpenSandbox={onOpenSandbox}
+                />
+              </div>
+
+              <ProjectConsoleBottomGrid
+                recentCommits={overview?.recentCommits}
+                recentActivity={overview?.recentActivity}
+                previewUrl={project?.previewUrl ?? overview?.previewUrl}
                 onOpenSandbox={onOpenSandbox}
+                onOpenDeploy={handleDeploy}
+                onOpenDatabase={() => setActiveTab("databases")}
               />
             </div>
+          )}
 
-            {/* Bottom 3 Columns: Deployments, Activity, Quick Actions */}
-            <ProjectConsoleBottomGrid />
-          </div>
+          {activeTab === "databases" && (
+            <div className="px-8 py-6">
+              <ProjectDatabaseView
+                projectId={project?.id}
+                projectName={projectName}
+                templateId={project?.templateId}
+              />
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Billing & Upgrade Modals */}
       <UpgradeModal
         isOpen={isUpgradeOpen}
         onClose={closeUpgrade}

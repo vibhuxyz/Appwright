@@ -1,15 +1,19 @@
 import { prisma } from "@repo/db";
 
-const DEFAULT_RUN_BUDGET_USD = 5;
+export interface StartBlueprintRunInput {
+  sessionId: string;
+  blueprintVersion: number;
+  budgetUsd: number;
+}
 
-export async function startBlueprintRun(sessionId: string, blueprintVersion: number): Promise<string> {
+export async function startBlueprintRun(input: StartBlueprintRunInput): Promise<string> {
   const run = await prisma.run.create({
     data: {
-      sessionId,
-      blueprintVersion,
+      sessionId: input.sessionId,
+      blueprintVersion: input.blueprintVersion,
       trigger: "INITIAL",
       status: "QUEUED",
-      budgetUsd: DEFAULT_RUN_BUDGET_USD,
+      budgetUsd: input.budgetUsd,
     },
     select: { id: true },
   });

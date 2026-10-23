@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  MAX_GAP_QUESTIONS,
   MAX_PROMPT_CHARS,
   MAX_QUESTION_LABEL_CHARS,
   MAX_QUESTION_NEED_CHARS,
@@ -9,6 +10,7 @@ import {
   MAX_QUESTIONS,
   MIN_QUESTION_OPTIONS,
 } from "./constants";
+import { extractFacts } from "../discovery/extract";
 import { extractJsonObject } from "../shared";
 import type { IntakeQuestion } from "./types";
 
@@ -18,18 +20,20 @@ Read the user request. Find the product decisions it leaves open that would chan
 
 Rules:
 - If this is a small edit, a question, or already fully specified, return {"questions":[]}.
-- If they want a new app or a substantial feature, return 1 to 3 questions.
+- If they want a new app or a substantial feature, return only the material product decisions that are still open, grouped in one concise batch of at most 8.
 - Questions must be about THIS product. A todo app should ask about sharing, due dates, or lists. A shop should ask about catalog, checkout, or inventory. Never use a generic platform checklist.
 - Do not ask about languages, frameworks, databases, hosting, or visual style.
-- Do not ask anything the request already decided.
+- Never ask whether to include standard engineering work. The builder adds responsive layout, navigation, loading and error states, accessibility, SEO, security, tests, an admin panel for managing business content, image handling, and deployment readiness by itself.
+- Do not add photo-upload or brand-asset questions. Images are collected after the plan and design system exist.
+- Only ask decisions that change the product or business: ordering versus browsing only, accounts versus guest access, which payment provider or outside system must be connected, or a business rule that cannot be safely inferred.
+- Do not ask anything the request already decided. If they named the business, gave an address, email, phone, or social profile, do not ask for that fact again.
+- Do not rephrase contact or social collection as a single paste-links question. Those details are collected as one input per profile and contact method.
 - Each question gets 2 to 4 short multiple-choice options that are the real, distinct answers to that question for this product (e.g. "Pickup only", "Delivery only", "Both pickup and delivery"), not "Yes"/"No" unless the decision is truly binary.
 - defaultOptionIndex is the index of the best default if they skip.
 - need is a unique kebab-case id. label is a 1-3 word preview heading. text is the spoken question.
 
 Return ONLY JSON:
 {"questions":[{"need":"ordering","text":"Should customers be able to order items for pickup or delivery?","label":"Ordering","options":["Pickup only","Delivery only","Both pickup and delivery","Neither, just browsing"],"defaultOptionIndex":2}]}
-
-User request:
 `;
 
 const GeneratedItemSchema = z.object({
@@ -106,12 +110,62 @@ function normalizeQuestion(
   const label = clip(item.label ?? labelFromSlug(need), MAX_QUESTION_LABEL_CHARS);
   if (label.length === 0) return undefined;
   const defaultOptionIndex = normalizeDefaultOptionIndex(item.defaultOptionIndex, options.length);
-  return { need, text, label, options, defaultOptionIndex };
+  return { need, text, label, options, defaultOptionIndex, inputType: "single", importance: "required" };
 }
 
-export function buildQuestionsPrompt(prompt: string): string {
+function withCatalogPhrasing(question: IntakeQuestion, match: IntakeQuestion | undefined): IntakeQuestion {
+  if (!match || question.inputType === "contacts") return question;
+  const keepCatalogOptions =
+    question.inputType === "short-text" ||
+    question.inputType === "images" ||
+    match.options.length < MIN_QUESTION_OPTIONS;
+  return {
+    ...question,
+    text: match.text,
+    label: match.label,
+    options: keepCatalogOptions ? question.options : match.options,
+    defaultOptionIndex: keepCatalogOptions ? question.defaultOptionIndex : match.defaultOptionIndex,
+  };
+}
+
+export function mergeQuestionPhrasing(
+  catalog: readonly IntakeQuestion[],
+  phrased: readonly IntakeQuestion[],
+  answeredNeeds: ReadonlySet<string>,
+): IntakeQuestion[] {
+  const byNeed = new Map(phrased.map((question) => [question.need, question]));
+  const catalogNeeds = new Set(catalog.map((question) => question.need));
+  const gaps = phrased
+    .filter((question) => !catalogNeeds.has(question.need) && !answeredNeeds.has(question.need))
+    .slice(0, MAX_GAP_QUESTIONS);
+  return [
+    ...catalog.map((question) => withCatalogPhrasing(question, byNeed.get(question.need))),
+    ...gaps,
+  ].slice(0, MAX_QUESTIONS);
+}
+
+function knownFactsBlock(prompt: string, answers: Readonly<Record<string, string>>): string {
+  const known = Object.entries(extractFacts(prompt, answers).answered)
+    .filter(([, value]) => value.length > 0)
+    .slice(0, 20)
+    .map(([id, value]) => `- ${id}: ${clip(value, 120)}`);
+  if (known.length === 0) return "";
+  return `Already known from the request (do not ask these again):\n${known.join("\n")}\n\n`;
+}
+
+function plannedQuestionsBlock(planned: readonly Pick<IntakeQuestion, "need" | "text">[]): string {
+  if (planned.length === 0) return "";
+  const lines = planned.map((question) => `- ${question.need}: ${clip(question.text, MAX_QUESTION_TEXT_CHARS)}`);
+  return `Already being asked this round (reuse these exact need ids to rephrase them; do not ask them again under another id):\n${lines.join("\n")}\nYou may add at most ${MAX_GAP_QUESTIONS} more questions for open decisions this list does not cover.\n\n`;
+}
+
+export function buildQuestionsPrompt(
+  prompt: string,
+  answers: Readonly<Record<string, string>> = {},
+  planned: readonly Pick<IntakeQuestion, "need" | "text">[] = [],
+): string {
   const request = clip(escapeRequest(prompt), MAX_PROMPT_CHARS);
-  return `${QUESTIONS_INSTRUCTIONS}<user-request>\n${request}\n</user-request>`;
+  return `${QUESTIONS_INSTRUCTIONS}${knownFactsBlock(prompt, answers)}${plannedQuestionsBlock(planned)}<user-request>\n${request}\n</user-request>`;
 }
 
 export function parseGeneratedQuestions(raw: string): ParsedQuestions {

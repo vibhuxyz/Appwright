@@ -13,6 +13,10 @@ export const CLIENT_COMPONENTS = new Set([
   "label.tsx",
   "button.tsx",
   "badge.tsx",
+  "toast.tsx",
+  "carousel.tsx",
+  "testimonials.tsx",
+  "modal.tsx",
 ]);
 
 export const COMPONENT_FILES = [
@@ -26,6 +30,13 @@ export const COMPONENT_FILES = [
   "tabs.tsx",
   "select.tsx",
   "dialog.tsx",
+  "spinner.tsx",
+  "skeleton.tsx",
+  "page-skeleton.tsx",
+  "toast.tsx",
+  "carousel.tsx",
+  "testimonials.tsx",
+  "modal.tsx",
 ] as const;
 
 export const GENERATED_BANNER =

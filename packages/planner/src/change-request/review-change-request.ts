@@ -1,6 +1,6 @@
 import type { Blueprint } from "@repo/contracts";
 import { validateBlueprint } from "../blueprint";
-import { compileTasks, type TaskSpec } from "../compile";
+import { compileTasks, withComposition, type TaskSpec } from "../compile";
 import { diffAffectedTaskIds } from "./diff-tasks";
 import type { ChangeRequest, ChangeRequestDecision } from "./types";
 
@@ -53,10 +53,11 @@ export function applyConfirmedChange(
   blueprint: Blueprint,
   currentTasks: readonly TaskSpec[],
 ): ChangeRequestDecision {
-  const nextTasks = compileTasks(blueprint);
+  const composed = withComposition(blueprint);
+  const nextTasks = compileTasks(composed);
   return {
     status: "approved",
-    blueprint,
+    blueprint: composed,
     affectedTaskIds: diffAffectedTaskIds(currentTasks, nextTasks),
   };
 }

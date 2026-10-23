@@ -25,6 +25,7 @@ Rules:
 - Field "type" is one of: String, Int, Boolean, DateTime, Json. Nothing else.
 - "features" may only contain "auth" and/or "payments" — include one only if the request clearly needs it.
 - "pages" must have at least one entry. Routes start with "/". This is a Next.js App Router app: a dynamic segment is written "[id]" in square brackets, e.g. "/restaurants/[id]" — never ":id" or "{id}".
+- Home and marketing pages include Testimonials and Carousel in "components". Contact, order and other form pages include Modal.
 - "primary" is a 6-digit hex colour.
 - entities and their fields model what the request actually describes — do not invent unrelated data.
 

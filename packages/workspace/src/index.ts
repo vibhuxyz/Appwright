@@ -20,6 +20,13 @@ export function sessionWorktreePath(
   return path.join(workspacePath(projectId), `session-${sessionId}`);
 }
 
+export function sessionBrowserReportPath(
+  projectId: string,
+  sessionId: string,
+): string {
+  return path.join(workspacePath(projectId), "browser-reports", sessionId);
+}
+
 export {
   applyComposition,
   planComposition,

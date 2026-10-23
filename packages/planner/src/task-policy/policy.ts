@@ -29,6 +29,12 @@ const CAPABILITY_BY_TASK_TYPE = {
   layout: "fast_coding",
   responsive: "fast_coding",
   "visual-verification": "cheap",
+  admin: "strong_coding",
+  media: "fast_coding",
+  seo: "fast_coding",
+  security: "strong_reasoning",
+  testing: "strong_coding",
+  deploy: "cheap",
 } as const satisfies Record<TaskType, Capability>;
 
 const VERIFICATION_TIER_BY_RISK = {

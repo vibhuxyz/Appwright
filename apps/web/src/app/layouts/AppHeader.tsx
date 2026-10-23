@@ -50,7 +50,7 @@ export function AppHeader({
   const user = useAuthStore((s) => s.user);
   const updateCredits = useAuthStore((s) => s.updateCredits);
   const credits = user?.credits ?? 0;
-  const isUpgraded = Boolean(user?.isUpgraded || (user?.plan && user.plan !== "free"));
+  const isUpgraded = user != null && user.plan !== "FREE";
 
   const {
     isAddCreditsOpen,
@@ -85,6 +85,11 @@ export function AppHeader({
         {/* Left: Wordmark & optional project context */}
         <div className="flex items-center gap-3">
           <Wordmark />
+          {!project && (
+            <Link to="/sections" className="text-xs font-medium text-muted hover:text-foreground">
+              Sections
+            </Link>
+          )}
           {project}
         </div>
 

@@ -1,20 +1,25 @@
-import type { Blueprint } from "@repo/contracts";
+import type { Blueprint, Page } from "@repo/contracts";
+import { compositionFingerprint, shellFor } from "@repo/ui-system";
 import {
+  ADMIN_GLOB,
+  ADMIN_ROUTE_PREFIX,
   APP_SHELL_FILE,
   AUTH_FEATURE,
   GLOBAL_STYLES_FILE,
   LAYOUTS_GLOB,
+  MEDIA_GLOB,
   PACKAGE_MANIFEST,
   PAYMENTS_FEATURE,
-  PRISMA_SCHEMA_FILE,
-  PRISMA_SEED_FILE,
+  MODELS_GLOB,
+  SEED_FILE,
   PROJECT_DATABASE,
   RESPONSIVE_NAV_GLOB,
   SHARED_COMPONENTS_GLOB,
   TYPOGRAPHY_FILE,
   VISUAL_VERIFICATION_FILE,
 } from "./constants";
-import { routeToPageFile, routeToSlug, toSlug } from "./slug";
+import { routeToLoadingFile, routeToPageFile, routeToSlug, toSlug } from "./slug";
+import { requirementDrafts } from "./requirement-drafts";
 import type { TaskDraft } from "./types";
 
 function foundationDrafts(): TaskDraft[] {
@@ -46,7 +51,7 @@ function dataDrafts(blueprint: Blueprint): TaskDraft[] {
       key: "schema",
       type: "schema",
       title: `Data model: ${entityNames}`,
-      owns: [PRISMA_SCHEMA_FILE, PROJECT_DATABASE],
+      owns: [MODELS_GLOB, PROJECT_DATABASE],
       reads: [PACKAGE_MANIFEST],
     },
     ...blueprint.entities.map((entity): TaskDraft => ({
@@ -54,14 +59,14 @@ function dataDrafts(blueprint: Blueprint): TaskDraft[] {
       type: "api",
       title: `API routes: ${entity.name}`,
       owns: [`src/app/api/${toSlug(entity.name)}/**`],
-      reads: [PRISMA_SCHEMA_FILE],
+      reads: [MODELS_GLOB],
     })),
     {
       key: "seed",
       type: "seed",
       title: "Seed data",
-      owns: [PRISMA_SEED_FILE, PROJECT_DATABASE],
-      reads: [PRISMA_SCHEMA_FILE],
+      owns: [SEED_FILE, PROJECT_DATABASE],
+      reads: [MODELS_GLOB],
     },
   ];
 }
@@ -69,7 +74,7 @@ function dataDrafts(blueprint: Blueprint): TaskDraft[] {
 function featureDrafts(blueprint: Blueprint): TaskDraft[] {
   const drafts: TaskDraft[] = [];
   const authReads =
-    blueprint.entities.length > 0 ? [PRISMA_SCHEMA_FILE] : [PACKAGE_MANIFEST];
+    blueprint.entities.length > 0 ? [MODELS_GLOB] : [PACKAGE_MANIFEST];
   if (blueprint.features.includes(AUTH_FEATURE)) {
     drafts.push({
       key: "auth",
@@ -95,24 +100,48 @@ function featureDrafts(blueprint: Blueprint): TaskDraft[] {
   return drafts;
 }
 
-function uiDrafts(blueprint: Blueprint): TaskDraft[] {
-  const pageReads = [
-    SHARED_COMPONENTS_GLOB,
-    LAYOUTS_GLOB,
-    ...(blueprint.entities.length > 0 ? [PRISMA_SCHEMA_FILE] : []),
-  ];
+function sectionNote(page: Page): string {
+  const ids = (page.sections ?? []).map((section) => section.sectionId);
+  return ids.length > 0 ? ` [${ids.join(", ")}]` : "";
+}
 
-  const firstPageRoute = blueprint.pages[0]?.route ?? "/";
-  const firstPageFile = routeToPageFile(firstPageRoute);
+function pageTitle(page: Page): string {
+  const names = page.components.length > 0 ? ` (${page.components.join(", ")})` : "";
+  return `Page ${page.route}: ${page.purpose}${names}${sectionNote(page)}`;
+}
 
+function pageReadsFor(route: string, baseReads: string[], blueprint: Blueprint): string[] {
+  const areas = new Set((blueprint.requirements ?? []).map((requirement) => requirement.area));
+  const isAdminRoute = route === ADMIN_ROUTE_PREFIX || route.startsWith(`${ADMIN_ROUTE_PREFIX}/`);
+  if (!isAdminRoute || !areas.has("admin")) return baseReads;
+  const isMediaRoute = route.endsWith("/media") && areas.has("media");
+  return [...baseReads, ADMIN_GLOB, ...(isMediaRoute ? [MEDIA_GLOB] : [])];
+}
+
+function shellDraft(blueprint: Blueprint): TaskDraft {
+  const shell = shellFor(blueprint);
+  const named = shell.footerId ? `${shell.navigationId}, ${shell.footerId}` : shell.navigationId;
+  return {
+    key: "app-shell",
+    type: "app-shell",
+    title: `App shell & navigation (${named})`,
+    owns: [APP_SHELL_FILE],
+    reads: [GLOBAL_STYLES_FILE],
+  };
+}
+
+function visualDraft(blueprint: Blueprint, firstPageFile: string): TaskDraft {
+  return {
+    key: "visual-verification",
+    type: "visual-verification",
+    title: `Visual smoke & render verification #${compositionFingerprint(blueprint.pages)}`,
+    owns: [VISUAL_VERIFICATION_FILE],
+    reads: [RESPONSIVE_NAV_GLOB, firstPageFile],
+  };
+}
+
+function frameDrafts(firstPageFile: string): TaskDraft[] {
   return [
-    {
-      key: "app-shell",
-      type: "app-shell",
-      title: "App shell & navigation framework",
-      owns: [APP_SHELL_FILE],
-      reads: [GLOBAL_STYLES_FILE],
-    },
     {
       key: "typography",
       type: "typography",
@@ -134,13 +163,6 @@ function uiDrafts(blueprint: Blueprint): TaskDraft[] {
       owns: [SHARED_COMPONENTS_GLOB],
       reads: [LAYOUTS_GLOB, GLOBAL_STYLES_FILE],
     },
-    ...blueprint.pages.map((page): TaskDraft => ({
-      key: `page-${routeToSlug(page.route)}`,
-      type: "page",
-      title: `Page ${page.route}: ${page.purpose}`,
-      owns: [routeToPageFile(page.route)],
-      reads: pageReads,
-    })),
     {
       key: "responsive",
       type: "responsive",
@@ -148,14 +170,32 @@ function uiDrafts(blueprint: Blueprint): TaskDraft[] {
       owns: [RESPONSIVE_NAV_GLOB],
       reads: [APP_SHELL_FILE, firstPageFile],
     },
-    {
-      key: "visual-verification",
-      type: "visual-verification",
-      title: "Visual smoke & render verification",
-      owns: [VISUAL_VERIFICATION_FILE],
-      reads: [RESPONSIVE_NAV_GLOB, firstPageFile],
-    },
   ];
+}
+
+function pageDrafts(blueprint: Blueprint, pageReads: string[]): TaskDraft[] {
+  return blueprint.pages.map((page): TaskDraft => ({
+    key: `page-${routeToSlug(page.route)}`,
+    type: "page",
+    title: pageTitle(page),
+    owns: [routeToPageFile(page.route), routeToLoadingFile(page.route)],
+    reads: pageReadsFor(page.route, pageReads, blueprint),
+  }));
+}
+
+function uiDrafts(blueprint: Blueprint): TaskDraft[] {
+  const pageReads = [SHARED_COMPONENTS_GLOB, LAYOUTS_GLOB, ...(blueprint.entities.length > 0 ? [MODELS_GLOB] : [])];
+  const firstPageFile = routeToPageFile(blueprint.pages[0]?.route ?? "/");
+  const [typography, layout, components, responsive] = frameDrafts(firstPageFile);
+  return [
+    shellDraft(blueprint),
+    typography,
+    layout,
+    components,
+    ...pageDrafts(blueprint, pageReads),
+    responsive,
+    visualDraft(blueprint, firstPageFile),
+  ].filter((task): task is TaskDraft => task !== undefined);
 }
 
 export function draftTasks(blueprint: Blueprint): TaskDraft[] {
@@ -164,5 +204,6 @@ export function draftTasks(blueprint: Blueprint): TaskDraft[] {
     ...dataDrafts(blueprint),
     ...featureDrafts(blueprint),
     ...uiDrafts(blueprint),
+    ...requirementDrafts(blueprint),
   ];
 }

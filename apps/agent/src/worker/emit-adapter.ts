@@ -1,7 +1,16 @@
-import type { AgentEvent, AgentEventSink } from "@repo/agent-core";
+import {
+  isProviderCreditsDepleted,
+  PROVIDER_CREDITS_DEPLETED_NOTICE,
+  type AgentEvent,
+  type AgentEventSink,
+} from "@repo/agent-core";
 import { publishChannel, sessionChannel } from "@repo/cache";
+import { usdToCredits } from "@repo/contracts";
 import { prisma } from "@repo/db";
+import { createLogger } from "@repo/logger";
 import { publishDelta, publishStatus, type PersistFields } from "./persist";
+
+const log = createLogger("agent-job");
 
 export interface EmitAdapterOptions {
   sessionId: string;
@@ -56,7 +65,6 @@ export function createEmitAdapter(opts: EmitAdapterOptions): {
         });
         break;
       case "usage": {
-        const tokensUsed = event.inputTokens + event.outputTokens;
         const [updatedSession, updatedUser] = await prisma.$transaction([
           prisma.session.update({
             where: { id: sessionId },
@@ -69,7 +77,7 @@ export function createEmitAdapter(opts: EmitAdapterOptions): {
           }),
           prisma.user.update({
             where: { id: userId },
-            data: { credits: { decrement: tokensUsed } },
+            data: { credits: { decrement: usdToCredits(event.costUsd) } },
             select: { credits: true },
           }),
         ]);
@@ -80,13 +88,23 @@ export function createEmitAdapter(opts: EmitAdapterOptions): {
         });
         break;
       }
-      case "error":
+      case "error": {
+        const providerCreditsDepleted = isProviderCreditsDepleted(event.message);
+        log.error("agent loop error", {
+          sessionId,
+          userId,
+          providerCreditsDepleted,
+          message: event.message,
+        });
         await persist({
           role: "assistant",
           type: "text",
-          content: `Something went wrong and the run stopped: ${event.message}`,
+          content: providerCreditsDepleted
+            ? PROVIDER_CREDITS_DEPLETED_NOTICE
+            : `Something went wrong and the run stopped: ${event.message}`,
         });
         break;
+      }
       case "agent_end":
         if (textBuffer) {
           await persist({ role: "assistant", type: "text", content: textBuffer });

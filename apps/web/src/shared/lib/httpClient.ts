@@ -104,6 +104,12 @@ export const httpClient = {
     }).then((r) => parseJson<T>(r)),
   delete: <T = void>(path: string, signal?: AbortSignal) =>
     request(path, { method: "DELETE", signal }).then((r) => parseJson<T>(r)),
+  getBlob: async (path: string, signal?: AbortSignal): Promise<Blob | null> => {
+    const res = await request(path, { signal });
+    if (res.status === 404) return null;
+    await rejectIfBad(res);
+    return res.blob();
+  },
   // EventSource cannot set headers, so the JWT rides as a query param here —
   // the API accepts it on stream routes only.
   streamUrl: (path: string) => {

@@ -6,44 +6,17 @@ import {
 } from "node:http";
 import { prisma } from "@repo/db";
 import { Router, type Request, type Response } from "express";
-import { injectInspector, isHtmlResponse } from "../preview";
+import {
+  PREVIEW_COOKIE,
+  allowFraming,
+  cookieValue,
+  injectInspector,
+  isApiPath,
+  isHtmlResponse,
+} from "../preview";
+import { startSessionDevServer } from "../workspace/manager";
 
 export const previewRouter = Router();
-
-const PREVIEW_COOKIE = "aw_preview";
-const API_PREFIXES = [
-  "/auth",
-  "/health",
-  "/session",
-  "/project",
-  "/projects",
-  "/conversation",
-  "/conversations",
-  "/stream",
-  "/models",
-  "/files",
-  "/vercel",
-  "/prompt",
-  "/approval",
-  "/user",
-  "/preview",
-];
-
-function isApiPath(pathname: string): boolean {
-  return API_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
-function cookieValue(header: string | undefined, name: string): string | null {
-  if (!header) return null;
-  for (const part of header.split(";")) {
-    const idx = part.indexOf("=");
-    if (idx === -1) continue;
-    if (part.slice(0, idx).trim() === name) {
-      return decodeURIComponent(part.slice(idx + 1).trim());
-    }
-  }
-  return null;
-}
 
 function subpathFrom(params: { subpath?: string | string[] }): string {
   const raw = params.subpath;
@@ -65,7 +38,7 @@ function outgoingHeaders(
   headers: IncomingHttpHeaders,
   token?: string,
 ): OutgoingHttpHeaders {
-  const out: OutgoingHttpHeaders = { ...headers };
+  const out = allowFraming({ ...headers });
   if (!token) return out;
   const extra = previewCookie(token);
   const existing = out["set-cookie"];
@@ -94,10 +67,22 @@ function relayHtmlWithInspector(
     const headers = outgoingHeaders(upstreamRes.headers, token);
     delete headers["content-length"];
     delete headers["content-encoding"];
+    delete headers["transfer-encoding"];
     headers["content-length"] = Buffer.byteLength(body, "utf8");
     res.writeHead(upstreamRes.statusCode ?? 502, headers);
     res.end(body);
   });
+}
+
+const PROXY_DEADLINE_MS = 90_000;
+
+function isConnectionRefused(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error.code === "ECONNREFUSED" || error.code === "ECONNRESET")
+  );
 }
 
 function proxyToDevServer(
@@ -106,9 +91,12 @@ function proxyToDevServer(
   port: number,
   upstreamPath: string,
   token?: string,
+  onRefused?: () => void,
 ): void {
   const requestHeaders = { ...req.headers, host: `127.0.0.1:${port}` };
   if (wantsHtml(req)) requestHeaders["accept-encoding"] = "identity";
+  const deadline = new AbortController();
+  const deadlineTimer = setTimeout(() => deadline.abort(), PROXY_DEADLINE_MS);
   const upstream = httpRequest(
     {
       host: "127.0.0.1",
@@ -116,6 +104,7 @@ function proxyToDevServer(
       method: req.method,
       path: upstreamPath,
       headers: requestHeaders,
+      signal: deadline.signal,
     },
     (upstreamRes: IncomingMessage) => {
       if (isHtmlResponse(upstreamRes.headers["content-type"])) {
@@ -129,25 +118,66 @@ function proxyToDevServer(
       upstreamRes.pipe(res);
     },
   );
-  upstream.setTimeout(15_000, () => upstream.destroy());
-  upstream.on("error", () => {
-    if (!res.headersSent) {
-      res.status(502).json({
-        error: { code: "BAD_GATEWAY", message: "preview server unreachable" },
-      });
-    } else {
+  upstream.on("close", () => clearTimeout(deadlineTimer));
+  upstream.on("error", (error: unknown) => {
+    if (res.headersSent) {
       res.end();
+      return;
     }
+    if (onRefused && isConnectionRefused(error)) {
+      onRefused();
+      return;
+    }
+    res.status(502).json({
+      error: { code: "BAD_GATEWAY", message: "preview server unreachable" },
+    });
   });
   req.pipe(upstream);
 }
 
-async function sessionPort(token: string): Promise<number | null> {
+interface PreviewSession {
+  id: string;
+  projectId: string;
+  devPort: number;
+}
+
+export async function sessionPort(token: string): Promise<number | null> {
+  const session = await previewSession(token);
+  return session?.devPort ?? null;
+}
+
+async function previewSession(token: string): Promise<PreviewSession | null> {
   const session = await prisma.session.findUnique({
     where: { previewToken: token },
-    select: { devPort: true },
+    select: { id: true, projectId: true, devPort: true },
   });
-  return session?.devPort ?? null;
+  if (!session?.devPort) return null;
+  return { id: session.id, projectId: session.projectId, devPort: session.devPort };
+}
+
+function servePreview(
+  req: Request,
+  res: Response,
+  session: PreviewSession,
+  upstreamPath: string,
+  token?: string,
+): void {
+  const restart = () => {
+    void startSessionDevServer(session.projectId, session.id)
+      .then(async (devPort) => {
+        await prisma.session.update({ where: { id: session.id }, data: { devPort } });
+        proxyToDevServer(req, res, devPort, upstreamPath, token);
+      })
+      .catch(() => {
+        if (!res.headersSent) {
+          res.status(502).json({
+            error: { code: "BAD_GATEWAY", message: "preview server unreachable" },
+          });
+        }
+      });
+  };
+  const canRestart = req.method === "GET" || req.method === "HEAD";
+  proxyToDevServer(req, res, session.devPort, upstreamPath, token, canRestart ? restart : undefined);
 }
 
 // Cookie catch-all: Next/Vite emit root-absolute `/_next/...` and `/@vite/...`
@@ -163,26 +193,20 @@ previewRouter.use(async (req, res, next) => {
     next();
     return;
   }
-  const port = await sessionPort(token);
-  if (!port) {
+  const session = await previewSession(token);
+  if (!session) {
     next();
     return;
   }
-  proxyToDevServer(req, res, port, req.originalUrl);
+  servePreview(req, res, session, req.originalUrl);
 });
 
 previewRouter.use("/preview/:token{/*subpath}", async (req, res) => {
   const token = String(req.params.token ?? "");
-  const port = await sessionPort(token);
-  if (!port) {
+  const session = await previewSession(token);
+  if (!session) {
     res.status(404).json({ error: { code: "NOT_FOUND", message: "preview not found" } });
     return;
   }
-  proxyToDevServer(
-    req,
-    res,
-    port,
-    withQuery(subpathFrom(req.params), req.originalUrl),
-    token,
-  );
+  servePreview(req, res, session, withQuery(subpathFrom(req.params), req.originalUrl), token);
 });

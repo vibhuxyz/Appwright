@@ -16,6 +16,11 @@ interface QuestionFlowProps {
   onRetry?: () => void;
 }
 
+function remainingAreOptional(questions: readonly PlanQuestion[], answeredCount: number): boolean {
+  const remaining = questions.slice(answeredCount);
+  return remaining.length > 0 && remaining.every((question) => question.importance === "optional");
+}
+
 export function QuestionFlow({
   questions,
   profileTitle,
@@ -43,7 +48,8 @@ export function QuestionFlow({
           ) : (
             <>
               <p className="mb-3 text-sm text-muted">
-                Answer or skip. A skip keeps that question’s default, and the plan uses it.
+                Business details are required. Optional questions can be skipped; a skip keeps that
+                question’s default.
               </p>
               <QuestionScrollback
                 answered={answered}
@@ -65,12 +71,24 @@ export function QuestionFlow({
         {!isComplete && currentQuestion && (
           <AnswerControls
             key={currentQuestion.need}
+            need={currentQuestion.need}
             options={currentQuestion.options}
             suggestion={currentQuestion.options[currentQuestion.defaultOptionIndex] ?? ""}
+            inputType={currentQuestion.inputType}
+            importance={currentQuestion.importance}
             isSubmitting={isSubmitting}
             onAnswer={answerCurrent}
-            onSkip={skipCurrent}
-            onSkipRest={skipRemaining}
+            prefill={currentQuestion.prefill}
+            onSkip={
+              currentQuestion.importance === "optional" ||
+              (currentQuestion.need !== "business-contacts" &&
+                currentQuestion.inputType !== "short-text" &&
+                currentQuestion.inputType !== "images" &&
+                currentQuestion.inputType !== "contacts")
+                ? skipCurrent
+                : undefined
+            }
+            onSkipRest={remainingAreOptional(questions, answered.length) ? skipRemaining : undefined}
           />
         )}
         {isComplete && questions.length > 0 && !error && (

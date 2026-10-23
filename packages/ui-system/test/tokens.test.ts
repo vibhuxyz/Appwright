@@ -81,8 +81,14 @@ describe("the registry", () => {
     }
   });
 
-  test("nine primitives, not forty — inventory with no demand is the trap", () => {
-    expect(allowedPrimitives()).toHaveLength(9);
+  test("sixteen primitives, not forty — every entry has a page that needs it", () => {
+    expect(allowedPrimitives()).toHaveLength(16);
+  });
+
+  test("covers the feedback and content components every site needs", () => {
+    for (const name of ["Modal", "Toast", "Carousel", "Testimonials", "Skeleton", "PageSkeleton", "Spinner"]) {
+      expect(allowedPrimitives()).toContain(name as never);
+    }
   });
 });
 
@@ -101,10 +107,20 @@ describe("the prompt section", () => {
     expect(uiSystemPromptSection()).toContain("p-[17px]");
   });
 
+  test("requires testimonials, carousel, modal, toast, skeleton and spinner on generated sites", () => {
+    const section = uiSystemPromptSection();
+    expect(section).toContain("Testimonials");
+    expect(section).toContain("Carousel");
+    expect(section).toContain("Modal");
+    expect(section).toContain("toast.success");
+    expect(section).toContain("PageSkeleton");
+    expect(section).toContain("Spinner");
+  });
+
   test("stays small enough to sit beside everything else in the context budget", () => {
     // Names and variants, not descriptions (V1.1 trap table). If this
     // fails, something started explaining components in prose.
-    expect(uiSystemPromptSection().length).toBeLessThan(2500);
+    expect(uiSystemPromptSection().length).toBeLessThan(3000);
   });
 });
 

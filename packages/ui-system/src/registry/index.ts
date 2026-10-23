@@ -4,8 +4,8 @@
 // hand-written prompt paragraph plus a separate validator list is two
 // definitions that drift (D10).
 //
-// Nine entries, deliberately. An unused registry entry is inventory with no
-// demand — add the tenth when a real page needs it.
+// Keep this list to primitives a generated page actually imports.
+// An unused registry entry is inventory with no demand.
 
 export interface RegistryEntry {
   /** Where the implementation comes from. `shadcn/ui` means the source is
@@ -39,7 +39,7 @@ export const registry = {
     ],
     sizes: ["sm", "default", "lg", "icon"],
     allowed: true,
-    use: "any clickable action; `asChild` wraps a link",
+    use: "clickable action; `asChild` wraps a link; `isLoading` during requests",
   },
   Card: {
     source: "shadcn/ui",
@@ -81,6 +81,7 @@ export const registry = {
       "DialogContent",
       "DialogHeader",
       "DialogTitle",
+      "DialogDescription",
       "DialogFooter",
     ],
     allowed: true,
@@ -113,6 +114,55 @@ export const registry = {
     parts: ["TabsList", "TabsTrigger", "TabsContent"],
     allowed: true,
     use: "switch between sibling views in one place",
+  },
+  Modal: {
+    source: "shadcn/ui",
+    file: "src/components/ui/modal.tsx",
+    parts: ["ConfirmModal"],
+    allowed: true,
+    use: "popup (trigger, title); ConfirmModal for destructive confirms",
+  },
+  Toast: {
+    source: "shadcn/ui",
+    file: "src/components/ui/toast.tsx",
+    parts: ["Toaster", "toast"],
+    allowed: true,
+    use: "action feedback: toast.success(title), toast.error(title); Toaster is in the layout",
+  },
+  Carousel: {
+    source: "shadcn/ui",
+    file: "src/components/ui/carousel.tsx",
+    parts: ["CarouselContent", "CarouselItem", "CarouselPrevious", "CarouselNext"],
+    allowed: true,
+    use: "sliding gallery or featured items; autoPlayMs optional",
+  },
+  Testimonials: {
+    source: "shadcn/ui",
+    file: "src/components/ui/testimonials.tsx",
+    parts: ["TestimonialCard"],
+    allowed: true,
+    use: "reviews carousel; items=[{quote,name,role,rating}]",
+  },
+  Skeleton: {
+    source: "shadcn/ui",
+    file: "src/components/ui/skeleton.tsx",
+    allowed: true,
+    use: "placeholder while data loads",
+  },
+  PageSkeleton: {
+    source: "shadcn/ui",
+    file: "src/components/ui/page-skeleton.tsx",
+    variants: ["page", "cards", "table", "detail"],
+    parts: ["CardGridSkeleton", "TableSkeleton", "DetailSkeleton"],
+    allowed: true,
+    use: "whole-page loading; use in every loading.tsx",
+  },
+  Spinner: {
+    source: "shadcn/ui",
+    file: "src/components/ui/spinner.tsx",
+    sizes: ["sm", "default", "lg"],
+    allowed: true,
+    use: "inline wait indicator",
   },
 } as const satisfies Record<string, RegistryEntry>;
 

@@ -1,4 +1,4 @@
-export type ResourceKind = "file" | "db" | "port" | "prisma" | "env";
+export type ResourceKind = "file" | "db" | "port" | "env";
 
 export interface CanonicalResource {
   kind: ResourceKind;
