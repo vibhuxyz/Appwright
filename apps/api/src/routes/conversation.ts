@@ -6,6 +6,7 @@ import {
   SendMessageRequest,
 } from "@repo/contracts";
 import { prisma } from "@repo/db";
+import { worktreeSessionIdOf } from "@repo/workspace";
 import { Router } from "express";
 import { requireAuthAllowingQueryToken } from "@repo/auth";
 import { setTraceContext } from "@repo/logger";
@@ -21,7 +22,11 @@ import {
 import { log } from "../log";
 import { ownedBlueprintSessionId, ownedSessionProjectId } from "../ownership";
 import { attachSseClient, publishStatus } from "../stream/sse";
-import { hasRunCapacity } from "../workflow/run-limit";
+import {
+  hasRunCapacity,
+  isWorktreeBusy,
+  WORKTREE_BUSY_MESSAGE,
+} from "../workflow/run-limit";
 import { enqueueConversation } from "../workflow/enqueue-conversation";
 import { serializeRow } from "../workflow/message-mapper";
 import { conversationRateLimitOk, hasUserSandboxCapacity } from "../workflow/rate-limit";
@@ -209,8 +214,16 @@ conversationRouter.post("/conversation", async (req, res) => {
     });
   }
 
+  const worktreeSessionId = worktreeSessionIdOf(session);
+  if (await isWorktreeBusy(worktreeSessionId, session.id)) {
+    return res.status(409).json({
+      error: { code: "WORKTREE_BUSY", message: WORKTREE_BUSY_MESSAGE },
+    });
+  }
+
   const job = await enqueueConversation({
     sessionId: session.id,
+    worktreeSessionId,
     projectId: session.projectId,
     prompt,
     answers,

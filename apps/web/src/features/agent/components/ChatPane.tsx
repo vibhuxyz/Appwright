@@ -181,6 +181,7 @@ export function ChatPane({
           }}
           onSubmit={send}
           onEnhance={handleEnhance}
+          onStopEnhance={enhancePrompt.cancel}
           onStop={() => stopConversation.mutate()}
         />
       )}

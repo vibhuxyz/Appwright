@@ -3,6 +3,13 @@ import { parsePorcelainZ, type PathChange } from "./changed-paths";
 export const MAX_MIRROR_FILE_BYTES = 2_000_000;
 export const MAX_PATHS_PER_SYNC = 300;
 const IGNORED_SEGMENTS = ["node_modules", ".next", ".git"];
+const BINARY_PATH =
+  /\.(?:png|jpe?g|gif|webp|ico|avif|bmp|woff2?|ttf|eot|otf|mp4|webm|mov|pdf|zip|gz|tgz|wasm)$/i;
+
+function isBinaryWorkspacePath(path: string): boolean {
+  const base = path.split("/").pop() ?? path;
+  return BINARY_PATH.test(base);
+}
 
 export interface SandboxMirrorPorts {
   listChanges(): Promise<string>;
@@ -34,6 +41,7 @@ function skipReasonFor(content: string): string | undefined {
 
 export class SandboxMirror {
   private readonly lastMirrored = new Map<string, string>();
+  private readonly settledBinary = new Set<string>();
 
   constructor(private readonly ports: SandboxMirrorPorts) {}
 
@@ -56,12 +64,22 @@ export class SandboxMirror {
   private async applyChange(change: PathChange, report: SyncReport): Promise<void> {
     if (change.kind === "delete") {
       this.lastMirrored.delete(change.path);
+      this.settledBinary.delete(change.path);
       await this.ports.removeHostFile(change.path);
       report.removed.push(change.path);
       return;
     }
+    if (this.settledBinary.has(change.path)) return;
+    if (isBinaryWorkspacePath(change.path)) {
+      this.settleBinary(change.path, report);
+      return;
+    }
     const content = await this.ports.readSandboxFile(change.path);
     const skipReason = skipReasonFor(content);
+    if (skipReason === "binary content") {
+      this.settleBinary(change.path, report);
+      return;
+    }
     if (skipReason) {
       report.skipped.push({ path: change.path, reason: skipReason });
       return;
@@ -70,5 +88,10 @@ export class SandboxMirror {
     await this.ports.writeHostFile(change.path, content);
     this.lastMirrored.set(change.path, content);
     report.written.push(change.path);
+  }
+
+  private settleBinary(path: string, report: SyncReport): void {
+    this.settledBinary.add(path);
+    report.skipped.push({ path, reason: "binary content" });
   }
 }

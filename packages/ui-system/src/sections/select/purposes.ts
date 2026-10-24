@@ -4,7 +4,7 @@ const MAX_PURPOSES = 8;
 const PRIVATE_ROUTE = /^\/(admin|dashboard|account|settings)(\/|$)/;
 
 const HOME: Record<ProjectType, readonly SectionPurpose[]> = {
-  "business-site": ["hero", "brand", "categories", "gallery", "location", "contact", "cta"],
+  "business-site": ["hero", "brand", "features", "gallery", "location", "contact", "cta"],
   portfolio: ["hero", "portfolio", "gallery", "story", "contact"],
   saas: ["hero", "features", "product-showcase", "faq", "cta"],
   marketplace: ["hero", "categories", "product-showcase", "cta"],
@@ -28,6 +28,7 @@ function withSignals(base: readonly SectionPurpose[], text: string): SectionPurp
   if (/\b(pric\w*|plans?|tiers?|subscription)\b/i.test(text)) insertBeforeCta(purposes, "pricing");
   if (/\b(faq|questions)\b/i.test(text)) insertBeforeCta(purposes, "faq");
   if (/\b(newsletter|subscribe)\b/i.test(text)) insertBeforeCta(purposes, "newsletter");
+  if (/\b(menu|catalog|shop|products?)\b/i.test(text)) insertBeforeCta(purposes, "categories");
   if (wantsTestimonials(text)) insertBeforeCta(purposes, "testimonials");
   return purposes.slice(0, MAX_PURPOSES);
 }

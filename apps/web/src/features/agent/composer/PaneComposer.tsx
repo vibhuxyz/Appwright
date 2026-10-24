@@ -21,6 +21,7 @@ export function PaneComposer({
   onChange,
   onSubmit,
   onEnhance,
+  onStopEnhance,
   onStop,
 }: {
   input: string;
@@ -40,6 +41,7 @@ export function PaneComposer({
   onChange: (value: string) => void;
   onSubmit: () => void;
   onEnhance: () => void;
+  onStopEnhance: () => void;
   onStop: () => void;
 }) {
   return (
@@ -65,6 +67,7 @@ export function PaneComposer({
         onChange={onChange}
         onSubmit={onSubmit}
         onEnhance={onEnhance}
+        onStopEnhance={onStopEnhance}
         onStop={onStop}
       />
     </div>

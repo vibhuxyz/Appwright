@@ -35,6 +35,17 @@ export interface RunAgentLoopParams {
   providerRetryDelayMs?: number;
 }
 
+function hasReasoningInMeta(toolCalls: readonly PendingToolCall[]): boolean {
+  const meta = toolCalls[0]?.providerMeta;
+  return (
+    typeof meta === "object" &&
+    meta !== null &&
+    "reasoningContent" in meta &&
+    typeof (meta as Record<string, unknown>).reasoningContent === "string" &&
+    ((meta as Record<string, unknown>).reasoningContent as string).length > 0
+  );
+}
+
 function toToolSpecs(tools: Tool[]): ToolSpec[] {
   return tools.map((t) => ({
     name: t.name,
@@ -146,7 +157,7 @@ export async function runAgentLoop(
       iterations++;
 
       const {
-        turn: { text, toolCalls, stopReason, usage },
+        turn: { text, toolCalls, stopReason, usage, providerMeta },
         billedModel,
       } = await collectTurnWithRetry(
         providers,
@@ -207,17 +218,23 @@ export async function runAgentLoop(
 
       if (toolCalls.length === 0) {
         if (text) {
-          messages.push({ role: "assistant", type: "text", content: text });
+          messages.push({
+            role: "assistant",
+            type: "text",
+            content: text,
+            providerMeta,
+          });
         }
         return end("completed");
       }
 
-      // Any reasoning text the model streamed before its tool calls this
-      // turn — push it so it's still part of the model's own context on the
-      // next iteration; it was already streamed live via text_delta events,
-      // this just stops it from being silently absent from messages[].
       if (text) {
-        messages.push({ role: "assistant", type: "text", content: text });
+        messages.push({
+          role: "assistant",
+          type: "text",
+          content: text,
+          providerMeta,
+        });
       }
 
       for (const call of toolCalls) {

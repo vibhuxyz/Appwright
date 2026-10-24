@@ -11,5 +11,7 @@ export type { ResolveGenerateResult } from "./resolve-generate";
 export { resolveStock } from "./resolve-stock";
 export type { ResolveStockResult } from "./resolve-stock";
 export { resolveUpload } from "./resolve-upload";
+export { reuseHeroForSocial } from "./reuse-hero-for-social";
+export { heroStandIn, photoSearchQuery } from "./social-fallback";
 export { respondFailed } from "./respond-failed";
 export { serializeProjectAsset } from "./serialize";

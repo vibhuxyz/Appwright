@@ -1,4 +1,5 @@
 import { prisma } from "@repo/db";
+import { worktreeSessionIdOf } from "@repo/workspace";
 
 // Every project-scoped route funnels through this. The userId goes in the
 // where-clause, not an if-statement after the lookup, so "not yours" and
@@ -24,6 +25,21 @@ export async function ownedSessionProjectId(
     select: { projectId: true },
   });
   return row?.projectId ?? null;
+}
+
+export async function ownedSessionWorktree(
+  sessionId: string,
+  userId: string,
+): Promise<{ projectId: string; worktreeSessionId: string } | null> {
+  const row = await prisma.session.findFirst({
+    where: { id: sessionId, project: { userId } },
+    select: { id: true, projectId: true, branch: true },
+  });
+  if (!row) return null;
+  return {
+    projectId: row.projectId,
+    worktreeSessionId: worktreeSessionIdOf(row),
+  };
 }
 
 // Same check, reached through a Run's session.

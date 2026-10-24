@@ -1,6 +1,7 @@
 import type { AssetPurpose, AssetSource } from "@repo/contracts";
 import { prisma } from "@repo/db";
 import { buildAssetFolder, uploadAsset } from "@repo/media";
+import { worktreeSessionIdOf } from "@repo/workspace";
 import { markSlotResolved } from "./mark-slot-resolved";
 import { writeAssetToWorktree } from "./write-to-worktree";
 
@@ -33,16 +34,22 @@ export async function finalizeAsset(input: FinalizeAssetInput) {
   const folder = buildAssetFolder(input.userId, input.projectId, sourceFolder, input.purpose);
   const publicId = input.slotId.replace(/[^a-zA-Z0-9_-]/g, "_");
 
-  const uploaded = await uploadAsset({
-    bytes: input.bytes,
-    mimeType: input.mimeType,
-    folder,
-    publicId,
-  });
+  const [uploaded, session] = await Promise.all([
+    uploadAsset({
+      bytes: input.bytes,
+      mimeType: input.mimeType,
+      folder,
+      publicId,
+    }),
+    prisma.session.findUniqueOrThrow({
+      where: { id: input.sessionId },
+      select: { id: true, branch: true },
+    }),
+  ]);
 
   const localPath = await writeAssetToWorktree({
     projectId: input.projectId,
-    sessionId: input.sessionId,
+    worktreeSessionId: worktreeSessionIdOf(session),
     purpose: input.purpose,
     assetId: publicId,
     extension,

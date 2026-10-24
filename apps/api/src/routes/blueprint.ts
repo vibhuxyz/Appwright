@@ -14,10 +14,11 @@ import { tasksAlreadySatisfied, validateTaskGraph, type Plan } from "@repo/plann
 import { Router } from "express";
 import { createAssetRequest, waitUntilAssetRequestResolved } from "../assets";
 import { log } from "../log";
-import { ownedSessionProjectId } from "../ownership";
+import { ownedSessionWorktree } from "../ownership";
 import { planFailure } from "../plan-preview";
 import { publishAssetRequest } from "../stream/sse";
 import { conversationRateLimitOk } from "../workflow/rate-limit";
+import { isWorktreeBusy, WORKTREE_BUSY_MESSAGE } from "../workflow/run-limit";
 import { applyComposition, planComposition } from "@repo/workspace";
 import { createSessionWorktree } from "../workspace/manager";
 
@@ -76,12 +77,13 @@ function requestIdOf(res: { getHeader(name: string): unknown }): string {
 
 
 blueprintRouter.post("/sessions/:sessionId/blueprint", async (req, res) => {
-  const projectId = await ownedSessionProjectId(req.params.sessionId, req.userId!);
-  if (!projectId) {
+  const owned = await ownedSessionWorktree(req.params.sessionId, req.userId!);
+  if (!owned) {
     return res.status(404).json({
       error: { code: "NOT_FOUND", message: "session not found", details: {}, requestId: requestIdOf(res) },
     });
   }
+  const { projectId, worktreeSessionId } = owned;
 
   const parsed = BuildBlueprintRequest.safeParse(req.body);
   if (!parsed.success) {
@@ -95,6 +97,17 @@ blueprintRouter.post("/sessions/:sessionId/blueprint", async (req, res) => {
       error: {
         code: "TOO_MANY_REQUESTS",
         message: "Too many requests. Slow down and try again shortly.",
+        details: {},
+        requestId: requestIdOf(res),
+      },
+    });
+  }
+
+  if (await isWorktreeBusy(worktreeSessionId, req.params.sessionId)) {
+    return res.status(409).json({
+      error: {
+        code: "WORKTREE_BUSY",
+        message: WORKTREE_BUSY_MESSAGE,
         details: {},
         requestId: requestIdOf(res),
       },
@@ -118,7 +131,10 @@ blueprintRouter.post("/sessions/:sessionId/blueprint", async (req, res) => {
       provider: new OpenAiProvider({ model: plannerModel(user.plan) }),
     });
 
-    const worktreeDir = await createSessionWorktree(projectId, req.params.sessionId);
+    const worktreeDir = await createSessionWorktree(
+      projectId,
+      worktreeSessionId,
+    );
     const plan = await dropAlreadySatisfiedTasks(builtPlan, worktreeDir);
 
     const reuseCounts = plan.reuseReport.reduce<Record<string, number>>((counts, entry) => {
@@ -164,11 +180,12 @@ blueprintRouter.post("/sessions/:sessionId/blueprint", async (req, res) => {
         {
           runId,
           sessionId,
+          worktreeSessionId,
           projectId,
           model: resolveModelForPlan(user.plan, session.model),
           plan: user.plan,
           userRemainingCents: creditsToCents(user.credits),
-          runtime: new LocalRuntime(projectId, sessionId),
+          runtime: new LocalRuntime(projectId, worktreeSessionId),
         },
         controller.signal,
       );

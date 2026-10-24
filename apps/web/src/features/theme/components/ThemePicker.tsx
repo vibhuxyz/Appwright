@@ -43,8 +43,9 @@ export function ThemePicker({
       />
       <div className="flex flex-col gap-3 p-4">
         <p className="text-sm text-muted">
-          Five full design systems from your prompt and answers. Scroll each one: colour, contrast, type,
-          radius, live components, and rules.
+          {query.data?.source === "preset"
+            ? "Starter design systems for this brief. Scroll each one, or describe a look below to generate a new set."
+            : "Five full design systems from your prompt and answers. Scroll each one: colour, contrast, type, radius, live components, and rules."}
         </p>
         {query.isError ? (
           <div className="flex flex-col gap-2">

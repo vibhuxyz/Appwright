@@ -2,6 +2,7 @@ import type { AssetSlot } from "@repo/contracts";
 import { prisma } from "@repo/db";
 import type { UnsplashClient } from "@repo/media";
 import { log } from "../../log";
+import { photoSearchQuery } from "../social-fallback";
 import { orientationForAspect } from "./orientation";
 import { persistUnsplashPhoto } from "./persist-photo";
 import { pickUnusedPhoto } from "./pick-unused-photo";
@@ -26,7 +27,7 @@ async function usedPhotoIds(sessionId: string): Promise<Set<string>> {
 
 export async function suggestUnsplashPhoto(input: SuggestUnsplashInput) {
   const searched = await input.client.search({
-    query: input.slot.suggestedPrompt.slice(0, 120),
+    query: photoSearchQuery(input.slot),
     page: 1,
     perPage: SUGGESTION_CANDIDATES,
     orientation: orientationForAspect(input.slot.aspectRatio),

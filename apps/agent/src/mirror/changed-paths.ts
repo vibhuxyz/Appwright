@@ -2,7 +2,21 @@ export type PathChange = { path: string; kind: "upsert" | "delete" };
 
 const STATUS_PREFIX_LENGTH = 3;
 const RENAME_OR_COPY = new Set(["R", "C"]);
-const READ_ONLY_COMMANDS = new Set(["ls", "cat", "grep", "rg", "find", "head", "tail", "pwd", "wc", "tree", "which"]);
+const READ_ONLY_COMMANDS = new Set([
+  "ls",
+  "cat",
+  "grep",
+  "rg",
+  "find",
+  "head",
+  "tail",
+  "pwd",
+  "wc",
+  "tree",
+  "which",
+  "file",
+  "stat",
+]);
 const READ_ONLY_GIT_SUBCOMMANDS = new Set(["status", "diff", "log", "show", "rev-parse", "ls-files"]);
 
 export function parsePorcelainZ(stdout: string): PathChange[] {

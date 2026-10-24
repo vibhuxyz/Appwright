@@ -13,6 +13,7 @@ export interface CollectedTurn {
   toolCalls: PendingToolCall[];
   stopReason: ProviderChunk & { type: "stop" };
   usage?: { inputTokens: number; outputTokens: number };
+  providerMeta?: unknown;
 }
 
 export async function collectTurn(
@@ -59,5 +60,11 @@ export async function collectTurn(
     throw new Error("provider.stream() ended without a stop chunk");
   }
 
-  return { text, toolCalls, stopReason: stop, usage };
+  return {
+    text,
+    toolCalls,
+    stopReason: stop,
+    usage,
+    providerMeta: stop.providerMeta,
+  };
 }

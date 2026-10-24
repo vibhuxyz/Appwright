@@ -38,9 +38,9 @@ export const agentApi = {
     httpClient
       .get(`/project/${projectId}/sessions`)
       .then((r) => z.array(sessionSchema).parse(r)),
-  createSession: (projectId: string, title?: string) =>
+  createSession: (projectId: string) =>
     httpClient
-      .post(`/project/${projectId}/session`, { title })
+      .post(`/project/${projectId}/session`, {})
       .then(sessionSchema.parse),
   updateSessionModel: (id: string, model: string) =>
     httpClient.put(`/session/${id}`, { model }).then(sessionSchema.parse),
@@ -83,8 +83,12 @@ export const agentApi = {
     httpClient.post<{ ok: boolean; stopped: boolean }>(
       `/conversation/${sessionId}/stop`,
     ),
-  enhancePrompt: (prompt: string) =>
-    httpClient.post<{ enhancedPrompt: string }>("/prompt/enhance", { prompt }),
+  enhancePrompt: (prompt: string, signal?: AbortSignal) =>
+    httpClient.post<{ enhancedPrompt: string }>(
+      "/prompt/enhance",
+      { prompt },
+      signal,
+    ),
 
   getDiff: (sessionId: string) =>
     httpClient.get<DiffFile[]>(`/session/${sessionId}/diff`),

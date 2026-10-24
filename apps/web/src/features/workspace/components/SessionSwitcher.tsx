@@ -1,9 +1,10 @@
-import { GitBranch } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import {
   useSessions,
   useSwitchSession,
 } from "@/features/agent/hooks/useSession";
 import type { Session } from "@/features/agent/schemas/agentSchemas";
+import { formatDateTime } from "@/shared/lib/formatters";
 
 const STATUS_LABEL: Record<Session["status"], string> = {
   IDLE: "Done",
@@ -43,8 +44,10 @@ export function SessionSwitcher({
             aria-current={session.id === activeSessionId ? "true" : undefined}
             className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface-3 aria-current:bg-surface-2 aria-current:text-foreground"
           >
-            <GitBranch className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1 truncate">{session.title ?? session.branch ?? session.id}</span>
+            <MessageSquare className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">
+              {session.title ?? `Chat · ${formatDateTime(session.createdAt)}`}
+            </span>
             <span className={`size-1.5 shrink-0 rounded-full ${STATUS_DOT[session.status]}`} />
             <span className="shrink-0 text-[10px] text-muted">{STATUS_LABEL[session.status]}</span>
           </button>

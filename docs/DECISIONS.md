@@ -112,6 +112,8 @@ No serialisation, no second process, no `AGENT_URL`, no contract generation. At 
 
 ## Decision 8: Session = worktree = branch ✅ ACTIVE _(target: V2)_
 
+> **Amended 2026-10-24 by [D73](#decision-73-new-chat-keeps-the-code--a-worktree-hosts-many-chats-one-running-at-a-time--active-2026-10-24-amends-d8)** — a worktree is no longer one session's: New Chat attaches to the current chat's branch instead of branching from `main`. Read "session" below as "the session that created the worktree".
+
 **Decision:** Each agent session gets its own `git worktree` on its own `agent/<sessionId>` branch, **inside the project's sandbox**. Merging back to `main` is an explicit, user-triggered action.
 
 **Why not `git checkout -b`:** it switches branches **in place** — one working directory, one branch at a time. Two agents cannot work at once, and switching yanks files out from under a running one. The failure is the confusing kind: no error, just an agent writing its edit into a file that now belongs to a different branch.
@@ -2250,6 +2252,45 @@ and a candidate for deletion if it's confirmed genuinely dead.
 **Revisit when:** real model output shows the option/character caps are too tight (a question whose
 real answers need more than 4 options or longer phrasing), or if the dead deterministic
 `selectQuestions()` path is confirmed unused and removed.
+
+---
+
+## Decision 73: New Chat keeps the code — a worktree hosts many chats, one running at a time ✅ ACTIVE _(2026-10-24, amends D8)_
+
+**Decision:** New Chat creates a new `Session` that inherits the current session's `branch` and
+`worktreePath` (`POST /project/:projectId/session` with `fromSessionId`) instead of getting a fresh
+`agent/<newId>` branch off `main`. A session's worktree is named by its stored branch:
+`worktreeSessionIdOf()` (`packages/workspace/src/session-branch`) reads `agent/<id>` and falls back
+to the session's own id, so existing sessions behave exactly as before. Every git and filesystem
+call that used to key on the session id — branch name, worktree path, dev-server key, file
+reads/writes, tool-call hydration, checkpoint, merge — now keys on that worktree session id,
+resolved once per entry point (each API route via `ownedSessionWorktree()`, each agent job from
+its session row).
+
+**Why:** under D8 every chat was a branch of `main`, which users hit in two ways. A new chat could
+not see the previous chat's work unless it had merged, and work merges only when verification
+passes, so an errored or stopped run's edits vanished from the new chat's preview. And every
+New Chat paid for a worktree, a `bun install` and a dev server before a message was sent, because
+the preview pane boots one at once. Users treat a chat as a conversation about the app, not a fork
+of it.
+
+**What we gave up:** two chats on the same code cannot run at once. `isWorktreeBusy()` makes
+`POST /conversation` and `POST /sessions/:id/blueprint` return 409 `WORKTREE_BUSY` while a sibling
+chat is `RUNNING` or `AWAITING_APPROVAL`. Parallel isolated work, D8's original motivation, now
+needs an explicit fork, which is not built.
+
+**Details that are easy to get wrong:**
+- Deleting a chat removes the worktree and branch only when no other session still references it.
+- `hydrateSessionFilesFromToolCalls()` replays tool calls from every session sharing the worktree,
+  ordered by `createdAt` then `seq`. Replaying one chat alone would overwrite a newer chat's edits
+  with stale content.
+- Sessions sharing a worktree share one dev server (`session:<worktreeSessionId>`); each keeps its
+  own `previewToken`.
+- Merging still removes the worktree. The next run on any chat sharing it recreates
+  `agent/<worktreeSessionId>` from `main`, which already holds the merged work.
+
+**Revisit when:** users want two independent variants of one app at once. That is a "Fork chat"
+action that branches from the current chat, not a change to New Chat.
 
 ---
 

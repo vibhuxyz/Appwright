@@ -4,6 +4,7 @@ import { prisma } from "@repo/db";
 import { claimSlot } from "./claim-slot";
 import { markSlotResolved } from "./mark-slot-resolved";
 import { resolveStock } from "./resolve-stock";
+import { reuseHeroForSocial } from "./reuse-hero-for-social";
 import { publishAssetRequest } from "../stream/sse";
 
 export interface FillStockInput {
@@ -26,20 +27,23 @@ export type FillStockSuccess = {
   readonly assetRequest: ReturnType<typeof serializeAssetRequest>;
 };
 
+function claimFailure(reason: "NOT_FOUND" | "ALREADY_RESOLVED" | "IN_PROGRESS"): FillStockFailure {
+  const isBusy = reason === "IN_PROGRESS";
+  return {
+    ok: false,
+    status: isBusy ? 409 : 404,
+    code: reason,
+    message: isBusy ? "Asset slot is already being resolved" : "Asset slot not found",
+  };
+}
+
 export async function fillStockSlot(input: FillStockInput): Promise<FillStockSuccess | FillStockFailure> {
   const claimed = await claimSlot({
     assetRequestId: input.assetRequestId,
     slotId: input.slot.id,
     status: "GENERATING",
   });
-  if (!claimed.ok) {
-    return {
-      ok: false,
-      status: claimed.reason === "IN_PROGRESS" ? 409 : 404,
-      code: claimed.reason,
-      message: claimed.reason === "IN_PROGRESS" ? "Asset slot is already being resolved" : "Asset slot not found",
-    };
-  }
+  if (!claimed.ok) return claimFailure(claimed.reason);
 
   try {
     const filled = await resolveStock({
@@ -50,36 +54,39 @@ export async function fillStockSlot(input: FillStockInput): Promise<FillStockSuc
       slot: claimed.slot,
     });
     if (!filled.ok) {
-      const failed = await markSlotResolved({
-        assetRequestId: input.assetRequestId,
-        slotId: input.slot.id,
-        status: "FAILED",
-      });
-      publishAssetRequest(input.sessionId, serializeAssetRequest(failed));
-      return {
+      return failOrReuseSocial(input, {
         ok: false,
         status: filled.error.code === "TIMEOUT" ? 503 : 502,
         code: filled.error.code,
         message: filled.error.message,
-      };
+      });
     }
     const assetRequest = serializeAssetRequest(filled.result.assetRequest);
     publishAssetRequest(input.sessionId, assetRequest);
     return { ok: true, assetRequest };
   } catch {
-    const failed = await markSlotResolved({
-      assetRequestId: input.assetRequestId,
-      slotId: input.slot.id,
-      status: "FAILED",
-    });
-    publishAssetRequest(input.sessionId, serializeAssetRequest(failed));
-    return {
+    return failOrReuseSocial(input, {
       ok: false,
       status: 502,
       code: "STOCK_FAILED",
       message: "Could not fetch a matching photo for this section",
-    };
+    });
   }
+}
+
+async function failOrReuseSocial(
+  input: FillStockInput,
+  failure: FillStockFailure,
+): Promise<FillStockSuccess | FillStockFailure> {
+  const reused = await reuseHeroForSocial(input);
+  if (reused) return { ok: true, assetRequest: reused.assetRequest };
+  const failed = await markSlotResolved({
+    assetRequestId: input.assetRequestId,
+    slotId: input.slot.id,
+    status: "FAILED",
+  });
+  publishAssetRequest(input.sessionId, serializeAssetRequest(failed));
+  return failure;
 }
 
 export async function fillRemainingStockSlots(

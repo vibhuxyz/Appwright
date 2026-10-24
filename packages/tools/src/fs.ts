@@ -15,6 +15,23 @@ export const editFileArgs = z.object({
 });
 export const listFilesArgs = z.object({ path: z.string() });
 
+const BINARY_PATH =
+  /\.(?:png|jpe?g|gif|webp|ico|avif|bmp|woff2?|ttf|eot|otf|mp4|webm|mov|pdf|zip|gz|tgz|wasm)$/i;
+
+function isBinaryPath(path: string): boolean {
+  const base = path.split(/[/\\]/).pop() ?? path;
+  return BINARY_PATH.test(base);
+}
+
+function binaryFileNote(path: string): string {
+  return [
+    `${path} is a binary file.`,
+    "Do not read it again, rewrite it, or regenerate it with python, bun, npx, or sed.",
+    "Use this path as the image source.",
+    "A missing image stays a neutral placeholder with its alt text.",
+  ].join(" ");
+}
+
 function withLineNumbers(content: string): string {
   return content
     .split("\n")
@@ -39,7 +56,13 @@ export async function readFileTool(
   if (isGeneratedUiPrimitive(args.path)) {
     return wrapUntrusted(`read_file:${args.path}`, uiPrimitiveReadStub(args.path));
   }
+  if (isBinaryPath(args.path)) {
+    return wrapUntrusted(`read_file:${args.path}`, binaryFileNote(args.path));
+  }
   const content = await runtime.readFile(args.path);
+  if (content.includes("\u0000")) {
+    return wrapUntrusted(`read_file:${args.path}`, binaryFileNote(args.path));
+  }
   return wrapUntrusted(
     `read_file:${args.path}`,
     truncate(withLineNumbers(content)),

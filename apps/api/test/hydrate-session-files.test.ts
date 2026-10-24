@@ -4,6 +4,7 @@ import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { listProjectPaths, readProjectFile } from "@repo/contracts/files";
 import { prisma } from "@repo/db";
+import { sessionBranchName } from "@repo/workspace";
 import { hydrateSessionFilesFromToolCalls } from "../src/workspace/hydrate-session-files";
 import { sessionWorktreePath, WORKSPACES_DIR } from "../src/workspace/manager";
 
@@ -109,6 +110,50 @@ describe("hydrateSessionFilesFromToolCalls", () => {
     expect(content).toContain("return <h1>Hello</h1>;");
 
     const again = await hydrateSessionFilesFromToolCalls(projectId, sessionId!);
+    expect(again).toBe(0);
+  });
+
+  it("replays a newer chat on the same worktree after the chat that created it", async () => {
+    const firstChatId = sessionId ?? "";
+    expect(firstChatId).not.toBe("");
+    const newChat = await prisma.session.create({
+      data: { projectId, branch: sessionBranchName(firstChatId) },
+    });
+    await prisma.message.create({
+      data: {
+        sessionId: newChat.id,
+        seq: 0,
+        role: "assistant",
+        type: "toolCall",
+        content: "edit_file",
+        data: {
+          toolName: "edit_file",
+          args: {
+            path: "src/components/BakeryHero.tsx",
+            oldString: "return <h1>Hello</h1>;",
+            newString: "return <h1>Fresh bread</h1>;",
+          },
+        },
+      },
+    });
+
+    const written = await hydrateSessionFilesFromToolCalls(
+      projectId,
+      firstChatId,
+    );
+    expect(written).toBe(1);
+
+    const content = await readProjectFile(
+      projectId,
+      "src/components/BakeryHero.tsx",
+      firstChatId,
+    );
+    expect(content).toContain("return <h1>Fresh bread</h1>;");
+
+    const again = await hydrateSessionFilesFromToolCalls(
+      projectId,
+      firstChatId,
+    );
     expect(again).toBe(0);
   });
 });

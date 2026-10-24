@@ -25,7 +25,11 @@ export type ProviderChunk =
   // design: FakeProvider never sends it, and a provider that stops
   // reporting usage must degrade to "cost unknown", not to a crash.
   | { type: "usage"; inputTokens: number; outputTokens: number }
-  | { type: "stop"; reason: "end_turn" | "tool_use" | "length" };
+  | {
+      type: "stop";
+      reason: "end_turn" | "tool_use" | "length";
+      providerMeta?: unknown;
+    };
 
 export interface Provider {
   // The model id this provider is bound to — the loop needs it to price a

@@ -8,6 +8,6 @@ export function useThemeOptions(request: ThemeOptionsRequest | null) {
     queryFn: ({ signal }) => themeApi.getOptions(request!, signal),
     enabled: Boolean(request?.prompt),
     staleTime: Number.POSITIVE_INFINITY,
-    retry: 1,
+    retry: false,
   });
 }

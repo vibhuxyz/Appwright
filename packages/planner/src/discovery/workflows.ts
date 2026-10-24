@@ -18,20 +18,25 @@ function ordersInScope(facts: ExtractedFacts): boolean {
   return facts.signals.ordering || mode.includes("Pickup") || mode.includes("Delivery");
 }
 
+function catalogInScope(facts: ExtractedFacts): boolean {
+  return facts.signals.bakery || facts.signals.commerce || facts.signals.storefront;
+}
+
 export function workflowsFrom(facts: ExtractedFacts): WorkflowSpec[] {
   const ordering = ordersInScope(facts);
   const pickup = ordering && (facts.signals.pickup || (facts.answered["ordering-mode"] ?? "").includes("Pickup"));
   const delivery = ordering && (facts.signals.delivery || (facts.answered["ordering-mode"] ?? "").includes("Delivery"));
   const custom = facts.signals.customOrders && !facts.exclusions.includes("custom-orders");
   const popups = facts.signals.popups && !facts.exclusions.includes("popups");
+  const catalog = catalogInScope(facts);
   const admin = ordering || custom || popups || facts.signals.bakery;
 
   return [
     workflow(
       "browse-catalog",
       "Browse the catalog",
-      true,
-      "Customers need to see products or the menu",
+      catalog,
+      catalog ? "Customers need to see products or the menu" : "No product catalog is in scope",
       ["customer"],
       ["Open the site", "Browse categories", "View an item"],
     ),

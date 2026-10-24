@@ -49,7 +49,7 @@ export interface PrismaRunClient {
       where: { sessionId_blueprintVersion: { sessionId: string; blueprintVersion: number } };
       select: {
         tasks: {
-          orderBy: { id: "asc" };
+          orderBy: { id: "asc" } | { createdAt: "asc" };
           select: {
             id: true;
             title: true;

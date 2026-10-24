@@ -182,6 +182,10 @@ gate is the first real consumer of the `"review"` policy V1.2 built but never en
       `defaultOptionIndex`) replaces `defaultAnswer: boolean` end to end: the model prompt, the
       parser's option normalize/dedupe/clamp, `applyPromptAnswers`/`requirementTurns`, and the
       `question-flow` UI's answer buttons. See [D72](./DECISIONS.md).
+- [x] **D73 added 2026-10-24** — **New Chat keeps the code.** A new chat inherits the current
+      chat's `agent/<id>` branch and worktree instead of branching from `main`, so unmerged work
+      carries over and no new worktree, install or dev server is created. Chats sharing a worktree
+      run one at a time (409 `WORKTREE_BUSY`). Amends D8. See [D73](./DECISIONS.md).
 - [x] Slice 1 — `Message`, `AgentEvent` (with `seq`), `StopReason`, `Budget`, `AgentEventSink` in `packages/agent-core/src/types.ts`
 - [x] Slice 2 — provider abstraction (`providers/types.ts`), `FakeProvider`, `OpenAiProvider` (real, streaming, fetch-based, no SDK dep)
 - [x] Slice 3 — tools (`list_files`, `read_file`, `write_file`, `edit_file`, `grep`, `bash`), path fence + deny-list, `wrapUntrusted`, `deps.allow.json` guard

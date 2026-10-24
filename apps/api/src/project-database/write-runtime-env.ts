@@ -16,7 +16,7 @@ function envFileContents(vars: Record<string, string>): string {
 export async function writeProjectRuntimeEnvFile(input: {
   projectId: string;
   environment?: ProjectDbEnvironment;
-  sessionId?: string;
+  worktreeSessionId?: string;
 }): Promise<string | null> {
   const vars = await tryGetProjectRuntimeEnv({
     projectId: input.projectId,
@@ -24,8 +24,8 @@ export async function writeProjectRuntimeEnvFile(input: {
   });
   if (Object.keys(vars).length === 0) return null;
 
-  const root = input.sessionId
-    ? sessionWorktreePath(input.projectId, input.sessionId)
+  const root = input.worktreeSessionId
+    ? sessionWorktreePath(input.projectId, input.worktreeSessionId)
     : projectRepoPath(input.projectId);
   const dest = path.join(root, ".env.local");
   await writeFile(dest, envFileContents(vars), { mode: 0o600 });

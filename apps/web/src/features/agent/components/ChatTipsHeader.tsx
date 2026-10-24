@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Sparkles, ChevronDown } from "lucide-react";
+import { Sparkles, ChevronDown, Square } from "lucide-react";
 import type { PromptQuality } from "../utils/evaluatePrompt";
 
 interface TipItem {
@@ -42,13 +42,32 @@ const HIGHLIGHTED_TIPS: TipItem[] = [
   },
 ];
 
+function StopEnhanceButton({ onStop }: { onStop?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onStop}
+      title="Stop enhancing and keep your prompt"
+      aria-label="Stop enhancing prompt"
+      className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-lime/50 bg-lime/15 px-2.5 py-1 text-[11px] font-semibold text-lime transition-all hover:bg-lime/25 active:scale-95"
+    >
+      <Sparkles className="size-3.5 animate-spin" />
+      <span>Enhancing…</span>
+      <Square className="size-3 fill-current" />
+      <span>Stop</span>
+    </button>
+  );
+}
+
 export function ChatTipsHeader({
   onEnhanceSpec,
+  onStopEnhance,
   isEnhancing,
   hasInput,
   quality,
 }: {
   onEnhanceSpec?: () => void;
+  onStopEnhance?: () => void;
   isEnhancing?: boolean;
   hasInput?: boolean;
   quality?: PromptQuality;
@@ -85,43 +104,41 @@ export function ChatTipsHeader({
 
       {/* Right side Highlighted Enhance Icon Button (no popover blocking clicks) */}
       <div className="ml-2 shrink-0">
-        <button
-          type="button"
-          disabled={!hasInput || isEnhancing}
-          onClick={onEnhanceSpec}
-          title={
-            isEnhancing
-              ? "Enhancing prompt with AI…"
-              : hasInput
-                ? "Click to enhance prompt with AI specification"
+        {isEnhancing ? (
+          <StopEnhanceButton onStop={onStopEnhance} />
+        ) : (
+          <button
+            type="button"
+            disabled={!hasInput}
+            onClick={onEnhanceSpec}
+            title={
+              hasInput
+                ? "Improve this prompt with AI"
                 : "Type a prompt to enhance"
-          }
-          className={`group relative flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-            isEnhancing
-              ? "cursor-wait border border-lime/50 bg-lime/15 text-lime"
-              : hasInput
+            }
+            className={`group relative flex cursor-pointer items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+              hasInput
                 ? "border border-lime/50 bg-lime/10 text-lime shadow-xs shadow-lime/20 hover:scale-105 hover:border-lime hover:bg-lime/20 active:scale-95"
                 : "cursor-not-allowed border border-transparent text-muted/40 opacity-40"
-          }`}
-        >
-          <Sparkles
-            className={`size-3.5 transition-transform ${
-              isEnhancing
-                ? "animate-spin text-lime"
-                : hasInput
+            }`}
+          >
+            <Sparkles
+              className={`size-3.5 transition-transform ${
+                hasInput
                   ? "text-lime drop-shadow-[0_0_6px_rgba(227,252,24,0.6)] group-hover:scale-110"
                   : "text-muted"
-            }`}
-          />
-          {hasInput && (
-            <span className="text-[11px] font-semibold text-lime">
-              {isEnhancing ? "Enhancing…" : "Enhance"}
-            </span>
-          )}
-          {isEnhancementNeeded && !isEnhancing && (
-            <span className="absolute -top-1 -right-1 size-2 animate-pulse rounded-full bg-lime ring-2 ring-surface-2" />
-          )}
-        </button>
+              }`}
+            />
+            {hasInput && (
+              <span className="text-[11px] font-semibold text-lime">
+                Enhance
+              </span>
+            )}
+            {isEnhancementNeeded && (
+              <span className="absolute -top-1 -right-1 size-2 animate-pulse rounded-full bg-lime ring-2 ring-surface-2" />
+            )}
+          </button>
+        )}
       </div>
     </div>
   );

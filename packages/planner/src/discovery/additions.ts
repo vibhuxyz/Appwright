@@ -71,6 +71,27 @@ function inScope(workflows: readonly WorkflowSpec[], kind: WorkflowSpec["kind"])
   return workflows.some((workflow) => workflow.kind === kind && workflow.inScope);
 }
 
+function standardOrderPages(workflows: readonly WorkflowSpec[]): Page[] {
+  const pickup = inScope(workflows, "pickup-order");
+  if (!pickup && !inScope(workflows, "delivery-order")) return [];
+  return [
+    {
+      route: "/order",
+      purpose: pickup
+        ? "Place a standard order and choose pickup details"
+        : "Place a standard order for delivery",
+      components: ["OrderForm", "PickupSlotPicker", "OrderSummary"],
+    },
+    {
+      route: "/order/[id]",
+      purpose: pickup
+        ? "Customer order status, cancellation, and pickup instructions"
+        : "Customer order status and cancellation",
+      components: ["OrderStatus", "CancelOrderButton"],
+    },
+  ];
+}
+
 export function workflowAdditions(workflows: readonly WorkflowSpec[]): TemplateAdditions {
   const pages: Page[] = [];
   const entities: Entity[] = [];
@@ -80,26 +101,15 @@ export function workflowAdditions(workflows: readonly WorkflowSpec[]): TemplateA
     entities.push(CATEGORY, PRODUCT);
     pages.push({
       route: "/menu",
-      purpose: "Browse standard bakery items by category",
+      purpose: "Browse items by category",
       components: ["CategoryNav", "ProductGrid", "ProductCard"],
     });
   }
   const includeLocation = inScope(workflows, "pop-up-locations");
   if (inScope(workflows, "pickup-order") || inScope(workflows, "delivery-order")) {
-    entities.push(orderEntity(includeLocation), ORDER_ITEM);
+    entities.push(CATEGORY, PRODUCT, orderEntity(includeLocation), ORDER_ITEM);
     features.push("auth");
-    pages.push(
-      {
-        route: "/order",
-        purpose: "Place a standard order and choose pickup details",
-        components: ["OrderForm", "PickupSlotPicker", "OrderSummary"],
-      },
-      {
-        route: "/order/[id]",
-        purpose: "Customer order status, cancellation, and pickup instructions",
-        components: ["OrderStatus", "CancelOrderButton"],
-      },
-    );
+    pages.push(...standardOrderPages(workflows));
   }
   if (inScope(workflows, "custom-request")) {
     entities.push(customRequestEntity(includeLocation));

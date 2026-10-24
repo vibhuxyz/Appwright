@@ -1,4 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { agentApi, type SendMessagePayload } from "../api/agentApi";
 import { agentStore } from "../store/agentStore";
 
@@ -40,7 +41,22 @@ export function useStopConversation(sessionId: string | undefined) {
 }
 
 export function useEnhancePrompt() {
-  return useMutation({
-    mutationFn: (prompt: string) => agentApi.enhancePrompt(prompt),
+  const controllerRef = useRef<AbortController | null>(null);
+  const mutation = useMutation({
+    mutationFn: (prompt: string) => {
+      const controller = new AbortController();
+      controllerRef.current = controller;
+      return agentApi.enhancePrompt(prompt, controller.signal);
+    },
   });
+
+  useEffect(() => () => controllerRef.current?.abort(), []);
+
+  const cancel = () => {
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    mutation.reset();
+  };
+
+  return { ...mutation, cancel };
 }

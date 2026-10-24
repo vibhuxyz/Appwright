@@ -78,4 +78,13 @@ describe("scheduler", () => {
     expect(decision.waiting[0]?.reason.kind).toBe("upstream_failed");
     expect(describeWait(decision.waiting[0]!.reason)).toContain("upstream failed: a");
   });
+
+  it("dispatches in plan order when multiple tasks are ready", () => {
+    const decision = selectNextTasks(
+      [task("theme"), task("security"), task("media")],
+      { ...ROOMY, maxConcurrent: 2 },
+    );
+    expect(decision.dispatch).toEqual(["theme", "security"]);
+    expect(decision.waiting[0]?.reason.kind).toBe("capacity");
+  });
 });

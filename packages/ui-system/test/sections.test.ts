@@ -78,6 +78,7 @@ describe("fixtures", () => {
     const dashboard = results[3];
     expect(local?.pages[0]?.sectionIds).toContain("hero.split-image");
     expect(local?.pages[0]?.sectionIds).toContain("location.panel");
+    expect(local?.pages[0]?.sectionIds).not.toContain("categories.scroller");
     expect(local?.pages[0]?.sectionIds).not.toContain("proof.quote-band");
     expect(saas?.pages[0]?.sectionIds).toContain("features.alternating");
     expect(saas?.pages[0]?.sectionIds).not.toContain("location.panel");

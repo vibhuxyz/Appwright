@@ -98,7 +98,7 @@ export function resolveRequirements(input: ResolveInput): ResolvedRequirements {
   return {
     blueprint: {
       ...admin.blueprint,
-      pages: withRequiredUiComponents(admin.blueprint.pages),
+      pages: withRequiredUiComponents(admin.blueprint.pages, input.prompt),
       projectType,
       requirements,
       workflows: discovery.workflows.map((workflow) => ({

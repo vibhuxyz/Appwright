@@ -3,7 +3,7 @@ import { workspaceRoot } from "@repo/contracts/files";
 import { prisma } from "@repo/db";
 import { createLogger } from "@repo/logger";
 import { verifyWorkspace } from "@repo/verify";
-import type { Runtime } from "@repo/agent-core";
+import type { AgentEventSink, Runtime } from "@repo/agent-core";
 import {
   createPostgresPorts,
   createPrismaRunStore,
@@ -29,12 +29,14 @@ const RUN_FINAL_STATUS_BY_OUTCOME = {
 export interface ExecuteBlueprintRunOptions {
   runId: string;
   sessionId: string;
+  worktreeSessionId: string;
   projectId: string;
   model: string;
   plan: PlanId;
   userRemainingCents: number;
   runtime: Runtime;
   onTaskStatus?: (taskId: string, status: string) => void;
+  conversationEmit?: AgentEventSink;
 }
 
 function withTaskStatusNotifications(
@@ -54,7 +56,18 @@ export async function executeBlueprintRun(
   options: ExecuteBlueprintRunOptions,
   signal: AbortSignal,
 ): Promise<RunSummary | undefined> {
-  const { runId, sessionId, projectId, model, plan, userRemainingCents, runtime, onTaskStatus } = options;
+  const {
+    runId,
+    sessionId,
+    worktreeSessionId,
+    projectId,
+    model,
+    plan,
+    userRemainingCents,
+    runtime,
+    onTaskStatus,
+    conversationEmit,
+  } = options;
   const baseStore = createPrismaRunStore({ client: prisma, modelName: model, now: () => Date.now() });
   const store = onTaskStatus ? withTaskStatusNotifications(baseStore, onTaskStatus) : baseStore;
   const run = await store.loadRun(runId);
@@ -70,8 +83,8 @@ export async function executeBlueprintRun(
     runSpentCents: run.spentCents,
   });
 
-  const generator = createRunTaskGenerator({ sessionId, model, plan, runtime });
-  const workspaceDir = workspaceRoot(projectId, sessionId);
+  const generator = createRunTaskGenerator({ sessionId, model, plan, runtime, conversationEmit });
+  const workspaceDir = workspaceRoot(projectId, worktreeSessionId);
   const verifier = createWorkspaceVerifier(workspaceDir, verifyWorkspace);
   const ports = createPostgresPorts({ runId, store, generator, verifier, now: () => Date.now() });
 

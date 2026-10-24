@@ -30,12 +30,11 @@ export const businessSiteTemplate: ProjectTemplate = (blueprint) => {
     entities: [SITE_SETTINGS],
     features: [],
     acceptance: {
-      admin: [
-        "Admins edit catalog items, categories, prices, availability and featured flags without code",
-        "Admins edit business details, opening hours, gallery and social links",
-      ],
+      admin: ["Admins edit the business details, opening hours, gallery and social links the pages show"],
       seo: ["LocalBusiness structured data uses the verified business details"],
-      media: ["Hero, catalog item and gallery images each have a named slot"],
+      media: [
+        "Each image a page section names has one slot. Do not add a product catalog, prices, or featured items unless a page purpose is a shop or menu.",
+      ],
     },
   };
 };

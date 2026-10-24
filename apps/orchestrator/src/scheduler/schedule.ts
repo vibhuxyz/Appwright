@@ -37,9 +37,7 @@ export function selectNextTasks(
 ): SchedulerDecision {
   const statusById = new Map(tasks.map((task) => [task.id, task.status]));
   const active = tasks.filter((task) => task.status === "running");
-  const candidates = tasks
-    .filter((task) => DISPATCHABLE_STATUSES.has(task.status))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  const candidates = tasks.filter((task) => DISPATCHABLE_STATUSES.has(task.status));
 
   const dispatch: string[] = [];
   const waiting: WaitingTask[] = [];

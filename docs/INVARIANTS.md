@@ -40,7 +40,7 @@
 
 | Invariant | Version | Source |
 |---|---|---|
-| **Isolation:** one session's writes are never visible in another's worktree until merge | V2 | acceptance test 1 |
+| **Isolation:** one worktree's writes are never visible in another worktree until merge; chats sharing a worktree run one at a time (D73) | V2 | acceptance test 1, `worktree-busy.test.ts` |
 | **Gate:** a tool requiring approval cannot execute before an approve event; deny → loop continues, tool not run | V2 | acceptance test 2, O4 |
 | **Verification gates completion:** a run with a failing `tsc` cannot report success | V2 | acceptance test 5 |
 | A failed task cannot silently become successful | V3/V4 | D36–D40 |

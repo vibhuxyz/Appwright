@@ -515,6 +515,9 @@ Two kinds of optimization:
 ---
 
 ## 17. Dependencies
+- Add dependencies only when a concrete requirement needs them. Do not install packages before they are needed.
+- Before installing a package, check whether the existing stack already covers the functionality.
+- After implementation, audit dependencies for unused additions.
 - Use the platform first: `fetch`, `Intl`, `crypto.randomUUID`, `structuredClone`, `AbortController`.
 - One library per job.
 - Prefer small, tree-shakable ESM libraries.
@@ -579,16 +582,69 @@ Read your own diff and answer each question. Fix anything that is "yes".
 
 ---
 
-## 21. Final report
+## 21. Change-aware verification policy
+Replace repetitive, unconditional verification with an intelligent, change-aware verification strategy. Run only the checks that are necessary to validate the work performed in the current task.
+Verification must be proportional to the scope, risk, and impact of the changes. Do not run the same browser checks, test suites, or build steps after every user message by default.
+
+### 1. Classify every user request first
+- **Information or explanation only:** The user asks a question, requests instructions, or wants an explanation. If no code or configuration is modified, do not run code verification or browser tests.
+- **Small, localized code fix:** A change to one component, CSS rule, text value, or isolated function. Run only the relevant targeted check.
+- **UI or interaction change:** Changes to layouts, navigation, buttons, forms, modals, or responsive behavior. Test the affected component, page, interactions, and relevant viewport sizes.
+- **Backend or API change:** Test the affected endpoint, validation, error handling, and authorization where applicable.
+- **Authentication, security, storage, or deployment change:** Run the relevant security, integration, persistence, or deployment checks. Do not skip important checks simply to save time.
+- **Cross-cutting or major architectural change:** Run broader typecheck, lint, build, regression, and integration tests as appropriate.
+
+### 2. Change-to-test mapping
+- Answering a question without code changes → No code verification
+- Copy, text, or content change → Check the changed content if rendered behavior could be affected
+- CSS or text-overlap fix → Inspect the affected component at the relevant viewport widths
+- Button or interaction change → Test the changed interaction and its relevant states
+- Form change → Test validation, successful submission behavior, and relevant error states
+- API or business-logic change → Run the relevant unit or integration tests
+- Authentication or authorization change → Test permitted and denied access, session behavior, and affected protected routes
+- Database or upload change → Test persistence, validation, failures, and the affected data flow
+- Dependency, configuration, or shared architecture change → Run appropriate typecheck, lint, build, and regression tests
+- Full feature or release → Run comprehensive verification across affected routes and critical workflows
+
+### 3. Test only the affected scope
+- Identify changed files and the user-visible behavior they affect.
+- Prefer targeted tests over full-browser smoke tests.
+- Do not automatically open every route, submit every form, or click unrelated buttons.
+- Reuse existing test results only when they remain valid for the current code state.
+- When a change affects shared components or global styles, expand testing to the dependent pages and relevant viewports.
+- Do not run the complete browser suite merely because a new user message arrived.
+
+### 4. Avoid repeated verification
+- Maintain an execution record: files modified, changes made, relevant checks executed, actual results and failures, outstanding verification requirements.
+- When resuming a task, do not repeat successful checks unless new changes, a changed environment, or a discovered regression invalidate those results.
+- If verification fails, investigate and correct the cause before retrying. Do not repeat a failing command or entire browser routine without a reason.
+
+### 5. Report results accurately
+- If no code changed, omit code-verification summaries entirely.
+- For small changes, report only the relevant check and its actual outcome.
+- For larger changes, summarize the checks that were genuinely performed and their results.
+- Mention checks that were skipped only when the omission is relevant to the user's expectations, the task's risk, or release readiness.
+- Never claim that a browser test, typecheck, lint, build, or deployment passed unless it actually ran and its result is available.
+- Never claim that code was merged to a branch unless a successful merge was confirmed during the current execution or by reliable existing evidence.
+- Do not describe unrelated pages, forms, or buttons as tested when they were not part of the verification performed.
+
+### 6. Definition of done
+A task is complete when its requested behavior has been implemented and the appropriate level of verification has been performed.
+Completion does not require running every available test after every prompt. It requires sufficient, relevant evidence that the specific changes work.
+**Core rule: Verify what changed, test what could break, and do not test unrelated functionality without a reason.**
+
+---
+
+## 22. Final report
 1. List every file created, changed or moved with its line count.
-2. Run what exists: typecheck → lint → build → boot → smoke. Mark anything else `not run`.
+2. Run only the checks required by the change-aware verification policy. Mark anything else `not run`.
 3. Show the folder tree for every folder you touched.
 4. Report in this format:
 
 STATUS:      DONE | NO_CHANGE_NEEDED | BLOCKED | FAILED
 FILES:       <path — lines>
 TREE:        <folder tree of touched folders>
-VERIFY:      typecheck ✅ lint ✅ build ✅ smoke not run
+VERIFY:      <targeted checks run and their results, e.g. "typecheck ✅ (or omitted per policy)">
 PERF:        <bundle size change, profiler numbers, or "no perf-sensitive change">
 SELF-REVIEW: 20 questions checked, <any "yes" left and why>
 OPEN:        <follow-ups, rule violations found in untouched code, or "none">

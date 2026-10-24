@@ -42,10 +42,32 @@ describe("buildTaskPrompt", () => {
     expect(buildTaskPrompt({ ...task, acceptance: [] }, undefined)).not.toContain("Acceptance criteria");
   });
 
-  it("requires shadcn primitives on page tasks", () => {
+  it("requires page primitives without inventing a store or reviews", () => {
     const prompt = buildTaskPrompt({ ...task, type: "page", title: "Page /: Home", acceptance: [] }, undefined);
-    expect(prompt).toContain("Testimonials");
+    expect(prompt).not.toContain("includes Testimonials");
     expect(prompt).toContain("PageSkeleton");
     expect(prompt).toContain("Modal");
+    expect(prompt).toContain("Do not invent a shop");
+    expect(prompt).toContain("Do not create, read, or rewrite");
+  });
+
+  it("names the business for the shell instead of a sample shop", () => {
+    const prompt = buildTaskPrompt(
+      {
+        ...task,
+        type: "app-shell",
+        title: "App shell & navigation (nav.top-bar, footer.columns)",
+        pages: [{ route: "/", purpose: "Landing page for RK Home Planner", components: [] }],
+      },
+      undefined,
+    );
+    expect(prompt).toContain("RK Home Planner");
+    expect(prompt).toContain("Do not invent a shop");
+  });
+
+  it("includes dependency discipline criteria for scaffold tasks", () => {
+    const prompt = buildTaskPrompt({ ...task, type: "scaffold", title: "Scaffold project", acceptance: [] }, undefined);
+    expect(prompt).toContain("Do not install packages before they are needed");
+    expect(prompt).toContain("Never install stripe, next-auth, or zustand unless specifically required");
   });
 });

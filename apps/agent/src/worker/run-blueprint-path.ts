@@ -12,6 +12,7 @@ import {
 import { publishChannel, sessionChannel, type SseAssetRequestFrame } from "@repo/cache";
 import { provisionProjectDatabase } from "@repo/db";
 import { injectProjectRuntimeEnv } from "./inject-project-env";
+import { createEmitAdapter } from "./emit-adapter";
 import { publishStatus } from "./persist";
 import type { PersistFields } from "./persist";
 
@@ -26,6 +27,7 @@ export interface RunBlueprintPathOptions {
   prompt: string;
   projectId: string;
   sessionId: string;
+  worktreeSessionId: string;
   model: string;
   credits: number;
   userId: string;
@@ -35,6 +37,11 @@ export interface RunBlueprintPathOptions {
   signal: AbortSignal;
   persist: (fields: PersistFields) => Promise<unknown>;
   approvedBlueprintId?: string;
+}
+
+function runningTasksStatus(titles: ReadonlySet<string>): string {
+  if (titles.size === 0) return "Building…";
+  return `Building: ${[...titles].join(", ")}`;
 }
 
 async function approvedPlan(blueprintId: string, theme: ThemeOption | undefined): Promise<ApprovedBlueprint> {
@@ -57,7 +64,20 @@ async function freshPlan(
 }
 
 export async function runBlueprintPath(options: RunBlueprintPathOptions): Promise<string> {
-  const { prompt, projectId, sessionId, model, credits, userId, userPlan, theme, runtime, signal, persist } = options;
+  const {
+    prompt,
+    projectId,
+    sessionId,
+    worktreeSessionId,
+    model,
+    credits,
+    userId,
+    userPlan,
+    theme,
+    runtime,
+    signal,
+    persist,
+  } = options;
 
   const { plan, persisted } = options.approvedBlueprintId
     ? await approvedPlan(options.approvedBlueprintId, theme)
@@ -68,7 +88,7 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
       environment: "development",
       actorUserId: userId,
     });
-    await injectProjectRuntimeEnv({ projectId, sessionId, runtime });
+    await injectProjectRuntimeEnv({ projectId, worktreeSessionId, runtime });
   }
 
   const runId = await startBlueprintRun({
@@ -109,21 +129,31 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
 
   const titleById = new Map(persisted.tasks.map((task) => [task.id, task.title]));
   const reportedTasks = new Set<string>();
+  const runningTitles = new Set<string>();
+
+  const { emit: conversationEmit } = createEmitAdapter({ sessionId, userId, persist });
 
   const summary = await executeBlueprintRun(
     {
       runId,
       sessionId,
+      worktreeSessionId,
       projectId,
       model,
       plan: userPlan,
       userRemainingCents: creditsToCents(credits),
       runtime,
+      conversationEmit,
       onTaskStatus: (taskId, status) => {
         const title = titleById.get(taskId) ?? taskId;
         if (status === "running") {
-          publishStatus(sessionId, "RUNNING", `Building: ${title}`);
+          runningTitles.add(title);
+          publishStatus(sessionId, "RUNNING", runningTasksStatus(runningTitles));
           return;
+        }
+        if (status === "done" || status === "failed") {
+          runningTitles.delete(title);
+          publishStatus(sessionId, "RUNNING", runningTasksStatus(runningTitles));
         }
         if ((status === "done" || status === "failed") && !reportedTasks.has(taskId)) {
           reportedTasks.add(taskId);

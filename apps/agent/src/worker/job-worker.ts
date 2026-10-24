@@ -25,7 +25,7 @@ import { classify, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
 import { SandboxRuntime, type SandboxProvider } from "@repo/sandbox";
 import { ALL_TOOLS } from "@repo/tools";
-import { sessionWorktreePath } from "@repo/workspace";
+import { sessionWorktreePath, worktreeSessionIdOf } from "@repo/workspace";
 import { restoreWorkspace } from "../recovery";
 import { withSelectionApplied } from "./apply-selection";
 import { approvedBlueprintIdFromRows } from "./approved-blueprint-id";
@@ -93,7 +93,8 @@ export async function executeAgentJob(
   await prisma.session.update({ where: { id: session.id }, data: { status: "RUNNING" } });
   publishStatus(session.id, "RUNNING", "Analyzing request…");
 
-  const worktreeDir = sessionWorktreePath(job.projectId, job.sessionId);
+  const worktreeSessionId = worktreeSessionIdOf(session);
+  const worktreeDir = sessionWorktreePath(job.projectId, worktreeSessionId);
   const controller = new AbortController();
   const sandboxStartedAt = Date.now();
 
@@ -140,11 +141,11 @@ export async function executeAgentJob(
     const runtime = new HostMirrorRuntime(
       new SandboxRuntime(sandbox),
       job.projectId,
-      job.sessionId,
+      worktreeSessionId,
     );
     await injectProjectRuntimeEnv({
       projectId: job.projectId,
-      sessionId: job.sessionId,
+      worktreeSessionId,
       runtime,
     });
     const chosenTheme = chosenThemeFromRows(priorRows);
@@ -176,6 +177,7 @@ export async function executeAgentJob(
         prompt: currentTurnText(effectiveRows),
         projectId: job.projectId,
         sessionId: session.id,
+        worktreeSessionId,
         model: sessionModel,
         credits: user.credits,
         userId,
@@ -300,7 +302,10 @@ export async function executeAgentJob(
         await checkpointSession(sandbox, triggeringPrompt);
 
         if (verificationPassed) {
-          const merge = await autoMergeSession(job.projectId, session.id);
+          const merge = await autoMergeSession(
+            job.projectId,
+            worktreeSessionId,
+          );
           await persist({
             role: "assistant",
             type: "text",

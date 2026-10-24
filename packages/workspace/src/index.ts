@@ -41,3 +41,9 @@ export {
   type SkippedInput,
 } from "./compose";
 
+export {
+  sessionBranchName,
+  worktreeSessionIdOf,
+  type SessionBranchRef,
+} from "./session-branch";
+

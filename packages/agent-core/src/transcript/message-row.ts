@@ -28,10 +28,12 @@ export function serializeRow(row: MessageRow) {
 
 export function toCoreMessage(row: MessageRow): CoreMessage {
   if (row.type === "text") {
+    const data = row.data as { providerMeta?: unknown } | null | undefined;
     return {
       role: row.role as "user" | "assistant",
       type: "text",
       content: row.content,
+      providerMeta: data?.providerMeta ?? undefined,
     };
   }
   if (row.type === "toolCall") {

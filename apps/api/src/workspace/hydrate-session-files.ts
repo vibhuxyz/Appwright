@@ -8,6 +8,7 @@ import { prisma } from "@repo/db";
 import { isDenied, isGeneratedUiPrimitive } from "@repo/tools";
 import { z } from "zod";
 import { log } from "../log";
+import { sharedWorktreeWhere } from "./shared-worktree";
 
 const toolCallDataSchema = z.object({
   toolName: z.string(),
@@ -60,7 +61,7 @@ function opsFromToolCalls(rows: readonly { data: unknown }[]): FileToolOp[] {
 
 async function existingForEdits(
   projectId: string,
-  sessionId: string,
+  worktreeSessionId: string,
   ops: readonly FileToolOp[],
 ): Promise<Map<string, string>> {
   const existing = new Map<string, string>();
@@ -70,7 +71,10 @@ async function existingForEdits(
 
   for (const relPath of editPaths) {
     try {
-      existing.set(relPath, await readProjectFile(projectId, relPath, sessionId));
+      existing.set(
+        relPath,
+        await readProjectFile(projectId, relPath, worktreeSessionId),
+      );
     } catch {
       // File is not on disk yet; applyFileToolOps skips the edit until a write.
     }
@@ -84,19 +88,22 @@ async function existingForEdits(
 // args onto disk. Idempotent: unchanged content is left alone.
 export async function hydrateSessionFilesFromToolCalls(
   projectId: string,
-  sessionId: string,
+  worktreeSessionId: string,
 ): Promise<number> {
   try {
     const rows = await prisma.message.findMany({
-      where: { sessionId, type: "toolCall" },
-      orderBy: { seq: "asc" },
+      where: {
+        session: sharedWorktreeWhere(worktreeSessionId),
+        type: "toolCall",
+      },
+      orderBy: [{ createdAt: "asc" }, { seq: "asc" }],
       select: { data: true },
     });
 
     const ops = opsFromToolCalls(rows);
     if (ops.length === 0) return 0;
 
-    const existing = await existingForEdits(projectId, sessionId, ops);
+    const existing = await existingForEdits(projectId, worktreeSessionId, ops);
     const files = applyFileToolOps(ops, existing);
 
     let written = 0;
@@ -105,13 +112,13 @@ export async function hydrateSessionFilesFromToolCalls(
 
       let current: string | null = null;
       try {
-        current = await readProjectFile(projectId, relPath, sessionId);
+        current = await readProjectFile(projectId, relPath, worktreeSessionId);
       } catch {
         current = null;
       }
       if (current === content) continue;
 
-      await writeProjectFile(projectId, relPath, content, sessionId);
+      await writeProjectFile(projectId, relPath, content, worktreeSessionId);
       written += 1;
     }
 
@@ -119,7 +126,7 @@ export async function hydrateSessionFilesFromToolCalls(
   } catch (err) {
     log.warn("session file hydrate failed", {
       projectId,
-      sessionId,
+      worktreeSessionId,
       err: err instanceof Error ? err.message : String(err),
     });
     return 0;

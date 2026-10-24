@@ -26,7 +26,7 @@ export function createPrismaRunStore(config: PrismaRunStoreConfig): RunStore {
       },
       select: {
         tasks: {
-          orderBy: { id: "asc" },
+          orderBy: { createdAt: "asc" },
           select: {
             id: true,
             title: true,

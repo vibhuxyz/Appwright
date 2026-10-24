@@ -10,7 +10,11 @@ import { prisma } from "@repo/db";
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { PUBLIC_API_URL } from "../env";
-import { ownedProjectId, ownedSessionProjectId } from "../ownership";
+import {
+  ownedProjectId,
+  ownedSessionProjectId,
+  ownedSessionWorktree,
+} from "../ownership";
 import { modelForNewSession } from "../session-model";
 import {
   removeSessionWorktree,
@@ -19,6 +23,7 @@ import {
   stopDevServer,
 } from "../workspace/manager";
 import { ensureSessionWorktree } from "../workspace/ensure-session-worktree";
+import { sharedWorktreeWhere } from "../workspace/shared-worktree";
 
 function sessionPreviewUrl(previewToken: string | null | undefined): string | null {
   return previewToken ? `${PUBLIC_API_URL}/preview/${previewToken}` : null;
@@ -78,11 +83,12 @@ sessionRouter.post("/project/:projectId/session", async (req, res) => {
   // each call createSessionWorktree before using one).
   // createSessionWorktree persists branch/worktreePath onto the session row
   // itself once it has run, so there is one place that does it, not four.
+  const model = await modelForNewSession(req.userId!);
   const session = await prisma.session.create({
     data: {
       projectId: req.params.projectId,
       title: body.title,
-      model: await modelForNewSession(req.userId!),
+      model,
     },
   });
   res.status(201).json(serializeSession(session));
@@ -143,12 +149,20 @@ sessionRouter.put("/session/:id", async (req, res) => {
 });
 
 sessionRouter.delete("/session/:id", async (req, res) => {
-  const projectId = await ownedSessionProjectId(req.params.id, req.userId!);
-  if (!projectId) {
+  const owned = await ownedSessionWorktree(req.params.id, req.userId!);
+  if (!owned) {
     return res.status(404).json({ error: "not found" });
   }
-  stopDevServer(sessionServerKey(req.params.id));
-  await removeSessionWorktree(projectId, req.params.id);
+  const otherChatsOnWorktree = await prisma.session.count({
+    where: {
+      ...sharedWorktreeWhere(owned.worktreeSessionId),
+      id: { not: req.params.id },
+    },
+  });
+  if (otherChatsOnWorktree === 0) {
+    stopDevServer(sessionServerKey(owned.worktreeSessionId));
+    await removeSessionWorktree(owned.projectId, owned.worktreeSessionId);
+  }
   await prisma.session.delete({
     where: { id: req.params.id },
   });
@@ -156,16 +170,17 @@ sessionRouter.delete("/session/:id", async (req, res) => {
 });
 
 sessionRouter.post("/session/:id/preview", async (req, res) => {
-  const projectId = await ownedSessionProjectId(req.params.id, req.userId!);
-  if (!projectId) {
+  const owned = await ownedSessionWorktree(req.params.id, req.userId!);
+  if (!owned) {
     return res.status(404).json({ error: "not found" });
   }
+  const { projectId, worktreeSessionId } = owned;
   const existing = await prisma.session.findUnique({
     where: { id: req.params.id },
     select: { devPort: true, previewToken: true },
   });
-  await ensureSessionWorktree(projectId, req.params.id);
-  const devPort = await startSessionDevServer(projectId, req.params.id);
+  await ensureSessionWorktree(projectId, req.params.id, worktreeSessionId);
+  const devPort = await startSessionDevServer(projectId, worktreeSessionId);
   // Keep the token when the port is unchanged so a polling client does not
   // rotate the capability out from under an open iframe. Rotate only when
   // the upstream port changes (restart / reallocate).

@@ -12,6 +12,7 @@ import {
   resolveGenerate,
   resolveUpload,
   respondFailed,
+  reuseHeroForSocial,
   serializeAssetRequest,
   serializeProjectAsset,
 } from "../assets";
@@ -127,6 +128,13 @@ assetsRouter.post("/asset-requests/:id/slots/:slotId/generate", async (req, res)
       prompt: parsed.data.prompt,
     });
   } catch {
+    const reused = await reuseHeroForSocial({
+      assetRequestId: req.params.id,
+      projectId: owned.projectId,
+      sessionId: owned.sessionId,
+      slot: claimed.slot,
+    });
+    if (reused) return res.status(201).json(reused.asset);
     return respondFailed({
       res,
       sessionId: owned.sessionId,
@@ -139,6 +147,13 @@ assetsRouter.post("/asset-requests/:id/slots/:slotId/generate", async (req, res)
   }
 
   if (!generated.ok) {
+    const reused = await reuseHeroForSocial({
+      assetRequestId: req.params.id,
+      projectId: owned.projectId,
+      sessionId: owned.sessionId,
+      slot: claimed.slot,
+    });
+    if (reused) return res.status(201).json(reused.asset);
     const status = generated.error.code === "PROVIDER_TIMEOUT" ? 503 : 502;
     return respondFailed({
       res,

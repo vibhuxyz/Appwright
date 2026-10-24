@@ -15,10 +15,13 @@ export function ThemeOptionsGrid({
 }) {
   if (isPending) {
     return (
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        {Array.from({ length: 5 }, (_, index) => (
-          <Skeleton key={index} className="h-80 w-full" />
-        ))}
+      <div className="flex flex-col gap-3" role="status" aria-live="polite">
+        <p className="text-sm text-muted">Designing five systems…</p>
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {Array.from({ length: 5 }, (_, index) => (
+            <Skeleton key={index} className="h-80 w-full border border-border bg-surface-3" />
+          ))}
+        </div>
       </div>
     );
   }

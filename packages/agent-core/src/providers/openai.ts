@@ -70,12 +70,18 @@ function withReasoning(meta: unknown, reasoning: string): unknown {
   return { ...base, [REASONING_META_KEY]: reasoning };
 }
 
-function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
+export function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
   const result: OpenAiChatMessage[] = [];
 
   for (const m of messages) {
     if (m.type === "text") {
-      result.push({ role: m.role, content: m.content });
+      const { reasoningContent } =
+        m.role === "assistant" ? splitProviderMeta(m.providerMeta) : {};
+      result.push({
+        role: m.role,
+        content: m.content,
+        ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+      });
       continue;
     }
     if (m.type === "toolResponse") {
@@ -97,12 +103,15 @@ function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
       ...(extraContent ? { extra_content: extraContent } : {}),
     };
     const last = result.at(-1);
-    if (
-      last?.role === "assistant" &&
-      last.content === null &&
-      last.tool_calls
-    ) {
-      last.tool_calls.push(call);
+    if (last?.role === "assistant") {
+      if (!last.tool_calls) {
+        last.tool_calls = [call];
+      } else {
+        last.tool_calls.push(call);
+      }
+      if (reasoningContent && !last.reasoning_content) {
+        last.reasoning_content = reasoningContent;
+      }
     } else {
       result.push({
         role: "assistant",
@@ -360,7 +369,13 @@ export class OpenAiProvider implements Provider {
 
         const delta = choice.delta ?? {};
 
-        if (typeof delta.reasoning_content === "string") reasoning += delta.reasoning_content;
+        const reasoningDelta =
+          typeof delta.reasoning_content === "string"
+            ? delta.reasoning_content
+            : typeof delta.reasoning === "string"
+              ? delta.reasoning
+              : undefined;
+        if (reasoningDelta) reasoning += reasoningDelta;
 
         if (typeof delta.content === "string" && delta.content.length > 0) {
           yield { type: "text_delta", delta: delta.content };
@@ -405,7 +420,11 @@ export class OpenAiProvider implements Provider {
               : mapFinishReason(choice.finish_reason);
           pendingToolCalls.clear();
           emittedStop = true;
-          yield { type: "stop", reason };
+          yield {
+            type: "stop",
+            reason,
+            providerMeta: withReasoning(undefined, reasoning),
+          };
         }
       }
     }
@@ -428,6 +447,7 @@ export class OpenAiProvider implements Provider {
       yield {
         type: "stop",
         reason: pendingToolCalls.size > 0 ? "tool_use" : "end_turn",
+        providerMeta: withReasoning(undefined, reasoning),
       };
     }
 

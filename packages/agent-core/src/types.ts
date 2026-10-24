@@ -11,6 +11,7 @@ const textMessage = z.object({
   role: z.enum(["user", "assistant"]),
   type: z.literal("text"),
   content: z.string(),
+  providerMeta: z.unknown().optional(),
 });
 
 const toolCallMessage = z.object({

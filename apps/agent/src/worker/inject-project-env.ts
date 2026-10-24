@@ -16,7 +16,7 @@ function envFileContents(vars: Record<string, string>): string {
 
 export async function injectProjectRuntimeEnv(input: {
   projectId: string;
-  sessionId: string;
+  worktreeSessionId: string;
   runtime: Runtime;
 }): Promise<void> {
   const vars = await tryGetProjectRuntimeEnv({
@@ -27,7 +27,7 @@ export async function injectProjectRuntimeEnv(input: {
 
   const contents = envFileContents(vars);
   const hostPath = path.join(
-    sessionWorktreePath(input.projectId, input.sessionId),
+    sessionWorktreePath(input.projectId, input.worktreeSessionId),
     ".env.local",
   );
   await writeFile(hostPath, contents, { mode: 0o600 });
@@ -36,7 +36,7 @@ export async function injectProjectRuntimeEnv(input: {
   } catch (err) {
     log.warn("sandbox env write failed", {
       projectId: input.projectId,
-      sessionId: input.sessionId,
+      worktreeSessionId: input.worktreeSessionId,
       err: err instanceof Error ? err.message : String(err),
     });
   }

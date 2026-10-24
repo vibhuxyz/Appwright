@@ -57,6 +57,7 @@ describe("mightChangeFiles", () => {
   it("skips read-only commands and read-only git subcommands", () => {
     expect(mightChangeFiles(["ls", "-la"])).toBe(false);
     expect(mightChangeFiles(["git", "status"])).toBe(false);
+    expect(mightChangeFiles(["file", "public/logo.png"])).toBe(false);
   });
 
   it("syncs after anything that can write", () => {
@@ -90,10 +91,24 @@ describe("SandboxMirror", () => {
     expect(hostFiles.size).toBe(0);
   });
 
-  it("reports binary files instead of corrupting them", async () => {
-    const { ports } = fakePorts(porcelain("?? public/logo.png"), { "public/logo.png": "PNG\u0000data" });
-    const report = await new SandboxMirror(ports).syncChanges();
-    expect(report.skipped).toEqual([{ path: "public/logo.png", reason: "binary content" }]);
+  it("reports binary files once and does not read them again", async () => {
+    let reads = 0;
+    const { ports } = fakePorts(porcelain("?? public/assets/media/catalog.png"), {
+      "public/assets/media/catalog.png": "PNG\u0000data",
+    });
+    const counting: SandboxMirrorPorts = {
+      ...ports,
+      readSandboxFile: async (path) => {
+        reads += 1;
+        return ports.readSandboxFile(path);
+      },
+    };
+    const mirror = new SandboxMirror(counting);
+    const first = await mirror.syncChanges();
+    const second = await mirror.syncChanges();
+    expect(first.skipped).toEqual([{ path: "public/assets/media/catalog.png", reason: "binary content" }]);
+    expect(second.skipped).toEqual([]);
+    expect(reads).toBe(0);
   });
 
   it("ignores dependency and build folders", async () => {

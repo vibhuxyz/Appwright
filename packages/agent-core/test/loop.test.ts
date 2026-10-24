@@ -242,4 +242,41 @@ describe("runAgentLoop — the six exits", () => {
     expect(stopReason).toBe("completed");
     expect(executed).toBe(false);
   });
+
+  test("passes assistant text message with providerMeta to subsequent turns", async () => {
+    const receivedHistories: Message[][] = [];
+    const provider = {
+      model: "fake-model",
+      async *stream(messages: Message[]): AsyncIterable<import("../src/providers/types").ProviderChunk> {
+        receivedHistories.push([...messages]);
+        if (receivedHistories.length === 1) {
+          yield { type: "text_delta", delta: "working on it" };
+          yield {
+            type: "tool_call",
+            toolCallId: "call_1",
+            toolName: "echo",
+            args: {},
+          };
+          yield {
+            type: "stop",
+            reason: "tool_use",
+            providerMeta: { reasoningContent: "step 1 completed" },
+          };
+        } else {
+          yield { type: "text_delta", delta: "all done" };
+          yield { type: "stop", reason: "end_turn" };
+        }
+      },
+    };
+    const stopReason = await runAgentLoop(baseParams({ provider }));
+    expect(stopReason).toBe("completed");
+    expect(receivedHistories).toHaveLength(2);
+    const turn2Messages = receivedHistories[1];
+    const assistantTextMsg = turn2Messages?.find(
+      (m) => m.type === "text" && m.role === "assistant",
+    );
+    expect(assistantTextMsg?.type === "text" && assistantTextMsg.providerMeta).toEqual({
+      reasoningContent: "step 1 completed",
+    });
+  });
 });

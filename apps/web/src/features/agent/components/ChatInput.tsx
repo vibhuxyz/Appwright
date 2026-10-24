@@ -59,6 +59,7 @@ export function ChatInput({
   onChange,
   onSubmit,
   onEnhance,
+  onStopEnhance,
   onStop,
 }: {
   input: string;
@@ -72,6 +73,7 @@ export function ChatInput({
   onChange: (value: string) => void;
   onSubmit: () => void;
   onEnhance: () => void;
+  onStopEnhance: () => void;
   onStop: () => void;
 }) {
   const trimmed = input.trim();
@@ -82,6 +84,7 @@ export function ChatInput({
         {/* Top header row: Tips with highlighted colors & Enhance icon (no popover) */}
         <ChatTipsHeader
           onEnhanceSpec={onEnhance}
+          onStopEnhance={onStopEnhance}
           isEnhancing={isEnhancing}
           hasInput={Boolean(trimmed)}
           quality={quality}
@@ -96,7 +99,7 @@ export function ChatInput({
             </div>
             <div className="relative z-10 mt-2 flex items-center gap-2 text-[11px] font-medium text-lime">
               <Sparkles className="size-3.5 animate-spin" />
-              <span className="animate-pulse">Synthesizing full specification with AI…</span>
+              <span className="animate-pulse">Improving your prompt…</span>
             </div>
           </div>
         ) : (

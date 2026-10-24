@@ -42,6 +42,7 @@ export interface RunTaskGeneratorOptions {
   model: string;
   plan: PlanId;
   runtime: Runtime;
+  conversationEmit?: AgentEventSink;
 }
 
 function pathFromToolArgs(args: Record<string, unknown>): string | undefined {
@@ -49,7 +50,7 @@ function pathFromToolArgs(args: Record<string, unknown>): string | undefined {
 }
 
 export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGenerator {
-  const { sessionId, model, plan, runtime } = options;
+  const { sessionId, model, plan, runtime, conversationEmit } = options;
 
   return {
     async generate(input: FencedAttemptInput): Promise<GeneratedAttempt> {
@@ -69,6 +70,7 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
           const path = pathFromToolArgs(event.args);
           if (path) writtenPaths.push(path);
         }
+        return conversationEmit?.(event);
       };
 
       let lastError = "";

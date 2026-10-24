@@ -31,8 +31,9 @@ describe("bakery blueprint completeness", () => {
     const prompt = "Build a bakery website to browse the menu. Catalog only, no online ordering.";
     const resolved = seed(prompt);
     expect(resolved.blueprint.pages.find((page) => page.route === "/")?.components).toEqual(
-      expect.arrayContaining(["Testimonials", "Carousel"]),
+      expect.arrayContaining(["Carousel"]),
     );
+    expect(resolved.blueprint.pages.find((page) => page.route === "/")?.components).not.toContain("Testimonials");
     expect(resolved.blueprint.workflows?.find((workflow) => workflow.kind === "pickup-order")?.inScope).toBe(false);
     expect(resolved.blueprint.entities).toEqual([]);
     expect(resolved.blueprint.stack.db).toBe("none");
@@ -81,6 +82,38 @@ describe("bakery blueprint completeness", () => {
     const adminPages = resolved.blueprint.pages.filter((page) => page.route === "/admin");
     expect(adminPages).toHaveLength(1);
     expect(adminPages[0]?.purpose).toBe("Existing ops dashboard");
+  });
+
+  it("plans a home-planning landing page without a bakery catalog or pickup shop", () => {
+    const prompt = [
+      "Create a landing page for RK Home Planner, a home planning and design service in Ranchi.",
+      "Services include 2D floor plans, 3D designs, interiors, and measurement.",
+      "Work/portfolio gallery with category filters.",
+      "Process: enquiry, measurement, design and delivery.",
+      "Do not invent project counts, testimonials, client names, prices, ratings, or achievements.",
+    ].join(" ");
+    const draft = BlueprintSchema.parse({
+      blueprintVersion: 1,
+      intent: { type: "new-app", domain: "home-planning", complexity: "simple", projectType: "business-site" },
+      stack: STACK,
+      pages: [{ route: "/", purpose: "RK Home Planner landing page", components: ["Hero"] }],
+      theme: { preset: "midnight", primary: "#53ea78" },
+    });
+    const resolved = resolveRequirements({ blueprint: draft, prompt, needs: detectNeeds(prompt) });
+    const routes = resolved.blueprint.pages.map((page) => page.route);
+    expect(routes).toContain("/");
+    expect(routes).not.toContain("/menu");
+    expect(routes).not.toContain("/order");
+    expect(routes).not.toContain("/order/[id]");
+    const names = resolved.blueprint.entities.map((entity) => entity.name);
+    expect(names).not.toContain("Product");
+    expect(names).not.toContain("Order");
+    expect(names).not.toContain("Category");
+    expect(resolved.blueprint.stack.db).toBe("none");
+    expect(resolved.blueprint.pages.find((page) => page.route === "/")?.components).not.toContain("Testimonials");
+    expect(resolved.blueprint.workflows?.find((workflow) => workflow.kind === "browse-catalog")?.inScope).toBe(
+      false,
+    );
   });
 
   it("flags a pickup workflow that has no Order model", () => {

@@ -5,14 +5,23 @@ import { detectAssetSlots } from "@repo/media";
 import { reusablePurposesIn, resolveReusableSlots, type ReusableAsset } from "./resolve-reusable-slots";
 import { serializeAssetRequest } from "./serialize";
 
+export function reusableAssetWhere(
+  projectId: string,
+  sessionId: string,
+  purposes: readonly AssetPurpose[],
+): Prisma.ProjectAssetWhereInput {
+  return { projectId, sessionId, purpose: { in: [...purposes] } };
+}
+
 async function loadReusableAssets(
   projectId: string,
+  sessionId: string,
   purposes: readonly AssetPurpose[],
 ): Promise<ReusableAsset[]> {
   if (purposes.length === 0) return [];
 
   const rows = await prisma.projectAsset.findMany({
-    where: { projectId, purpose: { in: [...purposes] } },
+    where: reusableAssetWhere(projectId, sessionId, purposes),
     orderBy: { createdAt: "asc" },
     select: { purpose: true, id: true, localPath: true, altText: true, attribution: true },
   });
@@ -42,7 +51,7 @@ export async function createAssetRequest(
   const detected = detectAssetSlots(blueprint);
   if (detected.length === 0) return null;
 
-  const reusable = await loadReusableAssets(projectId, reusablePurposesIn(detected));
+  const reusable = await loadReusableAssets(projectId, sessionId, reusablePurposesIn(detected));
   const slots = resolveReusableSlots(detected, reusable);
   const allResolved = slots.every((slot) => slot.status === "RESOLVED" || slot.status === "SKIPPED");
 

@@ -3,6 +3,8 @@ import { PRIVATE_ROUTE_PATTERN } from "./constants";
 
 const HOME_COMPONENTS = ["Testimonials", "Carousel"] as const;
 const FORM_COMPONENTS = ["Modal"] as const;
+const FORBIDDEN_TESTIMONIALS = /\bdo not invent\b[^.]*\btestimonials\b/i;
+const ASKED_TESTIMONIALS = /\b(testimonial|reviews|social proof)\b/i;
 const HOME_PATTERN = /(^\/$)|home|landing|marketing|hero/i;
 const FORM_PATTERN = /form|contact|order|checkout|quote|request|signup|login|book/i;
 
@@ -27,12 +29,22 @@ function isPublicForm(page: Page): boolean {
   return FORM_PATTERN.test(`${page.route} ${page.purpose} ${page.components.join(" ")}`);
 }
 
-export function withRequiredUiComponents(pages: readonly Page[]): Page[] {
+function wantsReviewBlock(prompt: string): boolean {
+  return ASKED_TESTIMONIALS.test(prompt) && !FORBIDDEN_TESTIMONIALS.test(prompt);
+}
+
+function withoutTestimonials(components: readonly string[]): string[] {
+  return components.filter((name) => name !== "Testimonials");
+}
+
+export function withRequiredUiComponents(pages: readonly Page[], prompt = ""): Page[] {
+  const reviews = wantsReviewBlock(prompt);
   return pages.map((page) => {
+    const base = isPublicHome(page) && !reviews ? withoutTestimonials(page.components) : page.components;
     const extra: string[] = [];
-    if (isPublicHome(page)) extra.push(...HOME_COMPONENTS);
+    if (isPublicHome(page)) extra.push(...(reviews ? HOME_COMPONENTS : ["Carousel"]));
     if (isPublicForm(page)) extra.push(...FORM_COMPONENTS);
-    if (extra.length === 0) return page;
-    return { ...page, components: uniqueComponents(page.components, extra) };
+    if (extra.length === 0 && base === page.components) return page;
+    return { ...page, components: uniqueComponents(base, extra) };
   });
 }

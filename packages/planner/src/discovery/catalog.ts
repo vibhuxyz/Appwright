@@ -170,6 +170,37 @@ function isBusinessApp(facts: ExtractedFacts): boolean {
   return facts.signals.bakery || facts.signals.commerce || facts.projectType === "business-site";
 }
 
+function sellsGoods(facts: ExtractedFacts): boolean {
+  return (
+    facts.signals.bakery ||
+    facts.signals.commerce ||
+    facts.signals.storefront ||
+    facts.signals.ordering
+  );
+}
+
+function goodsTopics(facts: ExtractedFacts): MaterialTopic[] {
+  const topics: MaterialTopic[] = [];
+  if (!facts.signals.browseOnly && !isAnswered(facts, "ordering-mode")) topics.push(ORDERING_MODE);
+  const ordersInScope = ordersAreInScope(facts);
+  if (ordersInScope) {
+    topics.push(PAYMENT_METHOD, GUEST_CHECKOUT, ORDER_ACCEPTANCE);
+    if (facts.signals.pickup || (facts.answered["ordering-mode"] ?? "").includes("Pickup")) {
+      topics.push(PICKUP_SCHEDULING);
+    }
+    topics.push(STANDARD_AVAILABILITY);
+  }
+  if (facts.signals.customOrders) topics.push(CUSTOM_WORKFLOW);
+  if (facts.signals.popups) topics.push(POPUP_MENUS);
+  if (ordersInScope && !facts.signals.existingAdmin) {
+    topics.push(STAFF_ROLES, NOTIFICATIONS, DASHBOARD_PRIORITY);
+  } else if (ordersInScope) {
+    topics.push(NOTIFICATIONS);
+  }
+  if (facts.signals.browseOnly || isAnswered(facts, "ordering-mode")) topics.push(...siteContentTopics());
+  return topics;
+}
+
 function ordersAreInScope(facts: ExtractedFacts): boolean {
   if (facts.signals.browseOnly || facts.exclusions.includes("ordering")) return false;
   const mode = facts.answered["ordering-mode"] ?? "";
@@ -185,23 +216,7 @@ export function materialTopics(facts: ExtractedFacts): MaterialTopic[] {
 
   if (isBusinessApp(facts)) {
     topics.push(BUSINESS_NAME, contactsTopic(facts));
-    if (!facts.signals.browseOnly && !isAnswered(facts, "ordering-mode")) topics.push(ORDERING_MODE);
-    const ordersInScope = ordersAreInScope(facts);
-    if (ordersInScope) {
-      topics.push(PAYMENT_METHOD, GUEST_CHECKOUT, ORDER_ACCEPTANCE);
-      if (facts.signals.pickup || (facts.answered["ordering-mode"] ?? "").includes("Pickup")) {
-        topics.push(PICKUP_SCHEDULING);
-      }
-      topics.push(STANDARD_AVAILABILITY);
-    }
-    if (facts.signals.customOrders) topics.push(CUSTOM_WORKFLOW);
-    if (facts.signals.popups) topics.push(POPUP_MENUS);
-    if (ordersInScope && !facts.signals.existingAdmin) {
-      topics.push(STAFF_ROLES, NOTIFICATIONS, DASHBOARD_PRIORITY);
-    } else if (ordersInScope) {
-      topics.push(NOTIFICATIONS);
-    }
-    if (facts.signals.browseOnly || isAnswered(facts, "ordering-mode")) topics.push(...siteContentTopics());
+    if (sellsGoods(facts)) topics.push(...goodsTopics(facts));
   }
 
   return topics.filter((item) => !isAnswered(facts, item.id) && !isExcluded(facts, item.id));

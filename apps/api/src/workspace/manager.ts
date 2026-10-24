@@ -5,6 +5,7 @@ import { $ } from "bun";
 import { tryGetProjectRuntimeEnv } from "@repo/db";
 import {
   projectRepoPath,
+  sessionBranchName,
   sessionWorktreePath,
   workspacePath,
   WORKSPACES_DIR,
@@ -43,11 +44,11 @@ export async function createWorkspace(
 
 export async function createSessionWorktree(
   projectId: string,
-  sessionId: string,
+  worktreeSessionId: string,
 ): Promise<string> {
   const repoDir = projectRepoPath(projectId);
-  const worktreeDir = sessionWorktreePath(projectId, sessionId);
-  const branchName = `agent/${sessionId}`;
+  const worktreeDir = sessionWorktreePath(projectId, worktreeSessionId);
+  const branchName = sessionBranchName(worktreeSessionId);
 
   if (existsSync(worktreeDir)) {
     await unlinkNodeModulesSymlink(worktreeDir);
@@ -94,11 +95,11 @@ export async function unlinkNodeModulesSymlink(dir: string): Promise<void> {
 
 export async function removeSessionWorktree(
   projectId: string,
-  sessionId: string,
+  worktreeSessionId: string,
 ): Promise<void> {
   const repoDir = projectRepoPath(projectId);
-  const worktreeDir = sessionWorktreePath(projectId, sessionId);
-  const branchName = `agent/${sessionId}`;
+  const worktreeDir = sessionWorktreePath(projectId, worktreeSessionId);
+  const branchName = sessionBranchName(worktreeSessionId);
 
   if (existsSync(repoDir)) {
     await $`git -C ${repoDir} worktree remove --force ${worktreeDir}`
@@ -211,19 +212,19 @@ export function startDevServer(projectId: string): Promise<number> {
 
 export async function startSessionDevServer(
   projectId: string,
-  sessionId: string,
+  worktreeSessionId: string,
 ): Promise<number> {
-  const cwd = await createSessionWorktree(projectId, sessionId);
+  const cwd = await createSessionWorktree(projectId, worktreeSessionId);
   await writeProjectRuntimeEnvFile({
     projectId,
     environment: "development",
-    sessionId,
+    worktreeSessionId,
   }).catch(() => undefined);
-  return startServerAt(sessionServerKey(sessionId), cwd, projectId);
+  return startServerAt(sessionServerKey(worktreeSessionId), cwd, projectId);
 }
 
-export function sessionServerKey(sessionId: string): string {
-  return `session:${sessionId}`;
+export function sessionServerKey(worktreeSessionId: string): string {
+  return `session:${worktreeSessionId}`;
 }
 
 async function startServerAt(

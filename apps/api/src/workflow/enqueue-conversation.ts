@@ -12,6 +12,7 @@ import { serializeRow } from "./message-mapper";
 
 export interface EnqueueConversationOptions {
   sessionId: string;
+  worktreeSessionId: string;
   projectId: string;
   prompt: string;
   answers?: Readonly<Record<string, PromptAnswer>>;
@@ -51,7 +52,17 @@ export async function recordRequirementTurns<T>(
 export async function enqueueConversation(
   opts: EnqueueConversationOptions,
 ): Promise<Job> {
-  const { sessionId, projectId, prompt, answers, questions, theme, selection, blueprintId } = opts;
+  const {
+    sessionId,
+    worktreeSessionId,
+    projectId,
+    prompt,
+    answers,
+    questions,
+    theme,
+    selection,
+    blueprintId,
+  } = opts;
 
   const lastMessage = await prisma.message.findFirst({
     where: { sessionId },
@@ -92,6 +103,6 @@ export async function enqueueConversation(
     const turn = themeTurn(theme);
     await persistTurn({ type: "text", ...turn, data: { ...turn.data, ...(blueprintId ? { blueprintId } : {}) } });
   }
-  await createSessionWorktree(projectId, sessionId);
+  await createSessionWorktree(projectId, worktreeSessionId);
   return enqueueJob({ sessionId, projectId });
 }

@@ -51,6 +51,30 @@ describe("generated UI primitives", () => {
     ).rejects.toThrow(/generated UI primitive/);
   });
 
+  test("read_file refuses a binary image without opening it", async () => {
+    let opened = false;
+    const result = await readFileTool(
+      { path: "public/assets/media/catalog.png" },
+      runtime(async () => {
+        opened = true;
+        return "PNG\u0000data";
+      }),
+    );
+    expect(opened).toBe(false);
+    expect(result).toContain("binary file");
+    expect(result).toContain("Do not read it again");
+    expect(result).not.toContain("PNG");
+  });
+
+  test("read_file refuses null bytes that are not named as an image", async () => {
+    const result = await readFileTool(
+      { path: "public/assets/media/hero.bin" },
+      runtime(async () => "PNG\u0000data"),
+    );
+    expect(result).toContain("binary file");
+    expect(result).not.toContain("1\tPNG");
+  });
+
   test("ordinary source files still read through the runtime", async () => {
     const result = await readFileTool(
       { path: "src/app/page.tsx" },

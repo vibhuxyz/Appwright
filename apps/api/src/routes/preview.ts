@@ -5,6 +5,7 @@ import {
   type OutgoingHttpHeaders,
 } from "node:http";
 import { prisma } from "@repo/db";
+import { worktreeSessionIdOf } from "@repo/workspace";
 import { Router, type Request, type Response } from "express";
 import {
   PREVIEW_COOKIE,
@@ -138,6 +139,7 @@ function proxyToDevServer(
 interface PreviewSession {
   id: string;
   projectId: string;
+  worktreeSessionId: string;
   devPort: number;
 }
 
@@ -149,10 +151,15 @@ export async function sessionPort(token: string): Promise<number | null> {
 async function previewSession(token: string): Promise<PreviewSession | null> {
   const session = await prisma.session.findUnique({
     where: { previewToken: token },
-    select: { id: true, projectId: true, devPort: true },
+    select: { id: true, projectId: true, branch: true, devPort: true },
   });
   if (!session?.devPort) return null;
-  return { id: session.id, projectId: session.projectId, devPort: session.devPort };
+  return {
+    id: session.id,
+    projectId: session.projectId,
+    worktreeSessionId: worktreeSessionIdOf(session),
+    devPort: session.devPort,
+  };
 }
 
 function servePreview(
@@ -163,7 +170,7 @@ function servePreview(
   token?: string,
 ): void {
   const restart = () => {
-    void startSessionDevServer(session.projectId, session.id)
+    void startSessionDevServer(session.projectId, session.worktreeSessionId)
       .then(async (devPort) => {
         await prisma.session.update({ where: { id: session.id }, data: { devPort } });
         proxyToDevServer(req, res, devPort, upstreamPath, token);

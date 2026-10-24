@@ -39,11 +39,12 @@ export async function generateThemeOptions(
     if (generated.length === 0) return { themes: presets, source: "preset" };
     return { themes: mergeThemes(generated, presets), source: "ai" };
   } catch (error) {
-    if (isAbortError(error) || !(error instanceof Error)) throw error;
+    const timedOut = signal.aborted || isAbortError(error);
     log.error("generateThemeOptions fell back to presets", {
       model: provider.model,
       provider: providerFor(provider.model),
-      message: error.message,
+      timedOut,
+      message: error instanceof Error ? error.message : String(error),
     });
     return { themes: presets, source: "preset" };
   }

@@ -1,6 +1,6 @@
 import { listProjectPaths, readProjectFile } from "@repo/contracts/files";
 import { Router } from "express";
-import { ownedProjectId, ownedSessionProjectId } from "../ownership";
+import { ownedProjectId, ownedSessionWorktree } from "../ownership";
 import { hydrateSessionFilesFromToolCalls } from "../workspace/hydrate-session-files";
 
 export const filesRouter = Router();
@@ -11,13 +11,22 @@ filesRouter.get("/files/:projectId", async (req, res) => {
   }
   const sessionId =
     typeof req.query.sessionId === "string" ? req.query.sessionId : undefined;
-  if (sessionId && !(await ownedSessionProjectId(sessionId, req.userId!))) {
+  const owned = sessionId
+    ? await ownedSessionWorktree(sessionId, req.userId!)
+    : undefined;
+  if (owned === null) {
     return res.status(404).json({ error: "not found" });
   }
-  if (sessionId) {
-    await hydrateSessionFilesFromToolCalls(req.params.projectId, sessionId);
+  if (owned) {
+    await hydrateSessionFilesFromToolCalls(
+      req.params.projectId,
+      owned.worktreeSessionId,
+    );
   }
-  const paths = await listProjectPaths(req.params.projectId, sessionId);
+  const paths = await listProjectPaths(
+    req.params.projectId,
+    owned?.worktreeSessionId,
+  );
   res.json({ paths });
 });
 
@@ -31,17 +40,23 @@ filesRouter.get("/files/:projectId/content", async (req, res) => {
   }
   const sessionId =
     typeof req.query.sessionId === "string" ? req.query.sessionId : undefined;
-  if (sessionId && !(await ownedSessionProjectId(sessionId, req.userId!))) {
+  const owned = sessionId
+    ? await ownedSessionWorktree(sessionId, req.userId!)
+    : undefined;
+  if (owned === null) {
     return res.status(404).json({ error: "not found" });
   }
-  if (sessionId) {
-    await hydrateSessionFilesFromToolCalls(req.params.projectId, sessionId);
+  if (owned) {
+    await hydrateSessionFilesFromToolCalls(
+      req.params.projectId,
+      owned.worktreeSessionId,
+    );
   }
   try {
     const content = await readProjectFile(
       req.params.projectId,
       relPath,
-      sessionId,
+      owned?.worktreeSessionId,
     );
     res.json({ path: relPath, content });
   } catch (err) {

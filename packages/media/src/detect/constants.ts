@@ -48,7 +48,7 @@ export const PURPOSE_STYLE_HINTS: Readonly<Record<AssetPurpose, string>> = {
   background: "a subtle background texture image",
   icon: "a minimal flat icon",
   photo: "a professional photo",
-  social: "a 1200x630 social sharing preview image",
+  social: "a wide photograph of the real place or work, with no words or logos",
   other: "a supporting image",
 };
 

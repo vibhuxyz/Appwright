@@ -1,7 +1,38 @@
 import { describe, expect, test } from "bun:test";
-import { FakeProvider } from "@repo/agent-core";
-import { THEME_OPTION_COUNT } from "@repo/contracts";
+import { FakeProvider, type Provider, type ProviderChunk } from "@repo/agent-core";
+import { THEME_OPTION_COUNT, ThemeOptionsResponse } from "@repo/contracts";
 import { generateThemeOptions } from "../src/themes";
+
+const HANGING_PROVIDER_TIMEOUT_MS = 20;
+
+function hangingProvider(): Provider {
+  return {
+    model: "fake-model",
+    stream(_messages, _tools, { signal }): AsyncIterable<ProviderChunk> {
+      return {
+        [Symbol.asyncIterator]: () => ({
+          next: () =>
+            new Promise((_resolve, reject) => {
+              if (signal.aborted) {
+                reject(signal.reason);
+                return;
+              }
+              signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+            }),
+        }),
+      };
+    },
+  };
+}
+
+function rejectingProvider(error: unknown): Provider {
+  return {
+    model: "fake-model",
+    async *stream(): AsyncIterable<ProviderChunk> {
+      throw error;
+    },
+  };
+}
 
 function validTheme(
   name: string,
@@ -64,5 +95,24 @@ describe("generateThemeOptions", () => {
     expect(result.themes[0]?.summary).toContain("cream grounds");
     expect(result.themes[0]?.dos?.[0]).toContain("Ink on cream");
     expect(result.themes[0]?.donts?.[0]).toContain("white body copy");
+  });
+
+  test("falls back to preset design systems when the model times out", async () => {
+    const result = await generateThemeOptions(
+      { prompt: "an ecommerce store for handmade jewellery" },
+      hangingProvider(),
+      AbortSignal.timeout(HANGING_PROVIDER_TIMEOUT_MS),
+    );
+    const parsed = ThemeOptionsResponse.parse(result);
+    expect(parsed.source).toBe("preset");
+    expect(parsed.themes).toHaveLength(THEME_OPTION_COUNT);
+  });
+
+  test("falls back to preset design systems when the model throws a timeout", async () => {
+    const result = await generateThemeOptions(
+      { prompt: "a home planning studio in Ranchi" },
+      rejectingProvider(new DOMException("The operation timed out.", "TimeoutError")),
+    );
+    expect(ThemeOptionsResponse.parse(result).source).toBe("preset");
   });
 });

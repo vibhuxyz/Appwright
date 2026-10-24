@@ -184,6 +184,37 @@ describe("bakery discovery", () => {
     expect(contacts?.prefill?.Email).toBe("hello@riseandflour.test");
   });
 
+  it("does not turn a home-planning landing page into a bakery shop", () => {
+    const prompt = [
+      "Create a landing page for RK Home Planner, a home planning and design service in Ranchi.",
+      "Work/portfolio gallery of floor plans.",
+      "Process: enquiry, measurement, design and delivery.",
+      "Do not invent project counts, testimonials, client names, prices, ratings, or achievements.",
+    ].join(" ");
+    const workflows = workflowsFrom(extractFacts(prompt));
+    const inScope = workflows.filter((workflow) => workflow.inScope).map((workflow) => workflow.kind);
+    expect(inScope).not.toContain("browse-catalog");
+    expect(inScope).not.toContain("delivery-order");
+    expect(inScope).not.toContain("pickup-order");
+    expect(inScope).not.toContain("inventory");
+  });
+
+  it("keeps food delivery in scope without calling every business a catalog", () => {
+    const workflows = workflowsFrom(extractFacts("build me a food delivery app"));
+    expect(workflows.find((workflow) => workflow.kind === "delivery-order")?.inScope).toBe(true);
+    expect(workflows.find((workflow) => workflow.kind === "browse-catalog")?.inScope).toBe(false);
+  });
+
+  it("does not ask bakery ordering questions for a service landing page", () => {
+    const needs = needsOf(
+      "Create a website for my home planning business in Ranchi. Visitors enquire by phone.",
+    );
+    expect(needs).toEqual(expect.arrayContaining(["business-name", "business-contacts"]));
+    expect(needs).not.toContain("ordering-mode");
+    expect(needs).not.toContain("payment-method");
+    expect(needs).not.toContain("menu-structure");
+  });
+
   it("does not re-ask a topic after a previous batch answered it", () => {
     const first = selectDiscoveryQuestions(BAKERY_FULL);
     expect(first.length).toBeGreaterThan(0);

@@ -9,6 +9,17 @@ import { ToolCallGroup } from "./ToolCallGroup";
 import { UserMessageItem } from "./UserMessageItem";
 import { AgentMessageItem } from "./AgentMessageItem";
 
+function buildingSubtitle(statusDetail: string): string {
+  if (statusDetail === "Waiting for section images…") {
+    return "The build continues when every section has an image.";
+  }
+  const toolMatch = /^Running (\w+)…$/.exec(statusDetail);
+  if (toolMatch) {
+    return `Running ${toolMatch[1]}`;
+  }
+  return "Editing files, verifying TypeScript";
+}
+
 function EmptyState() {
   return (
     <div className="m-auto max-w-70 text-center">
@@ -135,9 +146,7 @@ export function MessageList({
               {statusDetail || "Writing code…"}
             </span>
             <span className="truncate text-[11px] text-muted">
-              {statusDetail === "Waiting for section images…"
-                ? "The build continues when every section has an image."
-                : "Building the checklist, editing files, verifying TypeScript"}
+            {buildingSubtitle(statusDetail)}
             </span>
           </div>
           <button

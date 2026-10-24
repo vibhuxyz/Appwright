@@ -15,6 +15,9 @@ const EXCLUSION_PATTERNS: readonly (readonly [RegExp, string])[] = [
   [/\bno (sms|text messages?)\b/i, "sms"],
 ];
 
+const ORDER_DELIVERY =
+  /\b(?:food delivery|home delivery|same[- ]day delivery|local delivery|delivery (?:app|service|option|orders?)|deliver(?:y|ies|ing)? orders?|orders? (?:for |with )?delivery|we deliver|offer delivery)\b/i;
+
 const ANSWER_PATTERNS: readonly (readonly [RegExp, string, string])[] = [
   [/\b(browse[- ]only|catalog only|informational only)\b/i, "ordering-mode", "Browse only"],
   [/\bstandard pickup orders?\b/i, "ordering-mode", "Pickup orders"],
@@ -72,7 +75,7 @@ function collectGoals(prompt: string, signals: DomainSignals): string[] {
 function detectSignals(prompt: string): DomainSignals {
   const browseOnly = detectScope(prompt).isBrowseOnly;
   const pickup = /\bpickup\b/i.test(prompt);
-  const delivery = /\bdeliver(y|ies|ing)?\b/i.test(prompt);
+  const delivery = ORDER_DELIVERY.test(prompt);
   const customOrders = /\b(custom cake|event requests?|custom orders?|bespoke)\b/i.test(prompt);
   const ordering = !browseOnly && (/\border/i.test(prompt) || pickup || delivery || customOrders);
   return {

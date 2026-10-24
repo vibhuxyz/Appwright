@@ -107,9 +107,11 @@ describe("the prompt section", () => {
     expect(uiSystemPromptSection()).toContain("p-[17px]");
   });
 
-  test("requires testimonials, carousel, modal, toast, skeleton and spinner on generated sites", () => {
+  test("names testimonials and carousel as optional and still requires modal, toast, skeleton and spinner", () => {
     const section = uiSystemPromptSection();
     expect(section).toContain("Testimonials");
+    expect(section).toContain("only when this task lists them");
+    expect(section).not.toContain("Home pages: Testimonials");
     expect(section).toContain("Carousel");
     expect(section).toContain("Modal");
     expect(section).toContain("toast.success");

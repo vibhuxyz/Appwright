@@ -1,6 +1,7 @@
 import type { AssetSlot } from "@repo/contracts";
 import { searchStockImage, sharedUnsplashClient, type StockSearchError } from "@repo/media";
 import { finalizeAsset } from "./finalize-asset";
+import { photoSearchQuery } from "./social-fallback";
 import { suggestUnsplashPhoto } from "./unsplash";
 
 const STOCK_TIMEOUT_MS = 25_000;
@@ -28,7 +29,7 @@ export async function resolveStock(input: ResolveStockInput): Promise<ResolveSto
   if (suggested) return { ok: true, result: suggested };
 
   const found = await searchStockImage({
-    query: input.slot.suggestedPrompt,
+    query: photoSearchQuery(input.slot),
     signal: AbortSignal.timeout(STOCK_TIMEOUT_MS),
   });
 
