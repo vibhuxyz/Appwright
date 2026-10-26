@@ -37,3 +37,7 @@ export function canUseModel(plan: PlanId, modelId: string): boolean {
 export function requiredPlanFor(modelId: string): PlanId {
   return PLAN_IDS.find((plan) => canUseModel(plan, modelId)) ?? "MAX";
 }
+
+export function canAccessCodebase(plan: PlanId): boolean {
+  return plan !== "FREE";
+}

@@ -7,6 +7,7 @@ export {
   PaidPlanIdSchema,
   PlanIdSchema,
   UpgradePlanRequest,
+  canAccessCodebase,
   canUseModel,
   requiredPlanFor,
   type PaidPlanId,

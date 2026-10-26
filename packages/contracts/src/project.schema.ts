@@ -1,4 +1,14 @@
 import z from "zod";
+import { IntegrationProviderSchema } from "./environment";
+
+export const ProjectStarterSchema = z.enum([
+  "blank",
+  "saas",
+  "ai-chat",
+  "ecommerce",
+  "blog-cms",
+  "pm",
+]);
 
 export const ProjectStatus = z.enum([
   "PROVISIONING",
@@ -9,15 +19,19 @@ export const ProjectStatus = z.enum([
 
 export const CreateProjectRequest = z.object({
   name: z.string().min(1),
-  templateId: z.enum(["vite-react", "nextjs-fullstack"]).default("vite-react"),
+  templateId: z.literal("nextjs-fullstack").default("nextjs-fullstack"),
+  starterId: ProjectStarterSchema.nullable().optional(),
+  integrations: z.array(IntegrationProviderSchema).max(5).default([]),
 });
 
 export const ProjectResponse = z.object({
   id: z.string(),
   name: z.string(),
   templateId: z.string(),
+  starterId: z.string().nullable(),
   status: ProjectStatus,
   previewUrl: z.string().nullable(),
+  hasProductionDeployment: z.boolean(),
   createdAt: z.string(),
 });
 

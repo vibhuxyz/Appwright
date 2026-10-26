@@ -1,4 +1,5 @@
 import { decryptSecret } from "./crypto";
+import { resolveProjectRuntimeEnvVars } from "./environment-registry";
 import { prisma } from "./prisma";
 import { ProjectDatabaseError } from "./project-database-errors";
 import { projectDatabaseSecretKey } from "./provision-project-database";
@@ -43,8 +44,18 @@ export async function getProjectRuntimeEnv(input: {
   projectId: string;
   environment: ProjectDbEnvironment;
 }): Promise<Record<string, string>> {
-  const uri = await getProjectRuntimeMongoUri(input);
-  return { MONGODB_URI: uri };
+  const result: Record<string, string> = {};
+  try {
+    const uri = await getProjectRuntimeMongoUri(input);
+    result.MONGODB_URI = uri;
+  } catch (err) {
+    if (!(err instanceof ProjectDatabaseError && err.code === "NOT_READY")) {
+      throw err;
+    }
+  }
+
+  const additionalVars = await resolveProjectRuntimeEnvVars(input);
+  return { ...result, ...additionalVars };
 }
 
 export async function tryGetProjectRuntimeEnv(input: {

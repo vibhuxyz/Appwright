@@ -45,7 +45,7 @@ export const ThemeOptionSchema = z.object({
 });
 export type ThemeOption = z.infer<typeof ThemeOptionSchema>;
 
-export const THEME_OPTION_COUNT = 5;
+export const THEME_OPTION_COUNT = 4;
 export const MAX_REFERENCE_COLORS = 8;
 export const MAX_THEME_DESCRIPTION_CHARS = 400;
 

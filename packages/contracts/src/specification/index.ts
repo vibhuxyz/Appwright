@@ -1,0 +1,26 @@
+export {
+  ProductTypeSchema,
+  ProjectSpecificationSchema,
+  SpecColorSchema,
+  SpecDesignSystemSchema,
+  SpecEntitySchema,
+  SpecEvidenceSchema,
+  SpecFieldSchema,
+  SpecIntegrationSchema,
+  SpecPageSchema,
+  SpecPageSectionSchema,
+  SpecProjectIntentSchema,
+  SpecRequirementsSchema,
+  SpecTypographySchema,
+} from "./specification.schema";
+export type {
+  ProductType,
+  ProjectSpecification,
+  SpecDesignSystem,
+  SpecEntity,
+  SpecEvidence,
+  SpecIntegration,
+  SpecPage,
+  SpecProjectIntent,
+  SpecRequirements,
+} from "./types";

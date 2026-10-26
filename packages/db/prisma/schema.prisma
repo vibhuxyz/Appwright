@@ -18,6 +18,7 @@ model User {
   // One Vercel account link per user, not per project. Connecting is a
   // property of the person, deploying is a property of the app.
   vercelConnection VercelConnection?
+  integrationAuditEvents IntegrationAuditEvent[]
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @default(now()) @updatedAt
 }
@@ -46,6 +47,7 @@ model Project {
   id            String        @id @default(cuid()) @db.VarChar(30)
   name          String
   templateId    String        @default("vite-react")
+  starterId     String?       @map("starter_id")
   workspacePath String
   status        ProjectStatus @default(READY)
   // Non-null since auth landed. A project with no owner is unreachable by
@@ -60,6 +62,15 @@ model Project {
   secret        Secret[]
   assets        ProjectAsset[]
   databases     ProjectDatabase[]
+  integrations  ProjectIntegration[]
+  integrationUsage IntegrationUsage[]
+  integrationPayments IntegrationPayment[]
+  integrationWebhookEvents IntegrationWebhookEvent[]
+  integrationAccessTokens ProjectIntegrationAccessToken[]
+  integrationAuditEvents IntegrationAuditEvent[]
+  envVariables  ProjectEnvironmentVariable[]
+  attachments   ProjectAttachment[]
+  integrationRequests IntegrationRequest[]
   // Deleting a project cleans up its sessions/messages/secrets too — there's
   // no route that deletes a session or secret on its own in V1.
   createdAt     DateTime      @default(now())
@@ -99,6 +110,9 @@ model Session {
   runs         Run[]
   assetRequests AssetRequest[]
   assets       ProjectAsset[]
+  attachments  ProjectAttachment[]
+  agentQuestions AgentQuestion[]
+  integrationRequests IntegrationRequest[]
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @default(now()) @updatedAt
 
@@ -119,6 +133,23 @@ model Approval {
 
   @@index([sessionId])
   @@index([sessionId, status])
+}
+
+model AgentQuestion {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  sessionId  String    @map("session_id") @db.VarChar(30)
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  toolCallId String?   @map("tool_call_id")
+  questions  Json
+  answers    Json?
+  status     String    @default("PENDING")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([sessionId, status], map: "idx_agent_questions__session_id_status")
+  @@map("agent_questions")
 }
 
 model Message {
@@ -155,6 +186,8 @@ model Blueprint {
   responsive       Json?
   projectType      String?
   requirements     Json?
+  dependencyManifest Json?
+  specification    Json?
   tasks            Task[]
   changeRequests   ChangeRequest[]
   assetRequests    AssetRequest[]
@@ -223,6 +256,44 @@ model ProjectAsset {
 
   @@index([projectId])
   @@index([sessionId])
+}
+
+enum AttachmentType {
+  IMAGE
+  PDF
+  DOCUMENT
+}
+
+enum AttachmentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model ProjectAttachment {
+  id            String           @id @default(cuid()) @db.VarChar(30)
+  projectId     String
+  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sessionId     String
+  session       Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  messageId     String?
+  name          String
+  mimeType      String
+  sizeBytes     Int
+  storageKey    String
+  type          AttachmentType
+  status        AttachmentStatus @default(PENDING)
+  metadata      Json?
+  extractedText String?          @db.Text
+  analysis      Json?
+  errorMessage  String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @default(now()) @updatedAt
+
+  @@index([projectId])
+  @@index([sessionId])
+  @@index([messageId])
 }
 
 enum TaskType {
@@ -541,4 +612,159 @@ model DatabaseDeletion {
 
   @@unique([databaseName], map: "uq_database_deletions__database_name")
   @@index([deleteAfter, status], map: "idx_database_deletions__delete_after_status")
+}
+
+model ProjectIntegration {
+  id           String    @id @default(cuid()) @db.VarChar(30)
+  projectId    String
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider     String
+  status       String    @default("missing")
+  required     Boolean   @default(false)
+  config       Json?
+  lastTestedAt DateTime?
+  lastError    String?
+  environments ProjectIntegrationEnvironment[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@unique([projectId, provider], map: "uq_project_integrations__project_id_provider")
+  @@index([projectId], map: "idx_project_integrations__project_id")
+}
+
+model ProjectIntegrationEnvironment {
+  id                   String            @id @default(cuid()) @db.VarChar(30)
+  integrationId        String            @db.VarChar(30)
+  integration          ProjectIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  environment          String
+  credentialMode       String            @default("BYOK")
+  status               String            @default("configuration_required")
+  lastTestedAt         DateTime?         @db.Timestamptz(3)
+  lastError            String?
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@unique([integrationId, environment], map: "uq_project_integration_env__integration_environment")
+  @@index([integrationId], map: "idx_project_integration_env__integration_id")
+}
+
+model IntegrationRequest {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  sessionId  String    @map("session_id") @db.VarChar(30)
+  session    Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  projectId  String    @map("project_id") @db.VarChar(30)
+  project    Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider   String
+  reason     String
+  status     String    @default("PENDING")
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  resolvedAt DateTime? @map("resolved_at") @db.Timestamptz(3)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([sessionId, provider], map: "uq_integration_requests__session_id_provider")
+  @@index([projectId, provider, status], map: "idx_integration_requests__project_id_provider_status")
+  @@map("integration_requests")
+}
+
+model IntegrationUsage {
+  id                String   @id @default(cuid()) @db.VarChar(30)
+  projectId         String
+  project           Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider          String
+  credentialMode    String
+  environment       String
+  operation         String
+  idempotencyKey    String   @db.VarChar(128)
+  requestFingerprint String
+  status            String
+  units             Int      @default(1)
+  providerRequestId String?
+  resultJson        Json?
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([projectId, provider, operation, environment, idempotencyKey], map: "uq_integration_usage__project_provider_operation_key")
+  @@index([projectId, provider, credentialMode, status], map: "idx_integration_usage__quota_lookup")
+}
+
+model IntegrationPayment {
+  id              String   @id @default(cuid()) @db.VarChar(30)
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider        String
+  environment     String
+  credentialMode  String
+  providerOrderId String
+  paymentId       String?
+  amountMinor     BigInt
+  currency        String   @db.VarChar(3)
+  status          String   @default("created")
+  idempotencyKey  String   @db.VarChar(128)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@unique([projectId, environment, idempotencyKey], map: "uq_integration_payments__project_environment_key")
+  @@unique([projectId, providerOrderId], map: "uq_integration_payments__project_provider_order")
+  @@index([projectId, environment, status], map: "idx_integration_payments__project_env_status")
+}
+
+model IntegrationWebhookEvent {
+  id          String   @id @default(cuid()) @db.VarChar(30)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  provider    String
+  eventId     String
+  payloadHash String
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@unique([projectId, provider, eventId], map: "uq_integration_webhooks__project_provider_event")
+  @@index([projectId, provider], map: "idx_integration_webhooks__project_provider")
+}
+
+model ProjectIntegrationAccessToken {
+  id        String   @id @default(cuid()) @db.VarChar(30)
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment String
+  tokenHash String   @unique
+  encryptedToken String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@unique([projectId, environment], map: "uq_project_integration_tokens__project_environment")
+}
+
+model IntegrationAuditEvent {
+  id          String   @id @default(cuid()) @db.VarChar(30)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  actorUserId String
+  actor       User     @relation(fields: [actorUserId], references: [id], onDelete: Cascade)
+  provider    String
+  environment String
+  action      String
+  status      String
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([projectId, createdAt], map: "idx_integration_audit_events__project_created")
+  @@index([actorUserId], map: "idx_integration_audit_events__actor")
+}
+
+model ProjectEnvironmentVariable {
+  id          String   @id @default(cuid()) @db.VarChar(30)
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment String
+  key         String
+  value       String?
+  isSecret    Boolean  @default(false)
+  secretRef   Int?
+  required    Boolean  @default(true)
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@unique([projectId, environment, key], map: "uq_project_env_vars__project_environment_key")
+  @@index([projectId], map: "idx_project_env_vars__project_id")
+  @@index([projectId, environment], map: "idx_project_env_vars__project_id_environment")
 }

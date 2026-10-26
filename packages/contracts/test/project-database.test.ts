@@ -4,6 +4,7 @@ import {
   DatabaseDocumentsResponse,
   DatabaseOverviewResponse,
   ProjectDatabaseResponse,
+  ProjectResponse,
   templateNeedsDatabase,
 } from "../src/index.ts";
 
@@ -37,9 +38,45 @@ describe("ProjectDatabaseResponse", () => {
 });
 
 describe("CreateProjectRequest", () => {
-  test("defaults templateId to vite-react", () => {
+  test("defaults new projects to Next.js and no optional integrations", () => {
     const parsed = CreateProjectRequest.parse({ name: "demo" });
-    expect(parsed.templateId).toBe("vite-react");
+    expect(parsed.templateId).toBe("nextjs-fullstack");
+    expect(parsed.integrations).toEqual([]);
+  });
+
+  test("keeps an unselected starter empty", () => {
+    const parsed = CreateProjectRequest.parse({ name: "demo", starterId: null });
+    expect(parsed.starterId).toBeNull();
+  });
+
+  test("returns the persisted starter selection with the project", () => {
+    const parsed = ProjectResponse.parse({
+      id: "project-1",
+      name: "demo",
+      templateId: "nextjs-fullstack",
+      starterId: "saas",
+      status: "READY",
+      previewUrl: null,
+      hasProductionDeployment: false,
+      createdAt: new Date(0).toISOString(),
+    });
+    expect(parsed.starterId).toBe("saas");
+  });
+
+  test("accepts supported optional integrations", () => {
+    const parsed = CreateProjectRequest.parse({
+      name: "demo",
+      starterId: "ecommerce",
+      integrations: ["mongodb", "email", "razorpay"],
+    });
+    expect(parsed.starterId).toBe("ecommerce");
+    expect(parsed.integrations).toEqual(["mongodb", "email", "razorpay"]);
+  });
+
+  test("rejects unsupported frameworks and providers", () => {
+    expect(() => CreateProjectRequest.parse({ name: "demo", templateId: "vite-react" })).toThrow();
+    expect(() => CreateProjectRequest.parse({ name: "demo", integrations: ["resend"] })).toThrow();
+    expect(() => CreateProjectRequest.parse({ name: "demo", starterId: "unknown" })).toThrow();
   });
 });
 

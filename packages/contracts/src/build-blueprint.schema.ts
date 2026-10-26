@@ -24,7 +24,7 @@ export const BuildBlueprintResponse = z.object({
 
 export const LatestBlueprintRunResponse = z.object({
   blueprintId: z.string(),
-  runId: z.string(),
+  runId: z.string().nullable(),
 });
 
 export type BuildBlueprintRequest = z.infer<typeof BuildBlueprintRequest>;

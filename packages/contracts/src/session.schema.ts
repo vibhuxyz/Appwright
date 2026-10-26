@@ -1,4 +1,5 @@
 import z from "zod";
+import { ImageAttachmentSchema, MAX_ATTACHMENTS_PER_MESSAGE } from "./attachment";
 import { ElementSelectionSchema } from "./element-selection.schema";
 import { ThemeOptionSchema } from "./theme";
 
@@ -104,16 +105,19 @@ export const PromptQuestionSchema = z
 export const SendMessageRequest = z.object({
   sessionId: z.string(),
   prompt: z.string().min(1),
+  attachments: z.array(ImageAttachmentSchema).max(MAX_ATTACHMENTS_PER_MESSAGE).optional(),
   answers: z.record(z.string(), PromptAnswerValue).optional(),
   questions: z.array(PromptQuestionSchema).max(24).optional(),
   selection: ElementSelectionSchema.optional(),
   theme: ThemeOptionSchema.optional(),
   blueprintId: z.string().min(1).max(40).optional(),
+  planFeedback: z.array(z.string().trim().min(1).max(1000)).max(5).optional(),
 });
 
 export const PromptQuestionsRequest = z.object({
   prompt: z.string().trim().min(1),
   sessionId: z.string().min(1).optional(),
+  attachments: z.array(ImageAttachmentSchema).max(MAX_ATTACHMENTS_PER_MESSAGE).optional(),
   answers: z.record(z.string(), PromptAnswerValue).optional(),
 });
 
