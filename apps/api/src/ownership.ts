@@ -89,3 +89,25 @@ export async function ownedProjectAssetId(
   });
   return row?.projectId ?? null;
 }
+
+export async function ownedAgentQuestionSessionId(
+  questionId: string,
+  userId: string,
+): Promise<string | null> {
+  const row = await prisma.agentQuestion.findFirst({
+    where: { id: questionId, session: { project: { userId } } },
+    select: { sessionId: true },
+  });
+  return row?.sessionId ?? null;
+}
+
+export async function ownedIntegrationRequestSessionId(
+  requestId: string,
+  userId: string,
+): Promise<string | null> {
+  const row = await prisma.integrationRequest.findFirst({
+    where: { id: requestId, project: { userId } },
+    select: { sessionId: true },
+  });
+  return row?.sessionId ?? null;
+}

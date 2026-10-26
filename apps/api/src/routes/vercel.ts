@@ -7,6 +7,8 @@ import {
   getProjectRuntimeMongoUri,
   prisma,
   provisionProjectDatabase,
+  resolveProjectRuntimeEnvVars,
+  runDeploymentPreflight,
 } from "@repo/db";
 import { Router } from "express";
 import { PUBLIC_API_URL, WEB_APP_URL, requireEnv } from "../env";
@@ -352,16 +354,33 @@ vercelRouter.post("/project/:id/deploy", async (req, res) => {
   const accessToken = decryptSecret(connection.encryptedToken);
   const teamId = connection.teamId;
 
+  const preflight = await runDeploymentPreflight({
+    projectId: project.id,
+    targetEnvironment: "production",
+  });
+  if (!preflight.ok) {
+    return res.status(422).json({
+      error: `Deployment preflight failed: ${preflight.errors.join("; ")}`,
+      details: preflight.errors,
+      checks: preflight.checks,
+    });
+  }
+
   const files = await collectDeployFiles(workspacePath(project.id));
   const framework =
     project.templateId === "nextjs-fullstack" ? "nextjs" : "vite";
 
-  const deployEnv: Record<string, string> = {};
+  const resolvedEnv = await resolveProjectRuntimeEnvVars({
+    projectId: project.id,
+    environment: "production",
+  });
+  const deployEnv: Record<string, string> = { ...resolvedEnv };
   const existingDatabase = await prisma.projectDatabase.findFirst({
     where: { projectId: project.id, status: { not: "PENDING_DELETE" } },
     select: { id: true },
   });
-  if (templateNeedsDatabase(project.templateId) && existingDatabase) {
+  const usesOwnDatabase = Boolean(resolvedEnv.MONGODB_URI);
+  if (templateNeedsDatabase(project.templateId) && existingDatabase && !usesOwnDatabase) {
     await provisionProjectDatabase({
       projectId: project.id,
       environment: "production",
@@ -459,19 +478,23 @@ vercelRouter.post("/project/:id/deploy", async (req, res) => {
     project.vercelProjectId = deployment.projectId;
   }
 
-  if (project.vercelProjectId && deployEnv.MONGODB_URI) {
-    await upsertVercelEnv({
-      vercelProjectId: project.vercelProjectId,
-      accessToken,
-      teamId,
-      key: "MONGODB_URI",
-      value: deployEnv.MONGODB_URI,
-    }).catch((err) => {
-      log.error("failed to persist production MONGODB_URI on Vercel", {
-        projectId: project.id,
-        err: err instanceof Error ? err.message : String(err),
+  if (project.vercelProjectId) {
+    for (const [envKey, envVal] of Object.entries(deployEnv)) {
+      if (!envVal) continue;
+      await upsertVercelEnv({
+        vercelProjectId: project.vercelProjectId,
+        accessToken,
+        teamId,
+        key: envKey,
+        value: envVal,
+      }).catch((err) => {
+        log.error("failed to persist production env on Vercel", {
+          projectId: project.id,
+          key: envKey,
+          err: err instanceof Error ? err.message : String(err),
+        });
       });
-    });
+    }
   }
 
   const alias = await productionAlias(
@@ -539,11 +562,24 @@ vercelRouter.get("/project/:id/deployment/:deploymentId", async (req, res) => {
     connection.teamId,
   );
 
+  let healthStatus: "ok" | "unhealthy" | "pending" = "pending";
+  if (deployment.readyState === "READY") {
+    try {
+      const healthRes = await fetch(`https://${deployment.url}/api/health`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      healthStatus = healthRes.ok ? "ok" : "unhealthy";
+    } catch {
+      healthStatus = "unhealthy";
+    }
+  }
+
   res.json({
     id: req.params.deploymentId,
     url: `https://${deployment.url}`,
     aliasUrl: alias ? `https://${alias}` : null,
     readyState: deployment.readyState,
     errorMessage: deployment.errorMessage ?? null,
+    healthStatus,
   });
 });

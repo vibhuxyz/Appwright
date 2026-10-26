@@ -5,6 +5,7 @@ import { Router } from "express";
 import { log } from "../log";
 import { ownedSessionProjectId } from "../ownership";
 import { createPlanPreview, planFailure } from "../plan-preview";
+import { publishIntakeProgress } from "../stream/sse";
 import { conversationRateLimitOk } from "../workflow/rate-limit";
 
 export const planPreviewRouter = Router();
@@ -36,7 +37,13 @@ planPreviewRouter.post("/v1/sessions/:sessionId/plan-previews", async (req, res)
 
   try {
     const provider = new OpenAiProvider({ model: plannerModel(user.plan) });
-    res.status(201).json(await createPlanPreview(req.params.sessionId, parsed.data, provider));
+    const sessionId = req.params.sessionId;
+    res.status(201).json(await createPlanPreview({
+      sessionId,
+      request: parsed.data,
+      provider,
+      onProgress: (progress) => publishIntakeProgress(sessionId, progress),
+    }));
   } catch (error) {
     const result = planFailure(error);
     log.error("plan preview failed", {

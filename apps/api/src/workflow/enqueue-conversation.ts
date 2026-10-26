@@ -1,4 +1,4 @@
-import type { ElementSelection, ThemeOption } from "@repo/contracts";
+import type { Attachment, ElementSelection, ThemeOption } from "@repo/contracts";
 import { enqueueJob, prisma, type Job, type Prisma } from "@repo/db";
 import {
   requirementTurns,
@@ -15,11 +15,13 @@ export interface EnqueueConversationOptions {
   worktreeSessionId: string;
   projectId: string;
   prompt: string;
+  attachments?: readonly Attachment[];
   answers?: Readonly<Record<string, PromptAnswer>>;
   questions?: readonly IntakeQuestion[];
   theme?: ThemeOption;
   selection?: ElementSelection;
   blueprintId?: string;
+  planFeedback?: readonly string[];
 }
 
 export async function recordRequirementTurns<T>(
@@ -39,7 +41,7 @@ export async function recordRequirementTurns<T>(
         role: turn.role,
         type: "text",
         content: turn.content,
-        data: { intake: true },
+        data: { intake: true, ...turn.data },
       }),
     );
   }
@@ -57,11 +59,13 @@ export async function enqueueConversation(
     worktreeSessionId,
     projectId,
     prompt,
+    attachments,
     answers,
     questions,
     theme,
     selection,
     blueprintId,
+    planFeedback,
   } = opts;
 
   const lastMessage = await prisma.message.findFirst({
@@ -96,12 +100,23 @@ export async function enqueueConversation(
     role: "user",
     type: "text",
     content: prompt,
-    ...(selection ? { data: { selection } } : {}),
+    data: {
+      ...(selection ? { selection } : {}),
+      ...(attachments && attachments.length > 0 ? { attachments } : {}),
+    },
   });
   await recordRequirementTurns(answers, questions, persistTurn);
   if (theme) {
     const turn = themeTurn(theme);
-    await persistTurn({ type: "text", ...turn, data: { ...turn.data, ...(blueprintId ? { blueprintId } : {}) } });
+    await persistTurn({
+      type: "text",
+      ...turn,
+      data: {
+        ...turn.data,
+        ...(blueprintId ? { blueprintId } : {}),
+        ...(planFeedback && planFeedback.length > 0 ? { planFeedback } : {}),
+      },
+    });
   }
   await createSessionWorktree(projectId, worktreeSessionId);
   return enqueueJob({ sessionId, projectId });

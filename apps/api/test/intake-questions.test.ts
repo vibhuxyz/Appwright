@@ -104,9 +104,7 @@ describe("generateIntakeQuestions", () => {
     const contacts = questions.find((question) => question.need === "business-contacts");
     expect(contacts?.inputType).toBe("contacts");
     expect(contacts?.text.toLowerCase()).not.toContain("paste");
-    expect(contacts?.options).toEqual(
-      expect.arrayContaining(["Instagram", "Phone", "WhatsApp", "Email", "Support"]),
-    );
+    expect(contacts?.options).toEqual(["Phone", "WhatsApp", "Email", "Address"]);
   });
 
   it("returns required business identity fields that the API response schema accepts", async () => {

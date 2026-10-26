@@ -100,11 +100,20 @@ planRouter.get("/v1/sessions/:sessionId/blueprint-run", async (req, res) => {
     orderBy: { createdAt: "desc" },
     select: { id: true, sessionId: true, blueprintVersion: true },
   });
-  if (!run) return res.json(null);
-  const blueprint = await prisma.blueprint.findUnique({
-    where: { sessionId_blueprintVersion: { sessionId: run.sessionId, blueprintVersion: run.blueprintVersion } },
+  const runBlueprint = run
+    ? await prisma.blueprint.findUnique({
+        where: { sessionId_blueprintVersion: { sessionId: run.sessionId, blueprintVersion: run.blueprintVersion } },
+        select: { id: true },
+      })
+    : null;
+  if (run && runBlueprint) {
+    return res.json(LatestBlueprintRunResponse.parse({ blueprintId: runBlueprint.id, runId: run.id }));
+  }
+  const latest = await prisma.blueprint.findFirst({
+    where: { sessionId: req.params.sessionId },
+    orderBy: { blueprintVersion: "desc" },
     select: { id: true },
   });
-  if (!blueprint) return res.json(null);
-  res.json(LatestBlueprintRunResponse.parse({ blueprintId: blueprint.id, runId: run.id }));
+  if (!latest) return res.json(null);
+  res.json(LatestBlueprintRunResponse.parse({ blueprintId: latest.id, runId: null }));
 });

@@ -4,7 +4,7 @@ export { isRepairPrompt };
 
 export type IntakeAction = "plan" | "send";
 
-export function intakeAction(input: { prompt: string; isFollowUp: boolean; planInDetail: boolean }): IntakeAction {
+export function intakeAction(input: { prompt: string; isFollowUp: boolean; isNewApp: boolean }): IntakeAction {
   if (input.isFollowUp || isRepairPrompt(input.prompt)) return "send";
-  return input.planInDetail ? "plan" : "send";
+  return input.isNewApp ? "plan" : "send";
 }

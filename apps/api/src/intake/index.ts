@@ -3,6 +3,8 @@ export {
   IntakeQuestionsError,
   QUESTIONS_TIMEOUT_MS,
 } from "./generate-questions";
-export { shouldPlanInDetail } from "./should-plan-in-detail";
+export { isNewAppRequest } from "./is-new-app-request";
 export { projectHasBuiltApp } from "./has-built-app";
 export { intakeAction, isRepairPrompt, type IntakeAction } from "./repair-prompt";
+export { INTAKE_PROGRESS, type IntakeProgress } from "./progress-steps";
+export { runIntakeRound } from "./run-intake-round";

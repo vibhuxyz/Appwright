@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 import { injectInspector, isHtmlResponse } from "../src/preview";
 
 describe("injectInspector", () => {
@@ -16,5 +16,16 @@ describe("injectInspector", () => {
     expect(isHtmlResponse("text/html; charset=utf-8")).toBe(true);
     expect(isHtmlResponse("application/javascript")).toBe(false);
     expect(isHtmlResponse(undefined)).toBe(false);
+  });
+});
+
+describe("telemetry injection", () => {
+  test("the injected scripts parse as valid JavaScript and hook console and fetch", () => {
+    const html = injectInspector("<html><body></body></html>");
+    const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((match) => match[1] ?? "");
+    expect(scripts).toHaveLength(2);
+    for (const source of scripts) expect(() => new Function(source)).not.toThrow();
+    expect(html).toContain("aw:console");
+    expect(html).toContain("aw:network");
   });
 });

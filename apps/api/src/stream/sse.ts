@@ -3,22 +3,28 @@ import {
   publishChannel,
   sessionChannel,
   subscribeChannel,
+  type SseAgentQuestionFrame,
   type SseApprovalFrame,
   type SseAssetRequestFrame,
   type SseDeltaFrame,
   type SseFrame,
+  type SseIntakeProgressFrame,
+  type SseIntegrationConfigFrame,
   type SseMessageFrame,
   type SseStatusFrame,
   type SseUsageFrame,
   type SseVerificationFrame,
   type Subscription,
 } from "@repo/cache";
+import { log } from "../log";
 
 export type {
+  SseAgentQuestionFrame,
   SseApprovalFrame,
   SseAssetRequestFrame,
   SseDeltaFrame,
   SseFrame,
+  SseIntegrationConfigFrame,
   SseMessageFrame,
   SseStatusFrame,
   SseUsageFrame,
@@ -135,6 +141,32 @@ export function publishAssetRequest(
   publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
 
+export function publishIntegrationConfigRequired(
+  sessionId: string,
+  request: SseIntegrationConfigFrame["request"],
+): void {
+  const frame: SseIntegrationConfigFrame = {
+    kind: "integration_configuration_required",
+    request,
+  };
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch(() => {});
+}
+
+export function publishAgentQuestion(
+  sessionId: string,
+  question: SseAgentQuestionFrame["question"],
+): void {
+  const frame: SseAgentQuestionFrame = { kind: "agent_question", question };
+  broadcastLocal(sessionId, frame);
+  publishChannel(sessionChannel(sessionId), frame).catch((error: unknown) => {
+    log.warn("Agent question frame publish failed", {
+      sessionId,
+      err: error instanceof Error ? error.message : String(error),
+    });
+  });
+}
+
 export function publishVerification(
   sessionId: string,
   results: unknown,
@@ -160,3 +192,14 @@ export function publishMessage(
   publishChannel(sessionChannel(sessionId), frame).catch(() => {});
 }
 
+
+export function publishIntakeProgress(sessionId: string, progress: Omit<SseIntakeProgressFrame, "kind">): void {
+  const frame: SseIntakeProgressFrame = { kind: "intake_progress", ...progress };
+  publishChannel(sessionChannel(sessionId), frame).catch((error: unknown) => {
+    broadcastLocal(sessionId, frame);
+    log.warn("Intake progress frame publish failed", {
+      sessionId,
+      err: error instanceof Error ? error.message : String(error),
+    });
+  });
+}

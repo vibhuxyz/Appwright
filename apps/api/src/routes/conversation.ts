@@ -10,18 +10,10 @@ import { worktreeSessionIdOf } from "@repo/workspace";
 import { Router } from "express";
 import { requireAuthAllowingQueryToken } from "@repo/auth";
 import { setTraceContext } from "@repo/logger";
-import {
-  generateIntakeQuestions,
-  IntakeQuestionsError,
-  QUESTIONS_TIMEOUT_MS,
-  intakeAction,
-  isRepairPrompt,
-  projectHasBuiltApp,
-  shouldPlanInDetail,
-} from "../intake";
+import { IntakeQuestionsError, runIntakeRound } from "../intake";
 import { log } from "../log";
 import { ownedBlueprintSessionId, ownedSessionProjectId } from "../ownership";
-import { attachSseClient, publishStatus } from "../stream/sse";
+import { attachSseClient, publishIntakeProgress, publishStatus } from "../stream/sse";
 import {
   hasRunCapacity,
   isWorktreeBusy,
@@ -121,23 +113,14 @@ conversationRouter.post("/conversation/questions", async (req, res) => {
     log.info("intake questions model", { userId: req.userId, model: provider.model, provider: providerFor(provider.model) });
     const sessionId = parsed.data.sessionId;
     const projectId = sessionId ? await ownedSessionProjectId(sessionId, req.userId!) : null;
-    const isFollowUp = projectId !== null && (await projectHasBuiltApp(projectId));
-    const skipPlan = isFollowUp || isRepairPrompt(parsed.data.prompt);
-    const action = intakeAction({
-      prompt: parsed.data.prompt,
-      isFollowUp,
-      planInDetail: skipPlan ? false : await shouldPlanInDetail(parsed.data.prompt, provider),
+    const { questions, action } = await runIntakeRound({
+      request: parsed.data,
+      projectId,
+      provider,
+      onProgress: (progress) => {
+        if (sessionId && projectId) publishIntakeProgress(sessionId, progress);
+      },
     });
-    const answers = parsed.data.answers ?? {};
-    const questions =
-      action === "plan"
-        ? await generateIntakeQuestions(
-            parsed.data.prompt,
-            provider,
-            AbortSignal.timeout(QUESTIONS_TIMEOUT_MS),
-            answers,
-          )
-        : [];
     const body = PromptQuestionsResponse.safeParse({ questions, action });
     if (!body.success) {
       throw new IntakeQuestionsError(
@@ -226,11 +209,13 @@ conversationRouter.post("/conversation", async (req, res) => {
     worktreeSessionId,
     projectId: session.projectId,
     prompt,
+    attachments: body.attachments,
     answers,
     questions: body.questions,
     theme: body.theme,
     selection: body.selection,
     blueprintId: body.blueprintId,
+    planFeedback: body.planFeedback,
   });
   res.status(202).json({ jobId: job.id, sessionId: session.id });
 });

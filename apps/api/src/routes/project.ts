@@ -17,7 +17,9 @@ function serializeProject(p: {
   id: string;
   name: string;
   templateId: string;
+  starterId: string | null;
   status: string;
+  vercelProjectId: string | null;
   createdAt: Date;
 }): ProjectResponse {
   const port = getDevServerPort(p.id);
@@ -25,8 +27,10 @@ function serializeProject(p: {
     id: p.id,
     name: p.name,
     templateId: p.templateId,
+    starterId: p.starterId,
     status: p.status as ProjectResponse["status"],
     previewUrl: port ? `http://localhost:${port}` : null,
+    hasProductionDeployment: p.vercelProjectId !== null,
     createdAt: p.createdAt.toISOString(),
   };
 }
@@ -43,12 +47,13 @@ projectRouter.post("/project", async (req, res) => {
       },
     });
   }
-  const { name, templateId } = parsed.data;
+  const { name, templateId, starterId, integrations } = parsed.data;
 
   const project = await prisma.project.create({
     data: {
       name,
       templateId,
+      starterId,
       workspacePath: "",
       status: "PROVISIONING",
       userId: req.userId!,
@@ -56,6 +61,15 @@ projectRouter.post("/project", async (req, res) => {
   });
 
   try {
+    await prisma.$transaction(
+      integrations.map((provider) =>
+        prisma.projectIntegration.upsert({
+          where: { projectId_provider: { projectId: project.id, provider } },
+          create: { projectId: project.id, provider, required: true, status: "missing" },
+          update: { required: true },
+        }),
+      ),
+    );
     const workspacePath = await createWorkspace(project.id, templateId);
 
     const updated = await prisma.project.update({
@@ -138,15 +152,31 @@ projectRouter.get("/v1/projects/:id/overview", async (req, res) => {
 
 
 projectRouter.delete("/project/:id", async (req, res) => {
-  const owned = await prisma.project.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
-    select: { id: true },
-  });
-  if (!owned) return res.status(404).json({ error: "not found" });
+  const projectId = req.params.id;
+  if (!projectId) {
+    return res.status(400).json({ error: "id is required" });
+  }
 
-  stopDevServer(req.params.id);
-  await scheduleProjectDatabaseDeletions(req.params.id);
-  await deleteWorkspace(req.params.id);
-  await prisma.project.delete({ where: { id: req.params.id } });
+  if (projectId.endsWith("-sample") || projectId.includes("sample")) {
+    return res.status(204).end();
+  }
+
+  const existing = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { id: true, userId: true },
+  });
+
+  if (!existing) {
+    return res.status(204).end();
+  }
+
+  if (existing.userId !== req.userId) {
+    return res.status(404).json({ error: "not found" });
+  }
+
+  stopDevServer(projectId);
+  await scheduleProjectDatabaseDeletions(projectId);
+  await deleteWorkspace(projectId);
+  await prisma.project.delete({ where: { id: projectId } });
   res.status(204).end();
 });

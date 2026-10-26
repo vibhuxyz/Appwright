@@ -7,7 +7,9 @@
     "start": "bun run src/index.ts",
     "dev": "bun run --watch src/index.ts",
     "build": "tsc --noEmit",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "eval:intake:offline": "bun --env-file=../../.env evals/intake/offline.ts",
+    "eval:intake": "bun --env-file=../../.env evals/intake/run.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

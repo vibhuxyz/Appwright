@@ -17,6 +17,7 @@ import { log } from "../log";
 import { ownedSessionWorktree } from "../ownership";
 import { planFailure } from "../plan-preview";
 import { publishAssetRequest } from "../stream/sse";
+import { awaitRequiredIntegrations } from "./integrations";
 import { conversationRateLimitOk } from "../workflow/rate-limit";
 import { isWorktreeBusy, WORKTREE_BUSY_MESSAGE } from "../workflow/run-limit";
 import { applyComposition, planComposition } from "@repo/workspace";
@@ -176,6 +177,8 @@ blueprintRouter.post("/sessions/:sessionId/blueprint", async (req, res) => {
       if (assetRequest && assetRequest.status !== "RESOLVED") {
         await waitUntilAssetRequestResolved(assetRequest.id, controller.signal);
       }
+      const preparation = await awaitRequiredIntegrations({ projectId, sessionId, signal: controller.signal });
+      if (preparation === "cancelled") return;
       await executeBlueprintRun(
         {
           runId,

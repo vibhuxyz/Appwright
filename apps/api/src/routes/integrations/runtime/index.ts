@@ -1,0 +1,21 @@
+import { Router } from "express";
+import { requireIntegrationToken } from "./context";
+import { integrationEmailRouter } from "./email";
+import { integrationPaymentOrderRouter, integrationPaymentVerifyRouter } from "./razorpay";
+import { razorpayWebhookRouter } from "./razorpay-webhook";
+import { cloudinaryUploadRouter } from "./cloudinary-upload";
+export { saveIntegrationRawBody } from "./raw-body";
+export { verifyHmacSignature } from "./verify-hmac";
+export { razorpayWebhookRouter } from "./razorpay-webhook";
+export { matchesImageType, uploadFolder } from "./cloudinary-upload";
+
+export const integrationRuntimeRouter = Router();
+integrationRuntimeRouter.use(razorpayWebhookRouter);
+integrationRuntimeRouter.use("/v1/integrations/email/send", requireIntegrationToken);
+integrationRuntimeRouter.use("/v1/integrations/razorpay/orders", requireIntegrationToken);
+integrationRuntimeRouter.use("/v1/integrations/razorpay/verify", requireIntegrationToken);
+integrationRuntimeRouter.use("/v1/integrations/cloudinary/upload", requireIntegrationToken);
+integrationRuntimeRouter.use(integrationEmailRouter);
+integrationRuntimeRouter.use(integrationPaymentOrderRouter);
+integrationRuntimeRouter.use(integrationPaymentVerifyRouter);
+integrationRuntimeRouter.use(cloudinaryUploadRouter);

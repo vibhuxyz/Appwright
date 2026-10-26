@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { lstat, mkdir, rm, unlink } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
-import { tryGetProjectRuntimeEnv } from "@repo/db";
+import { resolveSandboxRuntimeEnv } from "@repo/db";
 import {
   projectRepoPath,
   sessionBranchName,
@@ -10,7 +10,10 @@ import {
   workspacePath,
   WORKSPACES_DIR,
 } from "@repo/workspace";
+import { PUBLIC_API_URL } from "../env";
 import { writeProjectRuntimeEnvFile } from "../project-database/write-runtime-env";
+import { captureInstallLogs, captureServerLogs, logSystem } from "../dev-logs";
+import { devServerEnv } from "./dev-server-env";
 
 export { projectRepoPath, sessionWorktreePath, workspacePath, WORKSPACES_DIR };
 
@@ -246,11 +249,13 @@ async function startServerAt(
     promise = (async () => {
       try {
         await unlinkNodeModulesSymlink(cwd);
+        logSystem(serverKey, "Installing dependencies");
         const install = Bun.spawn(["bun", "install"], {
           cwd,
-          stdout: "inherit",
-          stderr: "inherit",
+          stdout: "pipe",
+          stderr: "pipe",
         });
+        captureInstallLogs(serverKey, install);
         const installExit = await install.exited;
         if (installExit !== 0) {
           throw new Error(
@@ -259,19 +264,22 @@ async function startServerAt(
         }
 
         const port = await allocatePort();
-        const runtimeEnv = await tryGetProjectRuntimeEnv({
+        const runtimeEnv = await resolveSandboxRuntimeEnv({
           projectId: envProjectId,
           environment: "development",
+          gatewayApiUrl: PUBLIC_API_URL,
         });
         const proc = Bun.spawn(
           await devServerArgs(cwd, port),
           {
             cwd,
-            stdout: "inherit",
-            stderr: "inherit",
-            env: { ...process.env, ...runtimeEnv },
+            stdout: "pipe",
+            stderr: "pipe",
+            env: devServerEnv(process.env, runtimeEnv),
           },
         );
+        logSystem(serverKey, `Starting dev server on port ${port}`);
+        captureServerLogs(serverKey, proc);
         servers.set(serverKey, { port, proc });
 
         const healthy = await waitForServer(port);

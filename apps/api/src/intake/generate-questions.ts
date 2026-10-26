@@ -10,14 +10,16 @@ import {
 } from "@repo/agent-core";
 import {
   buildQuestionsPrompt,
+  groundedKnownNeeds,
   mergeQuestionPhrasing,
   parseGeneratedQuestions,
   selectDiscoveryQuestions,
+  withoutKnownFacts,
   type IntakeQuestion,
 } from "@repo/planner";
 import { log } from "../log";
 
-export const QUESTIONS_TIMEOUT_MS = 15_000;
+export const QUESTIONS_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 8_000;
 
 export class IntakeQuestionsError extends Error {
@@ -77,7 +79,9 @@ async function phraseQuestions(
     );
     const parsed = parseGeneratedQuestions(raw);
     if (!parsed.ok) return catalog;
-    return mergeQuestionPhrasing(catalog, parsed.questions, new Set(Object.keys(answers)));
+    const knownNeeds = groundedKnownNeeds(parsed.known, prompt);
+    const answeredNeeds = new Set([...Object.keys(answers), ...knownNeeds]);
+    return mergeQuestionPhrasing(withoutKnownFacts(catalog, knownNeeds), parsed.questions, answeredNeeds);
   } catch (error) {
     if (error instanceof ProviderOutputTooLargeError) return catalog;
     const timedOut = isAbortError(error) || signal.aborted;

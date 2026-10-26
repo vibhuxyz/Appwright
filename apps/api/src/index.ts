@@ -8,6 +8,7 @@ import { runWithTrace, setTraceContext } from "@repo/logger";
 import { log } from "./log";
 import { authRouter } from "./routes/auth";
 import { blueprintRouter } from "./routes/blueprint";
+import { devLogsRouter } from "./routes/dev-logs";
 import { planRouter } from "./routes/plan";
 import { planPreviewRouter } from "./routes/plan-preview";
 import { themeRouter } from "./routes/theme";
@@ -15,6 +16,14 @@ import { conversationRouter, streamRouter } from "./routes/conversation";
 import { filesRouter } from "./routes/files";
 import { projectRouter } from "./routes/project";
 import { projectDatabaseRouter } from "./routes/project-database";
+import { environmentRouter } from "./routes/environment";
+import { environmentTestRouter } from "./routes/environment-tests";
+import { emailRouter } from "./routes/email-routes";
+import { integrationCardRouter } from "./routes/integration-card-routes";
+import { integrationManagementRouter } from "./routes/integrations";
+import { interactionsRouter } from "./routes/interactions";
+import { integrationRuntimeRouter, saveIntegrationRawBody } from "./routes/integrations/runtime";
+import { attachmentRouter } from "./routes/attachment-routes";
 import { promptRouter } from "./routes/prompt";
 import { sessionRouter } from "./routes/session";
 import { vercelCallbackRouter, vercelRouter } from "./routes/vercel";
@@ -29,9 +38,17 @@ import { pruneAllWorktrees } from "./workspace/prune";
 
 const PORT = Number(process.env.PORT ?? 3001);
 
+const UNLIMITED_BODY_BYTES = Number.POSITIVE_INFINITY;
+
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(["/conversation", "/conversation/questions"], express.json({ limit: UNLIMITED_BODY_BYTES }));
+app.use("/v1/integrations/cloudinary/upload", express.json({ limit: "14mb" }));
+app.use(express.json({
+  verify: (req, _res, buffer) => {
+    saveIntegrationRawBody(req, buffer);
+  },
+}));
 app.disable("x-powered-by");
 
 // ── Trace Context & Request Logging ──────────────────────────────────────────
@@ -79,6 +96,7 @@ app.get("/health", (_req, res) => {
 // ours (it is trusted via its signed `state`, not a token).
 app.use(authRouter);
 app.use(vercelCallbackRouter);
+app.use(integrationRuntimeRouter);
 
 // Also public: a plain <iframe src> can't attach an Authorization header
 // either. The random previewToken (not a JWT) is what gates this one.
@@ -108,11 +126,18 @@ app.use((req, _res, next) => {
 
 // ── Authenticated ────────────────────────────────────────────────────────────
 app.use(projectRouter);
+app.use(environmentRouter);
+app.use(environmentTestRouter);
+app.use(emailRouter);
+app.use(integrationCardRouter);
+app.use(integrationManagementRouter);
+app.use(interactionsRouter);
 app.use(projectDatabaseRouter);
 app.use(sessionRouter);
 app.use(conversationRouter);
 app.use(blueprintRouter);
 app.use(planRouter);
+app.use(devLogsRouter);
 app.use(planPreviewRouter);
 app.use(themeRouter);
 app.use(filesRouter);
@@ -121,6 +146,7 @@ app.use(promptRouter);
 app.use(gitRouter);
 app.use(approvalRouter);
 app.use(assetsRouter);
+app.use(attachmentRouter);
 app.use(browserScreenshotsRouter);
 app.use(unsplashRouter);
 

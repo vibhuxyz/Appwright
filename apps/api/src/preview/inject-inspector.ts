@@ -1,7 +1,8 @@
 import { INSPECTOR_SCRIPT } from "./inspector-script";
+import { TELEMETRY_SCRIPT } from "./telemetry-script";
 
 const BODY_CLOSE = /<\/body\s*>/gi;
-const SCRIPT_TAG = `<script data-aw-inspector>${INSPECTOR_SCRIPT}</script>`;
+const SCRIPT_TAG = `<script data-aw-telemetry>${TELEMETRY_SCRIPT}</script><script data-aw-inspector>${INSPECTOR_SCRIPT}</script>`;
 
 export function injectInspector(html: string): string {
   const matches = [...html.matchAll(BODY_CLOSE)];
