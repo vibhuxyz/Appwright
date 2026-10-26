@@ -133,3 +133,4 @@ export {
 export * from "./attachment";
 export * from "./specification";
 export * from "./type";
+export type { ProjectMemoryRows } from "./project-memory";

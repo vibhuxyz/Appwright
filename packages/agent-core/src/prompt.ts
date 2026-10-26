@@ -28,7 +28,10 @@ function treeForPrompt(entries: string[]): string[] {
   return tree;
 }
 
-export async function buildSystemPrompt(runtime: Runtime): Promise<string> {
+export async function buildSystemPrompt(
+  runtime: Runtime,
+  options: { memorySection?: string } = {},
+): Promise<string> {
   const template = await Bun.file(systemPromptPath).text();
 
   let fileTree: string[] = [];
@@ -48,5 +51,6 @@ export async function buildSystemPrompt(runtime: Runtime): Promise<string> {
     await loadStackStandards(),
     uiSystemPromptSection(),
     `Project file tree (top ${TREE_LIMIT}):\n${treeForPrompt(fileTree).join("\n")}`,
+    ...(options.memorySection ? [options.memorySection] : []),
   ].join("\n\n");
 }

@@ -35,6 +35,14 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("src/components/ui/");
   });
 
+  test("appends the project memory only when there is one", async () => {
+    const memorySection = "<project-memory>\n- src/App.tsx (1)\n</project-memory>";
+    const withMemory = await buildSystemPrompt(runtimeWith(["src/App.tsx"]), { memorySection });
+    const without = await buildSystemPrompt(runtimeWith(["src/App.tsx"]), { memorySection: "" });
+    expect(withMemory.endsWith(memorySection)).toBe(true);
+    expect(without).not.toContain("<project-memory>");
+  });
+
   test("says nothing about primitives when a project has none", async () => {
     const prompt = await buildSystemPrompt(runtimeWith(["src/App.tsx"]));
     expect(prompt).not.toContain("UI primitives under");

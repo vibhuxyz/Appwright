@@ -95,6 +95,7 @@ export {
   settleIntegrationRequests,
 } from "./integration-request";
 export type { IntegrationRequestOutcome, OpenedIntegrationRequest } from "./integration-request";
+export { loadProjectMemoryRows } from "./project-memory";
 export { pollUntil } from "./waiting";
 export type { PollOutcome } from "./waiting";
 export type { UsageReservation } from "./integrations";

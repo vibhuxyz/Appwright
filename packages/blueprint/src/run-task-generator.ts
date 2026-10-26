@@ -7,7 +7,8 @@ import {
   type Runtime,
 } from "@repo/agent-core";
 import { AGENT_LOOP_LIMITS, type PlanId, type TaskType } from "@repo/contracts";
-import { ALL_TOOLS } from "@repo/tools";
+import { createLogger } from "@repo/logger";
+import { ALL_TOOLS, guardTools } from "@repo/tools";
 import type { FencedAttemptInput, GeneratedAttempt, TaskGenerator } from "orchestrator";
 import { buildTaskPrompt } from "./build-task-prompt";
 import { generateAdminCrudAttempt } from "./generate-admin-crud-attempt";
@@ -34,6 +35,7 @@ const DETERMINISTIC_GENERATORS: Partial<
   payment: generatePaymentAttempt,
 };
 
+const log = createLogger("blueprint");
 const CENTS_PER_USD = 100;
 const WRITE_TOOL_NAMES = new Set(["write_file", "edit_file"]);
 
@@ -76,11 +78,12 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
       let lastError = "";
       const models = [model, ...bestModelsForPlan(plan).filter((id) => id !== model)];
       const [primary, ...fallback] = models.map((id) => new OpenAiProvider({ model: id }));
+      const guard = guardTools(ALL_TOOLS);
       const stopReason = await runAgentLoop({
         messages: [
           { role: "user", type: "text", content: buildTaskPrompt(task, input.previousError, { standards, projectTree }) },
         ],
-        tools: ALL_TOOLS,
+        tools: guard.tools,
         provider: primary ?? new OpenAiProvider({ model }),
         fallbackProviders: fallback,
         runtime,
@@ -97,6 +100,7 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
         signal: input.signal,
         sessionId,
       });
+      log.info("run guard stats", { sessionId, taskId: input.task.id, ...guard.stats() });
 
       const costCents = Math.round(costUsd * CENTS_PER_USD);
       if (stopReason === "completed") {

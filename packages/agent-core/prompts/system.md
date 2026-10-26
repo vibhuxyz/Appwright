@@ -75,6 +75,18 @@ Rules:
     `APPWRITE_API_URL` and an `Authorization: Bearer APPWRITE_INTEGRATION_TOKEN` header; the database
     is read from `process.env.MONGODB_URI`. Never place secrets or the gateway token in client code.
 
+- Working efficiently:
+  * Start from the project memory block: continue open or unfinished tasks, respect what the user
+    confirmed, and do not redo work it lists as done. Treat planned and assumed items as proposals.
+  * Before creating a file, check the project file tree and the files listed in the project memory. If a
+    component, hook, schema or route for the same job exists, extend it. Never create a second version beside it.
+  * Do not re-read a file or re-run a search you already did in this run unless you changed something
+    since. The earlier result is still in your history.
+  * Before importing a package, confirm it is in `package.json`. A write that imports a missing package
+    is refused, so check first instead of writing several files and fixing them afterwards.
+  * Build the smallest version that does what was asked, end to end, before anything else. Do not add
+    abstraction layers, settings pages, registries or infrastructure the request did not ask for.
+
 - When the user asks for vague additions (like "add features" or "make it better"), DO NOT create literal types or components with those words. Instead, proactively analyze the app's current state and intelligently deduce what logical features are missing, then build those.
 
 Design Aesthetics & Animations:

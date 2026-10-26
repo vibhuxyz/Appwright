@@ -18,6 +18,11 @@
 | Tool results are untrusted data, wrapped, never instructions | D23 | `wrapUntrusted` | ❓ |
 | Dependencies outside the allowlist are refused | D24 | `deps.allow.json` guard | ❓ |
 | No secret ever appears in an LLM prompt | D15 | env-injection at provision time | ⬜ needs a test that greps assembled prompts |
+| No code file is written that imports a package absent from `package.json` | D79 | `guardTools` (`tools/src/run-guard`) | ✅ `run-guard.test.ts` |
+| An existing file is never overwritten by `write_file` unless it was read in the same run | D79 | `guardTools` | ✅ `run-guard.test.ts` |
+| Project memory never exceeds `MAX_PROJECT_MEMORY_BYTES` and cannot close its own tag | D80, D33 | `formatProjectMemory` | ✅ `agent-core/test/project-memory.test.ts` |
+| Project memory never contains another project's data | D80 | `loadProjectMemoryRows` scoped by `projectId` | ✅ `apps/agent/test/project-memory.test.ts` |
+| Planned or assumed items are never labelled as confirmed by the user | D80 | label derived from the source table, not a model | ✅ `agent-core/test/project-memory.test.ts` |
 
 ## State & events (V1)
 

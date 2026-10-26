@@ -2404,6 +2404,91 @@ read. `site-language` and `work-showcase` are no longer asked by default, so a H
 portfolio-led site needs the user to say so in the prompt.
 
 **Revisit when:** a case is flaky at three trials, or users keep correcting an assumed default.
+
+---
+
+## Decision 79: A per-run tool guard and a session work ledger cut repeated agent work ✅ ACTIVE _(2026-10-27, target: agent loop, blueprint tasks)_
+
+**Decision:** every `runAgentLoop` call in the worker and in Blueprint tasks gets its tools through
+`guardTools()` (`packages/tools/src/run-guard/`). The guard is created fresh for each loop call,
+because a retry attempt starts from a fresh copy of the messages and can't see the last attempt's
+results. Its state matches what the model can see. It does three things:
+
+1. **Repeat reads.** A repeat `read_file`/`list_files`/`grep` with the same arguments, and no
+   `write_file`/`edit_file`/`bash` since, returns a short "unchanged, reuse that result" note
+   instead of the content again.
+2. **Overwrites.** `write_file` over an existing file not read in this run is refused.
+3. **Missing packages.** A `write_file`/`edit_file` whose code imports a package missing from
+   `package.json` is refused before anything is written. The refusal says whether the package is
+   on the allowlist (add it) or not (write the code yourself).
+
+The list of files already changed or read was first built per session. On the same day it was
+folded into the project memory ([D80](#decision-80-project-memory-is-assembled-from-postgres-across-every-chat-never-a-file-in-the-app--active-2026-10-27-target-agent-loop)),
+so there is one memory, not two. Each run logs `run guard stats` (cache hits, overwrites refused,
+import refusals, checks skipped), so the effect is measured, not assumed.
+
+**Why:** an audit of a long build found the agent re-reading the same files, rebuilding existing
+files, and writing code against packages that weren't installed and then fixing it. Each of these
+happens before verification ever runs, so only the tool layer can stop it. The audit's other two
+patterns are not code problems. Over-engineering is handled by a prompt rule. Blocked integration
+work is already handled by `request_integration` (D75/D77).
+
+**What we gave up:**
+- An agent that wants to replace an unread file pays one extra `read_file`.
+- The import scan is one regex, not a parser, and checks only the root `package.json`. It misses
+  unusual syntax, and it would wrongly refuse an import in a nested package with its own
+  `package.json`. Neither template has one; a scan of all 56 template code files found no false
+  refusals.
+- If `package.json` is missing or unreadable, the check is skipped and counted, not enforced.
+
+**Revisit when:** `run guard stats` shows import refusals that were wrong, or a template gains a
+nested `package.json`. Then resolve the nearest `package.json` per file.
+
+---
+
+## Decision 80: Project memory is assembled from Postgres across every chat, never a file in the app ✅ ACTIVE _(2026-10-27, target: agent loop)_
+
+**Decision:** at the start of every agent run, the worker loads one project's memory from rows
+Appwright already stores, across **all chats** of that project (`loadProjectMemoryRows` in
+`packages/db/src/project-memory/`). Pure code renders it (`formatProjectMemory` in
+`packages/agent-core/src/project-memory/`), and it goes into the system prompt as a
+`<project-memory>` block. The sections, in drop order (highest priority first):
+
+| Label | Section | Source |
+|---|---|---|
+| confirmed | Confirmed by the user | the user's own messages |
+| — | Open questions | pending agent questions, pending integration requests |
+| assumed | Assumed defaults | dismissed or expired questions, with the default used |
+| planned | Goal and approval | latest Blueprint intent; approved means a message carries its `blueprintId` |
+| planned | Tasks with status | Blueprint tasks |
+| — | Last verification | newest assistant row with `verification` |
+| — | Files already changed / read | tool-call rows |
+| planned | Acceptance criteria | Blueprint requirements |
+| planned | Pages, features | Blueprint |
+
+The cap is 12 KB. Lower-priority lines are dropped first, and the block says how many were cut.
+The system's own "Verification failed, retrying" row is now marked `verificationRetry`, so it is
+never shown as something the user said.
+
+**Why:** a user asked for an Emergent-style `/app/memory/PRD.md` plus a `TASKS.md` handoff. Checked
+first: **no such file or mechanism exists in Appwright.** Every agent input (history, blueprint)
+was scoped to one session, so a new chat (D73) knew only the file tree. The PRD content (goal,
+requirements, acceptance criteria, task status, verification) already lives in Postgres.
+Rendering it is D33 applied. A file in the generated app would be a second source of truth, it
+would ship to the user, and an agent-written PRD would be the model summary D33 refused. It
+would also let a model blur "suggested" into "approved". Here each label comes from where the
+data is stored, so it can't be blurred.
+
+**What we gave up:**
+- There is no file the user or agent can open or edit. The memory can only be read through the
+  prompt.
+- Requirements the user states in chat appear verbatim, newest first, not as a merged list.
+- Five extra indexed queries per run (they run in parallel with selection loading).
+- Only the latest Blueprint counts. An older plan in another chat is not shown.
+
+**Revisit when:** users need to see or correct the memory. Then render the same
+`formatProjectMemory` output in the UI, read-only, before considering an editable file.
+
 ---
 
 ## Open — not yet decided

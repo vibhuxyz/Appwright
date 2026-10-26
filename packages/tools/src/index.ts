@@ -27,6 +27,7 @@ export {
   withRepoLock,
 } from "./conflict";
 export type { ConflictFile, ConflictReport, ResolveResult } from "./conflict";
+export { guardTools, type RunGuardStats } from "./run-guard";
 
 export const TOOLS_VERSION = "0.0.0";
 

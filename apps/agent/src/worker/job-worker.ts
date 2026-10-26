@@ -1,5 +1,6 @@
 import {
   buildSystemPrompt,
+  formatProjectMemory,
   isProviderCreditsDepleted,
   OpenAiProvider,
   plannerModel,
@@ -21,11 +22,11 @@ import {
 import { loadMissingAssetsNotice } from "@repo/assets";
 import { applyTheme, chosenThemeFromRows } from "@repo/blueprint";
 import { AGENT_LOOP_LIMITS, loopSpendLimits, type Attachment } from "@repo/contracts";
-import { prisma, type Job } from "@repo/db";
+import { loadProjectMemoryRows, prisma, type Job } from "@repo/db";
 import { classify, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
 import { SandboxRuntime, type SandboxProvider } from "@repo/sandbox";
-import { ALL_TOOLS } from "@repo/tools";
+import { ALL_TOOLS, guardTools } from "@repo/tools";
 import { sessionWorktreePath, worktreeSessionIdOf } from "@repo/workspace";
 import { restoreWorkspace } from "../recovery";
 import { withSelectionApplied } from "./apply-selection";
@@ -155,8 +156,13 @@ export async function executeAgentJob(
       const themed = await applyTheme(runtime, chosenTheme);
       log.info("applied chosen theme", { sessionId: session.id, theme: chosenTheme.id, written: themed });
     }
-    const effectiveRows = await withSelectionApplied(priorRows, worktreeDir);
-    const systemPrompt = await buildSystemPrompt(runtime);
+    const [effectiveRows, memoryRows] = await Promise.all([
+      withSelectionApplied(priorRows, worktreeDir),
+      loadProjectMemoryRows(job.projectId),
+    ]);
+    const memorySection = formatProjectMemory(memoryRows);
+    log.info("project memory assembled", { sessionId: session.id, memoryBytes: Buffer.byteLength(memorySection, "utf8") });
+    const systemPrompt = await buildSystemPrompt(runtime, { memorySection });
     const systemMessage: CoreMessage = { role: "user", type: "text", content: systemPrompt };
     const messages: CoreMessage[] = [systemMessage, ...effectiveRows.filter((row) => !isTranscriptOnlyRow(row)).map(toCoreMessage)];
 
@@ -239,9 +245,10 @@ export async function executeAgentJob(
           deadlineAt,
           persist,
         });
+        const guard = guardTools([...ALL_TOOLS, ...interactiveTools]);
         stopReason = await runAgentLoop({
           messages,
-          tools: [...ALL_TOOLS, ...interactiveTools],
+          tools: guard.tools,
           provider: provider ?? new OpenAiProvider({ model: sessionModel }),
           runtime,
           emit,
@@ -253,6 +260,7 @@ export async function executeAgentJob(
           signal: controller.signal,
           sessionId: session.id,
         });
+        log.info("run guard stats", { sessionId: session.id, attempt, ...guard.stats() });
 
         if (stopReason !== "completed") break;
 
@@ -288,7 +296,12 @@ export async function executeAgentJob(
           type: "text",
           content: `Running verification checks on your changes found real errors — fix them, then\nstop. Do not describe the fix, make it with edit_file/write_file.\n\n${verify.outputText}`,
         });
-        await persist({ role: "user", type: "text", content: `Verification failed, retrying:\n${verify.outputText}` });
+        await persist({
+          role: "user",
+          type: "text",
+          content: `Verification failed, retrying:\n${verify.outputText}`,
+          data: { verificationRetry: true },
+        });
       }
     }
 

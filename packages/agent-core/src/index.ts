@@ -45,6 +45,7 @@ export {
   ProviderOutputTooLargeError,
 } from "./providers/read-provider-text";
 export { buildSystemPrompt } from "./prompt";
+export { formatProjectMemory } from "./project-memory";
 export { loadStackStandards } from "./standards";
 export { planTasks, formatPlanForAgent } from "./planner";
 export { verifyTypeScript, type VerifyResult } from "./verify";
