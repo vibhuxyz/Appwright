@@ -70,6 +70,37 @@ export interface SseAssetRequestFrame {
   };
 }
 
+export interface SseIntegrationConfigFrame {
+  kind: "integration_configuration_required";
+  request: {
+    id: string;
+    sessionId: string;
+    projectId: string;
+    provider: string;
+    required: boolean;
+    reason: string;
+    environment: string;
+    createdAt: string;
+  };
+}
+
+export interface SseAgentQuestionFrame {
+  kind: "agent_question";
+  question: {
+    id: string;
+    sessionId: string;
+    status: string;
+    createdAt: string;
+  };
+}
+
+export interface SseIntakeProgressFrame {
+  kind: "intake_progress";
+  tool: "request" | "questions" | "planner";
+  detail: string;
+  items?: string[];
+}
+
 export type SseFrame =
   | SseMessageFrame
   | SseDeltaFrame
@@ -77,4 +108,7 @@ export type SseFrame =
   | SseStatusFrame
   | SseApprovalFrame
   | SseVerificationFrame
-  | SseAssetRequestFrame;
+  | SseAssetRequestFrame
+  | SseIntegrationConfigFrame
+  | SseAgentQuestionFrame
+  | SseIntakeProgressFrame;

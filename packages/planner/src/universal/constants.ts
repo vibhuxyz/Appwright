@@ -23,7 +23,7 @@ export const PROJECT_TYPE_KEYWORDS: readonly (readonly [ProjectType, RegExp])[] 
   ["portfolio", /\b(portfolio|resume|cv|freelancer|photographer|personal-?(site|website))\b/i],
   [
     "business-site",
-    /\b(bakery|restaurant|cafe|shop|store|salon|clinic|business|landing-?page|brand|catalog)\b/i,
+    /\b(bakery|restaurant|cafe|shop|store|salon|clinic|business|landing[- ]?pages?|brand|catalog)\b/i,
   ],
 ];
 

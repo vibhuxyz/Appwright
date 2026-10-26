@@ -1,8 +1,6 @@
+import type { Attachment } from "@repo/contracts";
 import type { Message as CoreMessage } from "../types";
 
-// The durable shape a Message row takes once read back from Postgres —
-// deliberately not @repo/db's generated type, so this file stays usable from
-// any process that has the row, not just one with a Prisma client attached.
 export interface MessageRow {
   id: string;
   sessionId: string;
@@ -26,13 +24,21 @@ export function serializeRow(row: MessageRow) {
   };
 }
 
+export function isTranscriptOnlyRow(row: Pick<MessageRow, "data">): boolean {
+  return Boolean(row.data && typeof row.data === "object" && (row.data as { transcriptOnly?: unknown }).transcriptOnly === true);
+}
+
 export function toCoreMessage(row: MessageRow): CoreMessage {
   if (row.type === "text") {
-    const data = row.data as { providerMeta?: unknown } | null | undefined;
+    const data = row.data as
+      | { providerMeta?: unknown; attachments?: Attachment[] }
+      | null
+      | undefined;
     return {
       role: row.role as "user" | "assistant",
       type: "text",
       content: row.content,
+      attachments: data?.attachments,
       providerMeta: data?.providerMeta ?? undefined,
     };
   }

@@ -1,4 +1,5 @@
 import type { Message } from "../types";
+import { parseToolArgs } from "./parse-tool-args";
 import { INTERRUPTED_TOOL_RESULT, repairToolPairing } from "./tool-pairing";
 import type { Provider, ProviderChunk, ToolSpec } from "./types";
 
@@ -26,7 +27,13 @@ const GEMINI_CHAT_URL =
 
 interface OpenAiChatMessage {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content:
+    | string
+    | null
+    | Array<
+        | { type: "text"; text: string }
+        | { type: "image_url"; image_url: { url: string; detail?: string } }
+      >;
   reasoning_content?: string;
   tool_calls?: {
     id: string;
@@ -77,6 +84,35 @@ export function toOpenAiMessages(messages: Message[]): OpenAiChatMessage[] {
     if (m.type === "text") {
       const { reasoningContent } =
         m.role === "assistant" ? splitProviderMeta(m.providerMeta) : {};
+
+      if (m.role === "user" && m.attachments && m.attachments.length > 0) {
+        const parts: Array<
+          | { type: "text"; text: string }
+          | { type: "image_url"; image_url: { url: string; detail?: string } }
+        > = [{ type: "text", text: m.content }];
+
+        for (const att of m.attachments) {
+          if (att.type === "image" && (att.dataUrl || att.url)) {
+            parts.push({
+              type: "image_url",
+              image_url: { url: att.dataUrl || att.url || "", detail: "high" },
+            });
+          } else if (att.type === "pdf" && att.extractedText) {
+            parts.push({
+              type: "text",
+              text: `[Attached Document: ${att.name}]\n${att.extractedText}`,
+            });
+          }
+        }
+
+        result.push({
+          role: "user",
+          content: parts,
+          ...(reasoningContent ? { reasoning_content: reasoningContent } : {}),
+        });
+        continue;
+      }
+
       result.push({
         role: m.role,
         content: m.content,
@@ -254,6 +290,17 @@ export function providerFor(model: string): ProviderId {
   return "openai";
 }
 
+export function supportsVision(model: string): boolean {
+  const provider = providerFor(model);
+  if (provider === "openai") {
+    return !model.includes("embedding") && !model.includes("dall-e");
+  }
+  if (provider === "gemini") return true;
+  if (provider === "anthropic") return true;
+  if (provider === "groq") return model.includes("vision");
+  return false;
+}
+
 export interface OpenAiProviderOpts {
   apiKey?: string;
   model?: string;
@@ -405,7 +452,7 @@ export class OpenAiProvider implements Provider {
               type: "tool_call",
               toolCallId: call.id,
               toolName: call.name,
-              args: call.args ? JSON.parse(call.args) : {},
+              ...parseToolArgs(call.args),
               providerMeta: withReasoning(call.meta, reasoning),
             };
           }
@@ -440,7 +487,7 @@ export class OpenAiProvider implements Provider {
           type: "tool_call",
           toolCallId: call.id,
           toolName: call.name,
-          args: call.args ? JSON.parse(call.args) : {},
+          ...parseToolArgs(call.args),
           providerMeta: withReasoning(call.meta, reasoning),
         };
       }

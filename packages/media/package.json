@@ -19,6 +19,7 @@
   "dependencies": {
     "@repo/contracts": "workspace:*",
     "cloudinary": "^2.5.1",
+    "pdf-parse": "^2.4.5",
     "zod": "^4.4.3"
   }
 }

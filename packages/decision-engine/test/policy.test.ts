@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { UNKNOWN_DECISION } from "../src/classify";
-import { needsDetailedPlan, resolvePolicy } from "../src/policy";
+import { isNewBuildRequest, needsDetailedPlan, resolvePolicy } from "../src/policy";
 import type { Decision, DecisionResult } from "../src/types";
 
 function accepted(overrides: Partial<Decision>): DecisionResult {
@@ -125,5 +125,19 @@ describe("needsDetailedPlan", () => {
     // confidence < 0.5 rule today — but that's a coincidence, not a
     // guarantee, which is why status is checked first instead.
     expect(UNKNOWN_DECISION.confidence).toBeLessThan(0.5);
+  });
+});
+
+describe("isNewBuildRequest", () => {
+  it("treats any confident create request as a new build, however small", () => {
+    expect(isNewBuildRequest(accepted({ intent: "create", complexity: 3, confidence: 0.8 }))).toBe(true);
+  });
+
+  it("does not treat a change to an existing app as a new build", () => {
+    expect(isNewBuildRequest(accepted({ intent: "modify", complexity: 6, confidence: 0.9 }))).toBe(false);
+  });
+
+  it("does not trust a low-confidence read", () => {
+    expect(isNewBuildRequest(accepted({ intent: "create", complexity: 8, confidence: 0.3 }))).toBe(false);
   });
 });

@@ -68,6 +68,6 @@ describe("buildTaskPrompt", () => {
   it("includes dependency discipline criteria for scaffold tasks", () => {
     const prompt = buildTaskPrompt({ ...task, type: "scaffold", title: "Scaffold project", acceptance: [] }, undefined);
     expect(prompt).toContain("Do not install packages before they are needed");
-    expect(prompt).toContain("Never install stripe, next-auth, or zustand unless specifically required");
+    expect(prompt).toContain("Never install next-auth or zustand unless specifically required");
   });
 });

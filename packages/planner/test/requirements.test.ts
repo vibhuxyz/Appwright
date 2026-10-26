@@ -44,7 +44,7 @@ describe("architecture", () => {
     const architecture = decideArchitecture(detectNeeds("chat app with payments"));
     const choices = architecture.decisions.map((d) => d.choice);
     expect(choices).toContain("websockets");
-    expect(choices).toContain("stripe");
+    expect(choices).toContain("razorpay");
     expect(architecture.stack.framework).toBe("next");
     expect(Object.isFrozen(architecture)).toBe(true);
     expect(Object.isFrozen(architecture.decisions)).toBe(true);

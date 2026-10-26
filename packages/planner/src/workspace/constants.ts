@@ -9,6 +9,6 @@ export const BASE_DEPENDENCIES = [
 ] as const;
 export const DEPENDENCIES_BY_FEATURE: Readonly<Record<string, readonly string[]>> = {
   auth: ["next-auth", "bcryptjs"],
-  payments: ["stripe"],
+  payments: [],
   fileUpload: ["uploadthing"],
 };

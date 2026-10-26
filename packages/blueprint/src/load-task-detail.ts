@@ -1,11 +1,13 @@
 import {
   DEFAULT_DESIGN_BLOCK,
+  type DependencyManifest,
   type DesignBlock,
   DesignBlockSchema,
   type Entity,
   EntitySchema,
   type Page,
   PageSchema,
+  type ProjectSpecification,
 } from "@repo/contracts";
 import { prisma } from "@repo/db";
 import { z } from "zod";
@@ -23,6 +25,8 @@ export interface TaskDetail {
   pages: Page[];
   features: string[];
   design: DesignBlock;
+  manifest?: DependencyManifest;
+  specification?: ProjectSpecification;
 }
 
 export async function loadTaskDetail(taskId: string): Promise<TaskDetail> {
@@ -41,6 +45,8 @@ export async function loadTaskDetail(taskId: string): Promise<TaskDetail> {
           pages: true,
           features: true,
           design: true,
+          dependencyManifest: true,
+          specification: true,
         },
       },
     },
@@ -60,5 +66,11 @@ export async function loadTaskDetail(taskId: string): Promise<TaskDetail> {
     pages: z.array(PageSchema).parse(row.blueprint.pages),
     features: z.array(z.string()).parse(row.blueprint.features),
     design: row.blueprint.design ? DesignBlockSchema.parse(row.blueprint.design) : DEFAULT_DESIGN_BLOCK,
+    manifest: row.blueprint.dependencyManifest
+      ? (row.blueprint.dependencyManifest as unknown as DependencyManifest)
+      : undefined,
+    specification: row.blueprint.specification
+      ? (row.blueprint.specification as unknown as ProjectSpecification)
+      : undefined,
   };
 }

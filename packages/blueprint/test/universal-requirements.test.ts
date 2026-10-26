@@ -51,7 +51,7 @@ const BAKERY_CONTENT = content({
 });
 
 describe("universal requirements", () => {
-  it("plans admin, media, seo, security, tests and deploy for a browse-only bakery", async () => {
+  it("plans seo but no admin, media, security, tests or deploy for a browse-only bakery", async () => {
     const result = await plan({
       prompt: "Build a landing page for my bakery. Visitors only browse, no online ordering.",
       intent: { type: "new-app", domain: "bakery" },
@@ -59,9 +59,10 @@ describe("universal requirements", () => {
     });
 
     expect(result.blueprint.projectType).toBe("business-site");
-    expect(taskTypes(result)).toEqual(
-      expect.arrayContaining(["media", "seo", "security", "testing", "deploy"]),
-    );
+    expect(taskTypes(result)).toContain("seo");
+    for (const type of ["media", "security", "testing", "deploy"]) {
+      expect(taskTypes(result)).not.toContain(type);
+    }
     expect(taskTypes(result)).not.toContain("payment");
     expect(taskTypes(result)).not.toContain("admin");
     expect(taskTypes(result)).not.toContain("auth");
@@ -115,7 +116,7 @@ describe("universal requirements", () => {
     expect(admin?.acceptance.join(" ")).toContain("moderate sellers and listings");
   });
 
-  it("adds a contact flow and media slots for a portfolio without an admin panel", async () => {
+  it("adds a contact flow and seo for a static portfolio without an admin panel", async () => {
     const result = await plan({
       prompt: "A portfolio website for a freelance photographer.",
       intent: { type: "new-app", domain: "photography-portfolio" },
@@ -124,7 +125,8 @@ describe("universal requirements", () => {
 
     expect(result.blueprint.projectType).toBe("portfolio");
     expect(routes(result)).toContain("/contact");
-    expect(taskTypes(result)).toEqual(expect.arrayContaining(["media", "seo", "testing"]));
+    expect(taskTypes(result)).toContain("seo");
+    expect(taskTypes(result)).not.toContain("media");
     expect(taskTypes(result)).not.toContain("admin");
   });
 

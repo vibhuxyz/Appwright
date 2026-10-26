@@ -48,6 +48,12 @@ export function resolvePolicy(result: DecisionResult): ExecutionMode {
 // round trip of building a Blueprint and task DAG up front, rather than
 // just handing the agent a single-pass loop.
 const MIN_COMPLEXITY_FOR_PLAN = 6;
+const MIN_CONFIDENCE_FOR_INTENT = 0.5;
+
+export function isNewBuildRequest(result: DecisionResult): boolean {
+  if (result.status !== "accepted") return false;
+  return result.decision.intent === "create" && result.decision.confidence >= MIN_CONFIDENCE_FOR_INTENT;
+}
 
 // Whether this request is substantial enough to plan in detail first
 // (Blueprint → task DAG → multi-task run) instead of a single agent pass.

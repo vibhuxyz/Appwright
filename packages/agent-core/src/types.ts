@@ -1,16 +1,11 @@
 import { z } from "zod";
-
-// ---------------------------------------------------------------------------
-// Message — provider-agnostic history. Three branches, discriminated on `type`.
-// `role` (user/assistant) lives *inside* the text branch — it is not the
-// discriminant, `type` is, and Zod requires the discriminant literal to be
-// unique per branch.
-// ---------------------------------------------------------------------------
+import { AttachmentSchema } from "@repo/contracts";
 
 const textMessage = z.object({
   role: z.enum(["user", "assistant"]),
   type: z.literal("text"),
   content: z.string(),
+  attachments: z.array(AttachmentSchema).optional(),
   providerMeta: z.unknown().optional(),
 });
 

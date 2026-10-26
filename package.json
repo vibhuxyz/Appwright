@@ -45,5 +45,9 @@
     "prettier": "^3.7.4",
     "turbo": "^2.5.4",
     "typescript": "5.9.2"
+  },
+  "dependencies": {
+    "nodemailer": "^10.2.1",
+    "pdf-parse": "^2.4.5"
   }
 }

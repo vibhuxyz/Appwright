@@ -6,7 +6,7 @@ import type { ArchitectureDecision, CapabilityChoice } from "./types";
 // time (deps.allow.json), instead of failing deep into a run.
 const PACKAGES_BY_CHOICE: Record<CapabilityChoice, readonly string[]> = {
   websockets: ["ws"],
-  stripe: ["stripe"],
+  razorpay: [],
   "local-uploads": [],
   "mongodb-text-index": [],
 };

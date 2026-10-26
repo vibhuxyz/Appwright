@@ -126,6 +126,24 @@ describe("mergeQuestionPhrasing", () => {
     expect(merged.map((question) => question.need)).toEqual(["ordering-mode", "menu-categories", "opening-days"]);
   });
 
+  it("drops generic service questions the model left out and lets its own questions replace them", () => {
+    const generic = ["primary-action", "work-showcase", "site-language"].map(modelQuestion);
+    const merged = mergeQuestionPhrasing(
+      [catalogQuestion, ...generic],
+      [modelQuestion("site-language"), ...["audience", "hiring-flow", "signup", "pricing", "proof"].map(modelQuestion)],
+      new Set(),
+    );
+    expect(merged.map((question) => question.need)).toEqual([
+      "ordering-mode",
+      "site-language",
+      "audience",
+      "hiring-flow",
+      "signup",
+      "pricing",
+      "proof",
+    ]);
+  });
+
   it("caps the extra questions at three and skips ones already answered", () => {
     const merged = mergeQuestionPhrasing(
       [catalogQuestion],
@@ -154,7 +172,7 @@ describe("buildQuestionsPrompt", () => {
     expect(prompt).toContain("If they named the business");
     expect(prompt).toContain("Do not add photo-upload or brand-asset questions");
     expect(prompt).toContain("after the plan and design system exist");
-    expect(prompt).toContain("Do not rephrase contact or social collection as a single paste-links question");
+    expect(prompt).toContain("Do not rephrase contact collection as a single paste-links question");
   });
 
   it("lists identity already present in the request so the model does not re-ask it", () => {
@@ -257,7 +275,15 @@ describe("parseGeneratedQuestions", () => {
     expect(parseGeneratedQuestions(`{"questions":[]}`)).toEqual({
       ok: true,
       questions: [],
+      known: {},
     });
+  });
+
+  it("reads known facts and ignores a malformed known map", () => {
+    const parsed = parseGeneratedQuestions(`{"known":{"business-name":"100x School"},"questions":[]}`);
+    expect(parsed).toEqual({ ok: true, questions: [], known: { "business-name": "100x School" } });
+    const malformed = parseGeneratedQuestions(`{"known":{"business-name":7},"questions":[]}`);
+    expect(malformed).toEqual({ ok: true, questions: [], known: {} });
   });
 
   it("rejects non-JSON and the wrong shape", () => {
@@ -298,17 +324,20 @@ describe("applyPromptAnswers", () => {
 });
 
 describe("requirementTurns", () => {
-  it("records each asked question and the spoken answer", () => {
-    expect(
-      requirementTurns(
-        { sharing: "skip", "due-dates": "Due dates on tasks" },
-        TODO_QUESTIONS,
-      ),
-    ).toEqual([
-      { role: "assistant", content: "Should people share lists with others?" },
-      { role: "user", content: "Skipped — defaults to Just me" },
-      { role: "assistant", content: "Do tasks need due dates?" },
-      { role: "user", content: "Due dates on tasks" },
-    ]);
+  it("records one question card and one reply with the answers", () => {
+    const turns = requirementTurns({ sharing: "skip", "due-dates": "Due dates on tasks" }, TODO_QUESTIONS);
+    expect(turns.map((turn) => turn.role)).toEqual(["assistant", "user"]);
+    expect(turns[0]?.content).toContain("1. Sharing — Should people share lists with others?");
+    expect(turns[0]?.content).toContain("   a) Just me");
+    expect(turns[1]?.content).toBe(
+      "Sharing — Should people share lists with others?\nJust me (default)\n\n" +
+        "Due dates — Do tasks need due dates?\nDue dates on tasks",
+    );
+  });
+
+  it("marks the reply skipped when every question was skipped", () => {
+    const [, reply] = requirementTurns({ sharing: "skip" }, TODO_QUESTIONS);
+    expect(reply?.role === "user" && reply.data.questionReply.outcome).toBe("skipped");
+    expect(reply?.content.startsWith("User skipped — going with these defaults:")).toBe(true);
   });
 });

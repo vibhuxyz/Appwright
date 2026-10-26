@@ -4,7 +4,7 @@ export type Capability = "realtime" | "payments" | "fileStorage" | "search";
 
 export type CapabilityChoice =
   | "websockets"
-  | "stripe"
+  | "razorpay"
   | "local-uploads"
   | "mongodb-text-index";
 

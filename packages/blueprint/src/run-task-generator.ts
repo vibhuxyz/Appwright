@@ -60,7 +60,7 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
         return deterministicGenerator(task, runtime);
       }
 
-      const standards = await loadStackStandards();
+      const [standards, projectTree] = await Promise.all([loadStackStandards(), runtime.listDir(".")]);
       const writtenPaths: string[] = [];
       let costUsd = 0;
 
@@ -78,7 +78,7 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
       const [primary, ...fallback] = models.map((id) => new OpenAiProvider({ model: id }));
       const stopReason = await runAgentLoop({
         messages: [
-          { role: "user", type: "text", content: buildTaskPrompt(task, input.previousError, standards) },
+          { role: "user", type: "text", content: buildTaskPrompt(task, input.previousError, { standards, projectTree }) },
         ],
         tools: ALL_TOOLS,
         provider: primary ?? new OpenAiProvider({ model }),

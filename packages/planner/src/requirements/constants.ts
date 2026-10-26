@@ -15,6 +15,8 @@ export const MAX_EVIDENCE_PER_NEED = 5;
 export const MIN_QUESTION_OPTIONS = 2;
 export const MAX_QUESTION_OPTIONS = 8;
 export const MAX_QUESTION_OPTION_CHARS = 60;
+export const MAX_KNOWN_FACTS = 8;
+export const MIN_KNOWN_FACT_CHARS = 3;
 
 export const EXPLICIT_PATTERNS: Readonly<Record<NeedName, readonly RegExp[]>> = {
   auth: [/\b(log ?in|sign ?(up|in)|authenticat\w*|accounts?|passwords?)\b/i],

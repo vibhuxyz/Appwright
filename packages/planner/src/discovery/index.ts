@@ -5,6 +5,7 @@ export {
   extractIdentityFromPrompt,
 } from "./extract-identity";
 export { materialTopics } from "./catalog";
+export { GENERIC_SERVICE_TOPIC_IDS } from "./service-topics";
 export { workflowsFrom } from "./workflows";
 export { workflowAdditions, dashboardComponents } from "./additions";
 export { MAX_QUESTIONS_PER_BATCH } from "./constants";

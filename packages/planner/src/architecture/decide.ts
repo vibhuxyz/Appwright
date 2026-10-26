@@ -26,8 +26,8 @@ const RULES: readonly {
     isTriggered: (needs) => needs.payments.required,
     decision: {
       capability: "payments",
-      choice: "stripe",
-      reason: "needs.payments requires a hosted payment provider",
+      choice: "razorpay",
+      reason: "needs.payments uses the Appwrite Razorpay integration gateway",
     },
   },
   {

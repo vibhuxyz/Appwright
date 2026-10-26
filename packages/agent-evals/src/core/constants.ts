@@ -1,0 +1,9 @@
+export const DEFAULT_EVAL_MODEL = "gemini-flash-latest";
+export const MAX_ITERATIONS = 40;
+export const MAX_TOKENS = 150_000;
+export const MAX_COST_USD = 1;
+export const RUN_DEADLINE_MS = 8 * 60_000;
+export const TYPECHECK_TIMEOUT_MS = 60_000;
+export const MAX_DETAIL_CHARS = 400;
+export const DEFAULT_TRIALS = 1;
+export const RESULTS_DIR = "results";

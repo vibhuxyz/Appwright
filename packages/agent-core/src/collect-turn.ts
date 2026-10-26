@@ -5,6 +5,7 @@ export interface PendingToolCall {
   toolCallId: string;
   toolName: string;
   args: unknown;
+  argsError?: string;
   providerMeta?: unknown;
 }
 
@@ -44,6 +45,7 @@ export async function collectTurn(
         toolCallId: chunk.toolCallId,
         toolName: chunk.toolName,
         args: chunk.args,
+        ...(chunk.argsError ? { argsError: chunk.argsError } : {}),
         providerMeta: chunk.providerMeta,
       });
     } else if (chunk.type === "usage") {

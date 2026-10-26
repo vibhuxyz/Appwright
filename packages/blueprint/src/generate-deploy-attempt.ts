@@ -1,4 +1,6 @@
 import type { Runtime } from "@repo/agent-core";
+import { generateSafeEnvExample } from "@repo/db";
+import type { DependencyManifest } from "@repo/contracts";
 import type { GeneratedAttempt } from "orchestrator";
 import type { TaskDetail } from "./load-task-detail";
 
@@ -29,6 +31,43 @@ function storesRecords(features: readonly string[], entityCount: number): boolea
   return entityCount > 0 || features.some((feature) => feature === "auth" || feature === "payments");
 }
 
+function buildEnvSchemaFromManifest(manifest: DependencyManifest): string {
+  const isMongoRequired = manifest.database.required;
+  const mongoField = isMongoRequired
+    ? "  MONGODB_URI: z.string().min(1),"
+    : "  MONGODB_URI: z.string().min(1).optional(),";
+  const mongoPlaceholder = isMongoRequired
+    ? "  MONGODB_URI: \"mongodb://localhost:27017/app\","
+    : "";
+
+  const customVars = manifest.envVars.filter(
+    (v) => v.key !== "MONGODB_URI" && v.key !== "NEXT_PUBLIC_SITE_URL",
+  );
+  const extraFields = customVars
+    .map((v) => `  ${v.key}: ${v.required ? "z.string().min(1)" : "z.string().min(1).optional()"},`)
+    .join("\n");
+  const extraPlaceholders = customVars
+    .map((v) => `  ${v.key}: "${v.exampleValue ?? "placeholder"}",`)
+    .join("\n");
+
+  return `import { z } from "zod";
+
+const EnvSchema = z.object({
+${mongoField}
+  NEXT_PUBLIC_SITE_URL: z.string().url().default("http://localhost:3000"),
+${extraFields}
+});
+
+const BUILD_PLACEHOLDERS = {
+${mongoPlaceholder}
+${extraPlaceholders}
+};
+const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+
+export const env = EnvSchema.parse(isBuildPhase ? { ...BUILD_PLACEHOLDERS, ...process.env } : process.env);
+`;
+}
+
 function buildEnvSchemaFile(features: readonly string[], entityCount: number): string {
   const featureVars = featureEnvVarsFor(features);
   const database = storesRecords(features, entityCount);
@@ -39,7 +78,7 @@ function buildEnvSchemaFile(features: readonly string[], entityCount: number): s
   const mongoField = database
     ? "  MONGODB_URI: z.string().min(1),"
     : "  MONGODB_URI: z.string().min(1).optional(),";
-  const mongoPlaceholder = database ? `  MONGODB_URI: "mongodb://localhost:27017/app",` : "";
+  const mongoPlaceholder = database ? "  MONGODB_URI: \"mongodb://localhost:27017/app\"," : "";
   return `import { z } from "zod";
 
 const EnvSchema = z.object({
@@ -63,7 +102,7 @@ function buildEnvExampleFile(features: readonly string[], entityCount: number): 
     .map((envVar) => `${envVar.key}="${envVar.exampleValue}"`)
     .join("\n");
   const mongoLine = storesRecords(features, entityCount)
-    ? `MONGODB_URI="mongodb://localhost:27017/app"\n`
+    ? "MONGODB_URI=\"mongodb://localhost:27017/app\"\n"
     : "";
   return `${mongoLine}NEXT_PUBLIC_SITE_URL="http://localhost:3000"
 ${extraLines}
@@ -74,9 +113,17 @@ export async function generateDeployAttempt(
   task: TaskDetail,
   runtime: Runtime,
 ): Promise<GeneratedAttempt> {
+  const envExampleContent = task.manifest
+    ? generateSafeEnvExample(task.manifest.envVars)
+    : buildEnvExampleFile(task.features, task.entities.length);
+
+  const envSchemaContent = task.manifest
+    ? buildEnvSchemaFromManifest(task.manifest)
+    : buildEnvSchemaFile(task.features, task.entities.length);
+
   const files = [
-    { path: ".env.example", content: buildEnvExampleFile(task.features, task.entities.length) },
-    { path: "src/env.ts", content: buildEnvSchemaFile(task.features, task.entities.length) },
+    { path: ".env.example", content: envExampleContent },
+    { path: "src/env.ts", content: envSchemaContent },
     { path: "src/app/api/health/route.ts", content: HEALTH_ROUTE },
   ];
 

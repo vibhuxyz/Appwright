@@ -107,8 +107,24 @@ describe("generators emit Mongoose, never Prisma", () => {
 
 describe("buildTaskPrompt standards", () => {
   test("puts the standards before the task when provided", () => {
-    const prompt = buildTaskPrompt(taskWith({ title: "Seed", type: "seed" } as Partial<TaskDetail>), undefined, "STANDARDS BLOCK");
+    const prompt = buildTaskPrompt(taskWith({ title: "Seed", type: "seed" } as Partial<TaskDetail>), undefined, { standards: "STANDARDS BLOCK" });
     expect(prompt.startsWith("STANDARDS BLOCK")).toBe(true);
     expect(prompt).toContain("Task: Seed");
+  });
+
+  test("lists the project tree without the ui primitives", () => {
+    const prompt = buildTaskPrompt(taskWith({ title: "Seed", type: "seed" } as Partial<TaskDetail>), undefined, {
+      projectTree: ["src/app/page.tsx", "src/components/ui/button.tsx"],
+    });
+    expect(prompt).toContain("- src/app/page.tsx");
+    expect(prompt).not.toContain("- src/components/ui/button.tsx");
+    expect(prompt).toContain("(+1 more, including the src/components/ui primitives)");
+  });
+
+  test("adds the integration gateway only to tasks that call it", () => {
+    const layoutPrompt = buildTaskPrompt(taskWith({ title: "Layout shells", type: "layout" } as Partial<TaskDetail>), undefined);
+    const mediaPrompt = buildTaskPrompt(taskWith({ title: "Media", type: "media" } as Partial<TaskDetail>), undefined);
+    expect(layoutPrompt).not.toContain("cloudinary");
+    expect(mediaPrompt).toContain("/v1/integrations/cloudinary/upload");
   });
 });

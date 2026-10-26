@@ -23,3 +23,16 @@ export type {
   ImageProviderName,
   Result,
 } from "./image-provider";
+export {
+  extractPdf,
+  parsePngDimensions,
+  processImageAttachment,
+  sniffAttachmentMime,
+} from "./attachment";
+export type {
+  AttachmentSniffResult,
+  ExtractedPdfPage,
+  ExtractedPdfResult,
+  PdfExtractionResult,
+  ProcessedImageResult,
+} from "./attachment";

@@ -66,7 +66,7 @@ describe("planWorkspace", () => {
     const plan = planWorkspace({ ...BASE, features: ["auth", "payments"] });
     expect(plan.files.map((file) => file.path)).toEqual(["src/theme/tokens.css"]);
     expect(plan.files[0]?.content).toContain("--color-primary: #e23744;");
-    expect(plan.dependencies).toContain("stripe");
+    expect(plan.dependencies).not.toContain("stripe");
     expect(plan.dependencies).toContain("next-auth");
     expect([...plan.dependencies]).toEqual([...plan.dependencies].sort());
   });

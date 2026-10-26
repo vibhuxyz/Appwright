@@ -26,6 +26,10 @@ function notApplicable(id: string, area: Requirement["area"], reason: string): R
   return { id, area, level: "not-applicable", reason, acceptance: [] };
 }
 
+function storesData(blueprint: Blueprint): boolean {
+  return blueprint.stack.db !== "none";
+}
+
 function hasPublicPages(blueprint: Blueprint): boolean {
   return blueprint.pages.some((page) => !PRIVATE_ROUTE_PATTERN.test(page.route));
 }
@@ -49,6 +53,9 @@ function adminRequirement({ projectType, needs }: BaseRequirementContext): Requi
 }
 
 function mediaRequirement({ blueprint, projectType, needs }: BaseRequirementContext): Requirement {
+  if (!storesData(blueprint)) {
+    return notApplicable("media", "media", "Static site: section images come from the approved image slots");
+  }
   const isNeeded =
     MEDIA_PROJECT_TYPES.has(projectType) || needs.fileUpload.required || mentionsImagery(blueprint);
   if (!isNeeded) return notApplicable("media", "media", "No images or uploads were detected");
@@ -72,26 +79,47 @@ function seoRequirement({ blueprint }: BaseRequirementContext): Requirement {
   ]);
 }
 
+function securityRequirement({ blueprint }: BaseRequirementContext): Requirement {
+  if (!storesData(blueprint)) {
+    return notApplicable("security", "security", "Static site: no stored data or server input to protect");
+  }
+  return required("security", "security", "Every app needs server-side protection by default", [
+    "All request bodies, params and queries are validated on the server",
+    "Mutating and login endpoints are rate limited",
+    "Secrets stay server-side and security headers are set",
+    "Authorization is checked per resource, never trusted from the client",
+  ]);
+}
+
+function testingRequirement({ blueprint }: BaseRequirementContext): Requirement {
+  if (!storesData(blueprint) && blueprint.entities.length === 0) {
+    return notApplicable("testing", "testing", "Static site: the production build and render check are the evidence");
+  }
+  return required("testing", "testing", "Completion must be proven by evidence", [
+    "Unit tests cover business logic and validation",
+    "Critical user journeys are covered end to end",
+    "The production build passes",
+  ]);
+}
+
+function deployRequirement({ blueprint }: BaseRequirementContext): Requirement {
+  if (!storesData(blueprint)) {
+    return notApplicable("deploy", "deploy", "Static site: no environment, migrations or seed data to operate");
+  }
+  return required("deploy", "deploy", "The app must be operable after launch", [
+    "Environment variables are validated at boot",
+    "A health endpoint exists",
+    "Migrations and safe seed data run from documented commands",
+  ]);
+}
+
 export function baseRequirements(context: BaseRequirementContext): Requirement[] {
   return [
-    required("security", "security", "Every app needs server-side protection by default", [
-      "All request bodies, params and queries are validated on the server",
-      "Mutating and login endpoints are rate limited",
-      "Secrets stay server-side and security headers are set",
-      "Authorization is checked per resource, never trusted from the client",
-    ]),
+    securityRequirement(context),
     adminRequirement(context),
     mediaRequirement(context),
     seoRequirement(context),
-    required("testing", "testing", "Completion must be proven by evidence", [
-      "Unit tests cover business logic and validation",
-      "Critical user journeys are covered end to end",
-      "The production build passes",
-    ]),
-    required("deploy", "deploy", "The app must be operable after launch", [
-      "Environment variables are validated at boot",
-      "A health endpoint exists",
-      "Migrations and safe seed data run from documented commands",
-    ]),
+    testingRequirement(context),
+    deployRequirement(context),
   ];
 }

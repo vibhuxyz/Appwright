@@ -1,0 +1,22 @@
+{
+  "name": "@repo/agent-evals",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": "./src/index.ts",
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "eval": "bun run src/cli/main.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@repo/agent-core": "workspace:*",
+    "@repo/planner": "workspace:*",
+    "@repo/tools": "workspace:*"
+  }
+}

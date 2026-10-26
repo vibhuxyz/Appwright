@@ -22,6 +22,7 @@ const ANSWER_PATTERNS: readonly (readonly [RegExp, string, string])[] = [
   [/\b(browse[- ]only|catalog only|informational only)\b/i, "ordering-mode", "Browse only"],
   [/\bstandard pickup orders?\b/i, "ordering-mode", "Pickup orders"],
   [/\bpickup orders?\b/i, "ordering-mode", "Pickup orders"],
+  [/\border\w*\b[^.!?\n]{0,40}\bfor pick-?up\b/i, "ordering-mode", "Pickup orders"],
   [/\b(delivery|deliver) orders?\b/i, "ordering-mode", "Delivery orders"],
   [/\b(custom cake|event requests?|custom orders?)\b/i, "custom-orders", "Yes, custom cake and event requests"],
   [/\bstorefront and pop-?up\b/i, "locations", "Storefront and pop-up locations"],

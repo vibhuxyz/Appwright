@@ -30,6 +30,8 @@ export {
   buildQuestionsPrompt,
   parseGeneratedQuestions,
   mergeQuestionPhrasing,
+  groundedKnownNeeds,
+  withoutKnownFacts,
   applyPromptAnswers,
   requirementTurns,
   SKIP_PROMPT_ANSWER,
@@ -91,6 +93,8 @@ export {
 } from "./change-request";
 export { classifyIntent, parseIntent, buildIntentPrompt, type IntentClassifier } from "./intent";
 export {
+  extractPartialPages,
+  type PartialPage,
   buildContentPrompt,
   parseGeneratedContent,
   type BlueprintContent,
@@ -131,4 +135,9 @@ export {
   type DiscoveryState,
   type WorkflowSpec,
 } from "./discovery";
+export {
+  generateDependencyManifest,
+  type GenerateManifestInput,
+  type ManifestGeneratorResult,
+} from "./manifest";
 

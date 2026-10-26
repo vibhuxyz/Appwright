@@ -5,6 +5,7 @@ import {
   DEFAULT_DESIGN_BLOCK,
   DEFAULT_LAYOUT_BLOCK,
   DEFAULT_RESPONSIVE_BLOCK,
+  type ProjectSpecification,
   type ThemeOption,
 } from "@repo/contracts";
 import {
@@ -15,6 +16,7 @@ import {
   planBlueprint,
   resolveRequirements,
   validateArchitectureDecisions,
+  type PartialPage,
   type Plan,
 } from "@repo/planner";
 import { designWithTheme } from "./approved-plan";
@@ -35,14 +37,29 @@ export class BuildBlueprintError extends Error {
   }
 }
 
+export type BlueprintProgress =
+  | { stage: "intent" | "checking"; detail: string }
+  | { stage: "pages"; detail: string; pages: readonly PartialPage[] };
+
 export interface BuildBlueprintOptions {
   provider?: Provider;
   signal?: AbortSignal;
-  // Slice 3b — the id of a design direction the user picked in the design
-  // review step (see @repo/planner's generateDesignDirections). Falls back
-  // to the default direction when absent or unrecognised.
   directionId?: string;
   theme?: ThemeOption;
+  specification?: ProjectSpecification;
+  onProgress?: (progress: BlueprintProgress) => void;
+}
+
+function describeIntent(intent: { type: string; domain: string; complexity: string }): string {
+  const words = (text: string) => text.replace(/[-_]+/g, " ").trim();
+  return `Understood: a ${intent.complexity} ${words(intent.type)} for ${words(intent.domain)}`;
+}
+
+function reportPages(onProgress: BuildBlueprintOptions["onProgress"]) {
+  return (pages: readonly PartialPage[]) => {
+    const latest = pages.at(-1);
+    if (latest) onProgress?.({ stage: "pages", detail: `Planning ${latest.route}`, pages });
+  };
 }
 
 function isAbortError(error: unknown): boolean {
@@ -59,9 +76,10 @@ export async function buildBlueprint(
   prompt: string,
   options: BuildBlueprintOptions = {},
 ): Promise<Plan> {
-  const { provider, directionId, theme } = options;
+  const { provider, directionId, theme, specification, onProgress } = options;
   const signal = options.signal ?? AbortSignal.timeout(BUILD_BLUEPRINT_TIMEOUT_MS);
   try {
+    onProgress?.({ stage: "intent", detail: "Understanding what you want to build" });
     const intentResult = await classifyIntent(createIntentClassifier(provider), prompt, signal);
     if (!intentResult.ok) {
       throw new BuildBlueprintError(
@@ -80,7 +98,9 @@ export async function buildBlueprint(
       );
     }
 
-    const content = await generateBlueprintContent(prompt, signal, provider);
+    onProgress?.({ stage: "intent", detail: describeIntent(intentResult.value) });
+    const content = await generateBlueprintContent({ prompt, signal, provider, specification, onPages: reportPages(onProgress) });
+    onProgress?.({ stage: "checking", detail: `Checking ${content.pages.length} pages and splitting the build into tasks` });
     const direction = resolveDesignDirection(directionId);
 
     const draft = BlueprintSchema.safeParse({

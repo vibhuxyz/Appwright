@@ -16,7 +16,7 @@ export {
   type DecisionResult,
 } from "./types";
 export { classify, CLASSIFY_TIMEOUT_MS, UNKNOWN_DECISION } from "./classify";
-export { resolvePolicy, needsDetailedPlan } from "./policy";
+export { resolvePolicy, needsDetailedPlan, isNewBuildRequest } from "./policy";
 export { shouldRetryVerification, type VerifyOutcome } from "./verify";
 export {
   isDeniedInMode,

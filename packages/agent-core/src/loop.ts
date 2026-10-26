@@ -269,10 +269,10 @@ export async function runAgentLoop(
         openCallIds.add(call.toolCallId);
 
         const tool = toolsByName.get(call.toolName);
-        let resultText = "";
-        let failed = false;
+        let resultText = call.argsError ? `Error: ${call.argsError}` : "";
+        let failed = call.argsError !== undefined;
 
-        if (onApprovalRequired) {
+        if (!failed && onApprovalRequired) {
           const approval = await onApprovalRequired({
             toolCallId: call.toolCallId,
             toolName: call.toolName,

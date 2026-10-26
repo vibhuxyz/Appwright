@@ -14,6 +14,17 @@ describe("extractIdentityFromPrompt", () => {
     expect(extractFacts(USER_PROMPT).answered["business-name"]).toBe("vibhuBakery wallah");
   });
 
+  it("reads a name written as 'my <name> business' and skips descriptive words", () => {
+    const prompt =
+      "build landing page single app for my 100x school busines regading we run 100x schrrol super 30 boot cam";
+    expect(extractIdentityFromPrompt(prompt)["business-name"]).toBe("100x school");
+    expect(selectDiscoveryQuestions(prompt).map((question) => question.need)).not.toContain("business-name");
+    expect(extractIdentityFromPrompt("a site for my Small business")["business-name"]).toBeUndefined();
+    expect(extractIdentityFromPrompt("a site for my home planning business")["business-name"]).toBeUndefined();
+    expect(extractIdentityFromPrompt("a site for our Acme Labs company")["business-name"]).toBe("Acme Labs");
+    expect(extractIdentityFromPrompt("an app for our online bakery business")["business-name"]).toBeUndefined();
+  });
+
   it("reads email, phone, address, and social when they are in the prompt", () => {
     const prompt =
       "Bakery called Rise. Email hello@rise.test phone 555-010-0199 whatsapp 555-010-0200 address 12 Oven Lane instagram @risebakery https://rise.test support@rise.test";
@@ -42,7 +53,7 @@ describe("discovery uses extracted identity", () => {
       (question) => question.need === "business-contacts",
     );
     expect(contacts?.inputType).toBe("contacts");
-    expect(contacts?.options).toEqual(expect.arrayContaining(["Instagram", "Phone", "WhatsApp", "Email"]));
+    expect(contacts?.options).toEqual(["Phone", "WhatsApp", "Email", "Address"]);
     expect(needs[0]).not.toBe("business-name");
   });
 });

@@ -19,6 +19,7 @@ export type ProviderChunk =
       toolCallId: string;
       toolName: string;
       args: unknown;
+      argsError?: string;
       providerMeta?: unknown;
     }
   // Real token counts, reported once at the end of a stream. Optional by

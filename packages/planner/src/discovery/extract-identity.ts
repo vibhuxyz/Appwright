@@ -10,6 +10,43 @@ const NAME_LEADINS: readonly RegExp[] = [
   /(?:called|named)\s+["“']([^"”']+)["”']/gi,
 ];
 
+const POSSESSIVE_NAME =
+  /\b(?:my|our)\s+([\p{L}\p{N}][\p{L}\p{N}&'-]*(?:\s+[\p{L}\p{N}&'-]+){0,3}?)\s+(?:business|busines|buisness|company|startup|agency|brand|firm)\b/giu;
+
+const NAMED_FOR_PHRASE =
+  /\b(?:[Ww]ebsite|[Ss]ite|[Ll]anding page|[Pp]age|[Aa]pp)\s+for\s+(\p{Lu}[\p{L}\p{N}&'-]*(?:\s+\p{Lu}[\p{L}\p{N}&'-]*){0,3})/u;
+const PRONOUN_LEADINS: ReadonlySet<string> = new Set(["My", "Our", "The", "A", "An", "Your", "Their"]);
+
+const DESCRIPTIVE_WORDS: ReadonlySet<string> = new Set([
+  "a", "an", "the", "small", "new", "own", "online", "local", "family", "little", "home", "side",
+  "growing", "first", "bakery", "shop", "store", "cafe", "restaurant", "food", "tech", "software",
+  "consulting", "clothing", "coaching", "school", "service", "services",
+]);
+
+const PROPER_NAME_MARK = /[\p{Lu}\p{N}]/u;
+
+function isDescriptiveOnly(name: string): boolean {
+  return name.toLowerCase().split(/\s+/).every((word) => DESCRIPTIVE_WORDS.has(word));
+}
+
+function looksLikeProperName(name: string): boolean {
+  return name.length >= 2 && PROPER_NAME_MARK.test(name) && !isDescriptiveOnly(name);
+}
+
+function possessiveBusinessName(prompt: string): string | undefined {
+  for (const match of prompt.matchAll(POSSESSIVE_NAME)) {
+    const name = clip(match[1] ?? "");
+    if (looksLikeProperName(name)) return name;
+  }
+  return undefined;
+}
+
+function namedForBusinessName(prompt: string): string | undefined {
+  const name = clip(prompt.match(NAMED_FOR_PHRASE)?.[1] ?? "");
+  const firstWord = name.split(" ")[0] ?? "";
+  return looksLikeProperName(name) && !PRONOUN_LEADINS.has(firstWord) ? name : undefined;
+}
+
 function clip(value: string): string {
   return value.replace(/\s+/g, " ").trim().slice(0, MAX_IDENTITY_CHARS);
 }
@@ -42,7 +79,7 @@ export function extractBusinessName(prompt: string): string | undefined {
     const name = takeAfterLeadin(prompt, leadin);
     if (name) return name;
   }
-  return undefined;
+  return possessiveBusinessName(prompt) ?? namedForBusinessName(prompt);
 }
 
 export function extractBusinessEmail(prompt: string): string | undefined {

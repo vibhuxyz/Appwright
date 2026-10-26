@@ -10,7 +10,7 @@ import {
   MAX_QUESTIONS,
   MIN_QUESTION_OPTIONS,
 } from "./constants";
-import { extractFacts } from "../discovery/extract";
+import { GENERIC_SERVICE_TOPIC_IDS, extractFacts } from "../discovery";
 import { extractJsonObject } from "../shared";
 import type { IntakeQuestion } from "./types";
 
@@ -20,20 +20,22 @@ Read the user request. Find the product decisions it leaves open that would chan
 
 Rules:
 - If this is a small edit, a question, or already fully specified, return {"questions":[]}.
-- If they want a new app or a substantial feature, return only the material product decisions that are still open, grouped in one concise batch of at most 8.
+- If they want a new app or a substantial feature, return only the material product decisions that are still open, grouped in one concise batch. A simple app (todo, notes, tracker, landing page) gets at most 4 questions in total; only products that take orders, bookings or payments may use up to 8.
+- A landing or marketing page needs at most 2 questions beyond the ones already listed: who the visitor is and what they should do. Never ask about audience segments, business models or roles the request already describes.
 - Questions must be about THIS product. A todo app should ask about sharing, due dates, or lists. A shop should ask about catalog, checkout, or inventory. Never use a generic platform checklist.
 - Do not ask about languages, frameworks, databases, hosting, or visual style.
 - Never ask whether to include standard engineering work. The builder adds responsive layout, navigation, loading and error states, accessibility, SEO, security, tests, an admin panel for managing business content, image handling, and deployment readiness by itself.
 - Do not add photo-upload or brand-asset questions. Images are collected after the plan and design system exist.
 - Only ask decisions that change the product or business: ordering versus browsing only, accounts versus guest access, which payment provider or outside system must be connected, or a business rule that cannot be safely inferred.
-- Do not ask anything the request already decided. If they named the business, gave an address, email, phone, or social profile, do not ask for that fact again.
-- Do not rephrase contact or social collection as a single paste-links question. Those details are collected as one input per profile and contact method.
+- Do not ask anything the request already decided. If they named the business, gave an address, email, phone, do not ask for that fact again.
+- If the request already answers a question from the "Already being asked" list, leave it out of "questions" and put its need id in "known" with the answer copied word for word from the request (for example the business name as written).
+- Do not rephrase contact collection as a single paste-links question. Phone, WhatsApp, email and address are collected as one input each. Never ask for social media profiles.
 - Each question gets 2 to 4 short multiple-choice options that are the real, distinct answers to that question for this product (e.g. "Pickup only", "Delivery only", "Both pickup and delivery"), not "Yes"/"No" unless the decision is truly binary.
 - defaultOptionIndex is the index of the best default if they skip.
 - need is a unique kebab-case id. label is a 1-3 word preview heading. text is the spoken question.
 
 Return ONLY JSON:
-{"questions":[{"need":"ordering","text":"Should customers be able to order items for pickup or delivery?","label":"Ordering","options":["Pickup only","Delivery only","Both pickup and delivery","Neither, just browsing"],"defaultOptionIndex":2}]}
+{"known":{"business-name":"Sunrise Bakery"},"questions":[{"need":"ordering","text":"Should customers be able to order items for pickup or delivery?","label":"Ordering","options":["Pickup only","Delivery only","Both pickup and delivery","Neither, just browsing"],"defaultOptionIndex":2}]}
 `;
 
 const GeneratedItemSchema = z.object({
@@ -46,10 +48,11 @@ const GeneratedItemSchema = z.object({
 
 const GeneratedQuestionsSchema = z.object({
   questions: z.array(GeneratedItemSchema),
+  known: z.record(z.string(), z.string()).optional().catch(undefined),
 });
 
 export type ParsedQuestions =
-  | { ok: true; questions: IntakeQuestion[] }
+  | { ok: true; questions: IntakeQuestion[]; known: Record<string, string> }
   | { ok: false; reason: "invalid_json" | "invalid_shape" };
 
 function clip(value: string, max: number): string {
@@ -128,18 +131,24 @@ function withCatalogPhrasing(question: IntakeQuestion, match: IntakeQuestion | u
   };
 }
 
+function isDroppedByModel(question: IntakeQuestion, phrasedNeeds: ReadonlyMap<string, IntakeQuestion>): boolean {
+  return GENERIC_SERVICE_TOPIC_IDS.has(question.need) && !phrasedNeeds.has(question.need);
+}
+
 export function mergeQuestionPhrasing(
   catalog: readonly IntakeQuestion[],
   phrased: readonly IntakeQuestion[],
   answeredNeeds: ReadonlySet<string>,
 ): IntakeQuestion[] {
   const byNeed = new Map(phrased.map((question) => [question.need, question]));
+  const kept = catalog.filter((question) => !isDroppedByModel(question, byNeed));
   const catalogNeeds = new Set(catalog.map((question) => question.need));
+  const gapLimit = MAX_GAP_QUESTIONS + catalog.length - kept.length;
   const gaps = phrased
     .filter((question) => !catalogNeeds.has(question.need) && !answeredNeeds.has(question.need))
-    .slice(0, MAX_GAP_QUESTIONS);
+    .slice(0, gapLimit);
   return [
-    ...catalog.map((question) => withCatalogPhrasing(question, byNeed.get(question.need))),
+    ...kept.map((question) => withCatalogPhrasing(question, byNeed.get(question.need))),
     ...gaps,
   ].slice(0, MAX_QUESTIONS);
 }
@@ -156,7 +165,7 @@ function knownFactsBlock(prompt: string, answers: Readonly<Record<string, string
 function plannedQuestionsBlock(planned: readonly Pick<IntakeQuestion, "need" | "text">[]): string {
   if (planned.length === 0) return "";
   const lines = planned.map((question) => `- ${question.need}: ${clip(question.text, MAX_QUESTION_TEXT_CHARS)}`);
-  return `Already being asked this round (reuse these exact need ids to rephrase them; do not ask them again under another id):\n${lines.join("\n")}\nYou may add at most ${MAX_GAP_QUESTIONS} more questions for open decisions this list does not cover.\n\n`;
+  return `Already being asked this round (reuse these exact need ids to rephrase them; do not ask them again under another id; leave out any that do not fit this product):\n${lines.join("\n")}\nYou may add at most ${MAX_GAP_QUESTIONS} more questions for open decisions this list does not cover, plus one for each listed question you leave out.\n\n`;
 }
 
 export function buildQuestionsPrompt(
@@ -182,5 +191,5 @@ export function parseGeneratedQuestions(raw: string): ParsedQuestions {
     questions.push(question);
     if (questions.length === MAX_QUESTIONS) break;
   }
-  return { ok: true, questions };
+  return { ok: true, questions, known: parsed.data.known ?? {} };
 }

@@ -1,4 +1,5 @@
-import { CONTACT_FIELD_LABELS, contactPrefillFrom } from "./contact-fields";
+import { contactFieldsFor, contactPrefillFrom } from "./contact-fields";
+import { serviceBusinessTopics } from "./service-topics";
 import { siteContentTopics } from "./site-content-topics";
 import { textTopic, topic } from "./topic";
 import type { ExtractedFacts, MaterialTopic } from "./types";
@@ -116,9 +117,9 @@ function contactsTopic(facts: ExtractedFacts): MaterialTopic {
   return topic(
     "business-contacts",
     "Contact",
-    "Add each social profile and contact method in its own field.",
-    "Instagram, Facebook, TikTok, website, phone, WhatsApp, email, support, and address each get their own box. Leave a box empty to skip it.",
-    [...CONTACT_FIELD_LABELS],
+    "How can customers reach you?",
+    "These appear in the contact section and behind the main button.",
+    [...contactFieldsFor(facts)],
     0,
     { inputType: "contacts", importance: "required", prefill: contactPrefillFrom(facts.answered) },
   );
@@ -216,7 +217,7 @@ export function materialTopics(facts: ExtractedFacts): MaterialTopic[] {
 
   if (isBusinessApp(facts)) {
     topics.push(BUSINESS_NAME, contactsTopic(facts));
-    if (sellsGoods(facts)) topics.push(...goodsTopics(facts));
+    topics.push(...(sellsGoods(facts) ? goodsTopics(facts) : serviceBusinessTopics()));
   }
 
   return topics.filter((item) => !isAnswered(facts, item.id) && !isExcluded(facts, item.id));

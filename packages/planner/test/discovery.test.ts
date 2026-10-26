@@ -63,17 +63,7 @@ describe("bakery discovery", () => {
     );
     expect(contacts?.inputType).toBe("contacts");
     expect(contacts?.text.toLowerCase()).not.toContain("paste");
-    expect(contacts?.options).toEqual([
-      "Instagram",
-      "Facebook",
-      "TikTok",
-      "Website",
-      "Phone",
-      "WhatsApp",
-      "Email",
-      "Support",
-      "Address",
-    ]);
+    expect(contacts?.options).toEqual(["Phone", "WhatsApp", "Email", "Address"]);
   });
 
   it("asks more than three material questions for pickup plus custom plus pop-ups", () => {
@@ -89,6 +79,7 @@ describe("bakery discovery", () => {
       "pickup-scheduling",
     ]));
     expect(needsOf(BAKERY_FULL)).not.toContain("ordering-mode");
+    expect(needsOf("Bakery site. Customers order cakes for pickup.")).not.toContain("ordering-mode");
     expect(needsOf(BAKERY_FULL)).not.toContain("section-images");
     const afterFirst = Object.fromEntries(
       selectDiscoveryQuestions(BAKERY_FULL).map((question) => [

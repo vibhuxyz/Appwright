@@ -15,7 +15,7 @@ function creditInstruction(attribution: UnsplashAttribution): string {
   return `; this is a hotlinked Unsplash photo, so keep the URL as given and never download or copy it, show a visible credit "Photo by" ${name} "on Unsplash" next to it where the name links to ${attribution.photographerUrl} and Unsplash links to ${attribution.photoUrl}, and if you use next/image make sure images.remotePatterns allows images.unsplash.com`;
 }
 
-function describeSlot(slot: AssetSlot): string {
+export function describeAssetSlot(slot: AssetSlot): string {
   const usage = `${slot.purpose} for ${slot.componentName} (alt: "${slot.altText}"${
     slot.aspectRatio ? `, ratio ${slot.aspectRatio}` : ""
   })`;
@@ -36,5 +36,5 @@ export function assetHintsFor(title: string, rawSlotLists: readonly unknown[]): 
     })
     .filter((slot) => slot.pageRoute === route)
     .slice(0, MAX_HINTS)
-    .map(describeSlot);
+    .map(describeAssetSlot);
 }
