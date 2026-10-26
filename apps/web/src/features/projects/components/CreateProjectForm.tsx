@@ -20,11 +20,15 @@ export function CreateProjectForm({
     formState: { errors },
   } = useForm<CreateProjectFormValues>({
     resolver: zodResolver(createProjectFormSchema),
-    defaultValues: { name: "", templateId: "vite-react" },
+    defaultValues: { name: "" },
   });
 
-  const onSubmit = handleSubmit(async ({ name, templateId }) => {
-    const project = await createProject.mutateAsync({ name, templateId });
+  const onSubmit = handleSubmit(async ({ name }) => {
+    const project = await createProject.mutateAsync({
+      name,
+      templateId: "nextjs-fullstack",
+      integrations: [],
+    });
     reset();
     onCreated(project.id);
   });
@@ -41,14 +45,6 @@ export function CreateProjectForm({
           <p className="mt-1 text-xs text-danger">{errors.name.message}</p>
         )}
       </div>
-      <select
-        className="cursor-pointer rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm text-foreground-secondary outline-none"
-        disabled={createProject.isPending}
-        {...register("templateId")}
-      >
-        <option value="vite-react">Vite (React)</option>
-        <option value="nextjs-fullstack">Next.js</option>
-      </select>
       <Button type="submit" size="lg" className="w-auto rounded-xl px-6" disabled={createProject.isPending}>
         {createProject.isPending ? "Creating…" : "Create"}
       </Button>

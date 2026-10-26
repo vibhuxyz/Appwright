@@ -24,4 +24,25 @@ export const workspaceApi = {
       )
       .then(fileContentSchema.parse);
   },
+  downloadProject: async (
+    projectId: string,
+    sessionId?: string,
+    filename?: string,
+  ) => {
+    const sessionQuery = sessionId
+      ? `?sessionId=${encodeURIComponent(sessionId)}`
+      : "";
+    const blob = await httpClient.getBlob(
+      `/files/${projectId}/download${sessionQuery}`,
+    );
+    if (!blob) throw new Error("Could not download project files");
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename || `${projectId}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  },
 };

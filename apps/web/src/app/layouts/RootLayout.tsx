@@ -5,6 +5,7 @@ import { getToken } from "@/shared/lib/httpClient";
 import { authApi } from "@/features/auth/api/authApi";
 import { AuthScreen } from "@/features/auth/components/AuthScreen";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
+import { Toaster } from "@/shared/components/toast";
 
 export function RootLayout() {
   const user = useAuthStore((s) => s.user);
@@ -49,6 +50,7 @@ export function RootLayout() {
           <Outlet />
         </ErrorBoundary>
       </main>
+      <Toaster />
     </div>
   );
 }

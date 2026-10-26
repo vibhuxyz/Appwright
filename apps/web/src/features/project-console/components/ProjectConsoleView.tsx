@@ -18,6 +18,7 @@ import {
   useVercelStatus,
 } from "@/features/deployments/hooks/useDeployment";
 import { ProjectDatabaseView } from "@/features/database";
+import { ProjectEnvironmentView } from "@/features/environment";
 
 export function ProjectConsoleView({
   projectName,
@@ -100,6 +101,7 @@ export function ProjectConsoleView({
                   database={overview?.database}
                   previewUrl={project?.previewUrl ?? overview?.previewUrl}
                   onOpenDatabase={() => setActiveTab("databases")}
+                  onOpenEnvironment={() => setActiveTab("environment")}
                 />
                 <ProjectConsoleLivePreview
                   projectName={projectName}
@@ -125,6 +127,28 @@ export function ProjectConsoleView({
                 projectId={project?.id}
                 projectName={projectName}
                 templateId={project?.templateId}
+              />
+            </div>
+          )}
+
+          {(activeTab === "connectors" ||
+            activeTab === "payments" ||
+            activeTab === "environment" ||
+            activeTab === "auth" ||
+            activeTab === "storage" ||
+            activeTab === "messaging" ||
+            activeTab === "realtime") && (
+            <div className="px-8 py-6">
+              <ProjectEnvironmentView
+                projectId={project?.id}
+                projectName={projectName}
+                section={activeTab === "connectors"
+                  ? "connectors"
+                  : activeTab === "payments"
+                    ? "payments"
+                    : activeTab === "environment"
+                      ? "secrets"
+                      : "environment"}
               />
             </div>
           )}

@@ -1,3 +1,5 @@
+import { useAuthStore } from "@/stores/authStore";
+import { useBillingModalStore } from "@/features/billing/store/billingModalStore";
 import { WORKSPACE_TABS, useWorkspaceStore, type WorkspaceTab } from "@/stores/workspaceStore";
 import { cn } from "@/shared/lib/cn";
 
@@ -11,17 +13,24 @@ const LABEL: Record<WorkspaceTab, string> = {
   logs: "Logs",
   analytics: "Analytics",
   settings: "Settings",
+  connectors: "Connectors",
+  secrets: "Secrets",
 };
 
-/**
- * One surface at a time. "Code" and "Preview" are two values of the same
- * tab — they are never on screen together, which is what makes each of them
- * worth the full width of the pane. The strip scrolls sideways rather than
- * wrapping, so a narrow right pane still shows every option.
- */
 export function WorkspaceTabs() {
   const activeTab = useWorkspaceStore((s) => s.activeTab);
   const setActiveTab = useWorkspaceStore((s) => s.setActiveTab);
+  const user = useAuthStore((s) => s.user);
+  const openUpgrade = useBillingModalStore((s) => s.openUpgrade);
+  const isFree = user?.plan === "FREE";
+
+  const handleTabClick = (tab: WorkspaceTab) => {
+    if (tab === "code" && isFree) {
+      openUpgrade();
+      return;
+    }
+    setActiveTab(tab);
+  };
 
   return (
     <div
@@ -36,15 +45,20 @@ export function WorkspaceTabs() {
             key={tab}
             role="tab"
             aria-selected={active}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabClick(tab)}
             className={cn(
-              "shrink-0 cursor-pointer rounded-lg px-4 py-1.5 text-[13px] font-medium transition-colors",
+              "flex shrink-0 cursor-pointer items-center rounded-lg px-4 py-1.5 text-[13px] font-medium transition-colors",
               active
                 ? "bg-surface-3 text-foreground"
                 : "text-muted hover:text-foreground-secondary",
             )}
           >
-            {LABEL[tab]}
+            <span>{LABEL[tab]}</span>
+            {tab === "code" && isFree && (
+              <span className="ml-1.5 rounded-sm bg-[#E3FC18]/15 px-1 py-0.5 text-[10px] font-bold text-[#E3FC18]">
+                PRO
+              </span>
+            )}
           </button>
         );
       })}

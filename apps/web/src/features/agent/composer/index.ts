@@ -1,2 +1,3 @@
-export { ChatPaneHeader } from "./ChatPaneHeader";
+export { NewChatButton } from "./NewChatButton";
 export { PaneComposer } from "./PaneComposer";
+export { useComposerDraft } from "./use-composer-draft";

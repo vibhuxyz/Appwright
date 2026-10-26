@@ -1,4 +1,4 @@
-import type { PlanPreview, ThemeOption } from "@repo/contracts";
+import type { Attachment, PlanPreview, ThemeOption } from "@repo/contracts";
 import type { PlanAnswers, PlanQuestion } from "@/features/plan";
 import type { OutgoingMessage } from "../hooks/useSendMessage";
 
@@ -14,12 +14,13 @@ export interface IntakeGate {
   afterSeq: number;
   theme?: ThemeOption;
   plan?: PlanPreview;
+  planFeedback?: readonly string[];
+  attachments?: readonly Attachment[];
 }
 
 export interface IntakeControls {
   gate: IntakeGate | null;
   setGate: (value: IntakeGate | null | ((current: IntakeGate | null) => IntakeGate | null)) => void;
-  answersRef: { current: PlanAnswers | null };
   sessionId: string | undefined;
   activePromptRef: { current: string | null };
   deliver: (message: OutgoingMessage) => void;

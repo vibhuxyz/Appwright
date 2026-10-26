@@ -1,3 +1,4 @@
+import type { Attachment } from "@repo/contracts";
 import { ChatInput } from "../components/ChatInput";
 import { PromptSuggestionBar } from "../components/PromptSuggestionBar";
 import type { PromptQuality } from "../utils/evaluatePrompt";
@@ -7,6 +8,7 @@ export function PaneComposer({
   input,
   trimmed,
   running,
+  isPaused = false,
   isEnhancing,
   enhancedSuccess,
   enhanceError,
@@ -15,6 +17,9 @@ export function PaneComposer({
   suggestions,
   canUndo,
   model,
+  attachments = [],
+  isUploading = false,
+  uploadError = null,
   onUndo,
   onApplySuggestion,
   onModelChange,
@@ -23,10 +28,14 @@ export function PaneComposer({
   onEnhance,
   onStopEnhance,
   onStop,
+  onAddFiles,
+  onRemoveAttachment,
+  onPaste,
 }: {
   input: string;
   trimmed: string;
   running: boolean;
+  isPaused?: boolean;
   isEnhancing: boolean;
   enhancedSuccess: boolean;
   enhanceError: string | null;
@@ -35,6 +44,9 @@ export function PaneComposer({
   suggestions: PromptSuggestion[];
   canUndo: boolean;
   model: string | undefined;
+  attachments?: readonly Attachment[];
+  isUploading?: boolean;
+  uploadError?: string | null;
   onUndo: () => void;
   onApplySuggestion: (appendText: string) => void;
   onModelChange: (model: string) => void;
@@ -43,6 +55,9 @@ export function PaneComposer({
   onEnhance: () => void;
   onStopEnhance: () => void;
   onStop: () => void;
+  onAddFiles?: (files: FileList | File[]) => void;
+  onRemoveAttachment?: (id: string) => void;
+  onPaste?: (e: React.ClipboardEvent) => void;
 }) {
   return (
     <div className="mt-auto shrink-0">
@@ -58,17 +73,24 @@ export function PaneComposer({
       <ChatInput
         input={input}
         running={running}
+        isPaused={isPaused}
         isEnhancing={isEnhancing}
         enhancedSuccess={enhancedSuccess}
         enhanceError={enhanceError}
         quality={quality}
         model={model}
+        attachments={attachments}
+        isUploading={isUploading}
+        uploadError={uploadError}
         onModelChange={onModelChange}
         onChange={onChange}
         onSubmit={onSubmit}
         onEnhance={onEnhance}
         onStopEnhance={onStopEnhance}
         onStop={onStop}
+        onAddFiles={onAddFiles}
+        onRemoveAttachment={onRemoveAttachment}
+        onPaste={onPaste}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useProject, useProjects } from "@/features/projects/hooks/useProjects";
-import { ProjectWorkspace } from "@/features/workspace/components/ProjectWorkspace";
+import { ProjectWorkspace } from "@/features/workspace";
 import { ProjectConsoleView } from "@/features/project-console";
 
 export function ProjectPage({

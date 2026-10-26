@@ -4,6 +4,7 @@ interface TranscriptMessage {
   seq?: number;
   role?: string;
   content: string;
+  data?: { questionReply?: { kind: string } } | null;
 }
 
 export function profileTitleFromPrompt(prompt: string): string {
@@ -40,10 +41,7 @@ export function questionsAreInChat(
   afterSeq: number,
 ): boolean {
   if (questions.length === 0) return false;
-  const contents = new Set(
-    messages.filter((message) => isAfter(message, afterSeq)).map((message) => message.content),
-  );
-  return questions.every((question) => contents.has(question.text));
+  return messages.some((message) => isAfter(message, afterSeq) && message.data?.questionReply?.kind === "intake");
 }
 
 export function intakeLanded(

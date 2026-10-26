@@ -49,8 +49,8 @@ export function DashboardView({
 
       {!onOpenCreate && (
         <CreateProjectModal
+          key={`${isInternalCreateOpen}-${selectedTemplate?.id ?? "blank"}`}
           isOpen={isInternalCreateOpen}
-          initialTemplate={selectedTemplate}
           onClose={() => {
             setIsInternalCreateOpen(false);
             setSelectedTemplate(null);

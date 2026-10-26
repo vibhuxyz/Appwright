@@ -11,8 +11,8 @@ export const SUGGESTED_TEMPLATES = [
   {
     id: "blank",
     name: "Blank Project",
-    framework: "vite-react" as const,
-    desc: "Vite SPA",
+    framework: "nextjs-fullstack" as const,
+    desc: "Next.js full-stack",
     Icon: Plus,
     iconStyle: "border-slate-700/60 bg-slate-800/80 text-slate-300",
   },
@@ -34,9 +34,9 @@ export const SUGGESTED_TEMPLATES = [
   },
   {
     id: "ecommerce",
-    name: "Ecommerce",
+    name: "Ecommerce Store",
     framework: "nextjs-fullstack" as const,
-    desc: "Store & Stripe",
+    desc: "Store & Razorpay",
     Icon: ShoppingBag,
     iconStyle: "border-amber-500/30 bg-amber-500/15 text-amber-400",
   },
@@ -50,12 +50,15 @@ export const SUGGESTED_TEMPLATES = [
   },
   {
     id: "pm",
-    name: "Project Mgmt",
+    name: "Project Management",
     framework: "nextjs-fullstack" as const,
     desc: "Sprint Kanban",
     Icon: Kanban,
     iconStyle: "border-rose-500/30 bg-rose-500/15 text-rose-400",
   },
-];
+] as const;
+
+export const CAROUSEL_TEMPLATES = SUGGESTED_TEMPLATES.slice(1);
+export const STARTER_ROTATION_DELAY_MS = 5000;
 
 export type StarterTemplate = (typeof SUGGESTED_TEMPLATES)[number];

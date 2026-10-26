@@ -1,5 +1,6 @@
 import type { PlanAnswers, PlanQuestion } from "@/features/plan";
 import { agentApi } from "../api/agentApi";
+import { agentStore } from "../store/agentStore";
 import type { IntakeControls, IntakeGate } from "./types";
 
 interface PlanningInput {
@@ -8,6 +9,7 @@ interface PlanningInput {
   answers: PlanAnswers;
   asked: readonly PlanQuestion[];
   feedback?: string;
+  planFeedback?: readonly string[];
 }
 
 function errorText(error: unknown): string {
@@ -15,9 +17,10 @@ function errorText(error: unknown): string {
 }
 
 export function beginPlanning(input: PlanningInput, controls: IntakeControls) {
-  const { prompt, afterSeq, answers, asked, feedback } = input;
+  const { prompt, afterSeq, answers, asked, feedback, planFeedback } = input;
   const isCurrent = (current: IntakeGate | null): current is IntakeGate =>
     Boolean(current && current.prompt === prompt && current.afterSeq === afterSeq);
+  const attachments = controls.gate?.attachments;
   const planning: IntakeGate = {
     prompt,
     status: "planning",
@@ -26,11 +29,14 @@ export function beginPlanning(input: PlanningInput, controls: IntakeControls) {
     answers,
     error: null,
     afterSeq,
+    attachments,
+    ...(planFeedback && planFeedback.length > 0 ? { planFeedback } : {}),
   };
   if (!controls.sessionId) {
     controls.setGate({ ...planning, error: "No active session" });
     return;
   }
+  agentStore.getState().clearIntakeSteps();
   controls.setGate(planning);
   void agentApi
     .planPreview(controls.sessionId, {
@@ -52,14 +58,14 @@ export function beginPlanning(input: PlanningInput, controls: IntakeControls) {
 
 export function retryPlanning(controls: IntakeControls) {
   if (!controls.gate) return;
-  const { prompt, afterSeq, answers, asked } = controls.gate;
-  beginPlanning({ prompt, afterSeq, answers, asked }, controls);
+  const { prompt, afterSeq, answers, asked, planFeedback } = controls.gate;
+  beginPlanning({ prompt, afterSeq, answers, asked, planFeedback }, controls);
 }
 
 export function revisePlan(controls: IntakeControls, feedback: string) {
   if (!controls.gate) return;
-  const { prompt, afterSeq, answers, asked } = controls.gate;
-  beginPlanning({ prompt, afterSeq, answers, asked, feedback }, controls);
+  const { prompt, afterSeq, answers, asked, planFeedback = [] } = controls.gate;
+  beginPlanning({ prompt, afterSeq, answers, asked, feedback, planFeedback: [...planFeedback, feedback] }, controls);
 }
 
 export function approvePlan(controls: IntakeControls) {

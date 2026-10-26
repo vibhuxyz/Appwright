@@ -7,93 +7,19 @@ export interface ContactFieldConfig {
   autoComplete: string;
   inputMode?: "text" | "email" | "tel" | "url";
   required: boolean;
-  group: "social" | "contact";
 }
 
 export const CONTACT_FIELDS: readonly ContactFieldConfig[] = [
-  {
-    label: "Instagram",
-    placeholder: "https://instagram.com/yourbakery",
-    type: "text",
-    autoComplete: "url",
-    inputMode: "url",
-    required: false,
-    group: "social",
-  },
-  {
-    label: "Facebook",
-    placeholder: "https://facebook.com/yourbakery",
-    type: "text",
-    autoComplete: "url",
-    inputMode: "url",
-    required: false,
-    group: "social",
-  },
-  {
-    label: "TikTok",
-    placeholder: "https://tiktok.com/@yourbakery",
-    type: "text",
-    autoComplete: "url",
-    inputMode: "url",
-    required: false,
-    group: "social",
-  },
-  {
-    label: "Website",
-    placeholder: "https://yourbakery.com",
-    type: "text",
-    autoComplete: "url",
-    inputMode: "url",
-    required: false,
-    group: "social",
-  },
-  {
-    label: "Phone",
-    placeholder: "+91 98765 43210",
-    type: "tel",
-    autoComplete: "tel",
-    inputMode: "tel",
-    required: true,
-    group: "contact",
-  },
-  {
-    label: "WhatsApp",
-    placeholder: "+91 98765 43210",
-    type: "tel",
-    autoComplete: "tel",
-    inputMode: "tel",
-    required: false,
-    group: "contact",
-  },
-  {
-    label: "Email",
-    placeholder: "hello@yourbakery.com",
-    type: "email",
-    autoComplete: "email",
-    inputMode: "email",
-    required: true,
-    group: "contact",
-  },
-  {
-    label: "Support",
-    placeholder: "support@yourbakery.com",
-    type: "email",
-    autoComplete: "email",
-    inputMode: "email",
-    required: false,
-    group: "contact",
-  },
-  {
-    label: "Address",
-    placeholder: "Street, city, postcode",
-    type: "text",
-    autoComplete: "street-address",
-    required: true,
-    group: "contact",
-  },
+  { label: "Phone", placeholder: "+91 98765 43210", type: "tel", autoComplete: "tel", inputMode: "tel", required: true },
+  { label: "WhatsApp", placeholder: "+91 98765 43210", type: "tel", autoComplete: "tel", inputMode: "tel", required: false },
+  { label: "Email", placeholder: "hello@yourbusiness.com", type: "email", autoComplete: "email", inputMode: "email", required: true },
+  { label: "Address", placeholder: "Street, city, postcode", type: "text", autoComplete: "street-address", required: true },
 ];
 
 const MAX_CONTACT_ANSWER_CHARS = 1000;
+const EMPTY_VALUE = "—";
+const PAIR_SEPARATOR = "; ";
+const LABEL_SEPARATOR = ": ";
 
 export function fieldsToShow(requested: readonly string[]): readonly ContactFieldConfig[] {
   if (requested.length === 0) return CONTACT_FIELDS;
@@ -105,10 +31,22 @@ export function fieldsToShow(requested: readonly string[]): readonly ContactFiel
 export function encodeContactAnswer(values: Readonly<Record<string, string>>): string {
   const parts = CONTACT_FIELDS.map((field) => {
     const value = values[field.label]?.trim() ?? "";
-    return `${field.label}: ${value.length > 0 ? value : "—"}`;
+    return `${field.label}${LABEL_SEPARATOR}${value.length > 0 ? value : EMPTY_VALUE}`;
   });
-  const joined = parts.join("; ");
-  return joined.length <= MAX_CONTACT_ANSWER_CHARS
-    ? joined
-    : joined.slice(0, MAX_CONTACT_ANSWER_CHARS);
+  return parts.join(PAIR_SEPARATOR).slice(0, MAX_CONTACT_ANSWER_CHARS);
+}
+
+export function decodeContactAnswer(encoded: string): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const field of CONTACT_FIELDS) {
+    const match = new RegExp(`(?:^|${PAIR_SEPARATOR})${field.label}${LABEL_SEPARATOR}([^;]*)`).exec(encoded);
+    const value = match?.[1]?.trim() ?? "";
+    if (value.length > 0 && value !== EMPTY_VALUE) values[field.label] = value;
+  }
+  return values;
+}
+
+export function contactsAreFilled(encoded: string, requested: readonly string[] = []): boolean {
+  const values = decodeContactAnswer(encoded);
+  return fieldsToShow(requested).every((field) => !field.required || (values[field.label] ?? "").length > 0);
 }

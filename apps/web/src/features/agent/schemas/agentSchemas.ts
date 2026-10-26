@@ -1,3 +1,9 @@
+import {
+  AttachmentSchema,
+  QuestionReplyDataSchema,
+  QuestionSetDataSchema,
+  ThemeOptionSchema,
+} from "@repo/contracts";
 import { z } from "zod";
 
 export const sessionStatusSchema = z.enum([
@@ -49,6 +55,13 @@ export const msgSchema = z.object({
       args: z.record(z.string(), z.unknown()).optional(),
       stopReason: z.string().optional(),
       intake: z.boolean().optional(),
+      attachments: z.array(AttachmentSchema).optional(),
+      questionSet: QuestionSetDataSchema.optional().catch(undefined),
+      questionReply: QuestionReplyDataSchema.optional().catch(undefined),
+      theme: ThemeOptionSchema.optional().catch(undefined),
+      blueprintId: z.string().optional(),
+      planFeedback: z.array(z.string()).optional().catch(undefined),
+      transcriptOnly: z.boolean().optional(),
     })
     .nullable(),
   createdAt: z.string(),

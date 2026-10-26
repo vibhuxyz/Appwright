@@ -1,4 +1,4 @@
-import type { ThemeOption } from "@repo/contracts";
+import { THEME_OPTION_COUNT, type ThemeOption } from "@repo/contracts";
 import { Skeleton } from "@/shared/components/ui/Skeleton";
 import { ThemeOptionCard } from "./ThemeOptionCard";
 
@@ -16,9 +16,9 @@ export function ThemeOptionsGrid({
   if (isPending) {
     return (
       <div className="flex flex-col gap-3" role="status" aria-live="polite">
-        <p className="text-sm text-muted">Designing five systems…</p>
+        <p className="text-sm text-muted">Designing four systems…</p>
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {Array.from({ length: 5 }, (_, index) => (
+          {Array.from({ length: THEME_OPTION_COUNT }, (_, index) => (
             <Skeleton key={index} className="h-80 w-full border border-border bg-surface-3" />
           ))}
         </div>

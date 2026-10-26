@@ -32,7 +32,7 @@ export function ThemeCustomControls({
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-border-soft p-3">
       <p className="text-xs text-muted">
-        Want something else? Describe it, or upload a logo or photo. We generate five new systems from that.
+        Want something else? Describe it, or upload a logo or photo. We generate four new systems from that.
       </p>
       <label className="flex flex-col gap-1 text-xs text-muted">
         Describe the look

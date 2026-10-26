@@ -10,8 +10,8 @@ export function ToolCallGroup({
   responsesByCallId,
   isAgentRunning,
 }: {
-  calls: Msg[];
-  responsesByCallId: Map<string | undefined, Msg>;
+  calls: readonly Msg[];
+  responsesByCallId: ReadonlyMap<string | undefined, Msg>;
   isAgentRunning?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);

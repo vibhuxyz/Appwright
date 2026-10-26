@@ -26,8 +26,8 @@ export function DashboardPage() {
         onOpenCreate={handleOpenCreate}
       />
       <CreateProjectModal
+        key={`${isCreateOpen}-${selectedTemplate?.id ?? "blank"}`}
         isOpen={isCreateOpen}
-        initialTemplate={selectedTemplate}
         onClose={() => {
           setIsCreateOpen(false);
           setSelectedTemplate(null);

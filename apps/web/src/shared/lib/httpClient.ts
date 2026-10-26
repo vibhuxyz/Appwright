@@ -76,6 +76,13 @@ export const httpClient = {
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal,
     }).then((r) => parseJson<T>(r)),
+  postNoContent: (path: string, body?: unknown, signal?: AbortSignal): Promise<void> =>
+    request(path, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal,
+    }).then(rejectIfBad),
   postMaybeStream: async (path: string, body?: unknown, signal?: AbortSignal) => {
     const res = await request(path, {
       method: "POST",

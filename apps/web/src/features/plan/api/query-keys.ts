@@ -5,5 +5,4 @@ export const planKeys = {
   attempts: (runId: string, taskId: string) =>
     ["plan", "attempts", runId, taskId] as const,
   latestRun: (sessionId: string) => ["plan", "latest-run", sessionId] as const,
-  designDirections: (prompt: string) => ["plan", "design-directions", prompt] as const,
 };

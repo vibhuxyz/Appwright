@@ -1,16 +1,14 @@
-import type { ElementSelection } from "@repo/contracts";
+import type { Attachment, ElementSelection, ThemeOption } from "@repo/contracts";
 import { useRef, useState } from "react";
 import type { PlanAnswers } from "@/features/plan";
 import { agentStore } from "../store/agentStore";
 import { useSendMessage, type OutgoingMessage } from "../hooks/useSendMessage";
 import { intakeLanded } from "./chat-echo";
-import type { ThemeOption } from "@repo/contracts";
 import {
   askQuestions,
   chooseTheme,
   fetchRound,
   isComposerHeld,
-  retryAnswers,
   skipQuestions,
   submitAnswers,
   type IntakeControls,
@@ -20,17 +18,29 @@ import { approvePlan, retryPlanning, revisePlan } from "./plan-round";
 
 export type { IntakeGate };
 
+const USER_STEPS: ReadonlySet<IntakeGate["status"]> = new Set(["asking", "reviewing-plan", "choosing-theme"]);
+
+const WORKING_STEPS: ReadonlySet<IntakeGate["status"]> = new Set(["checking", "planning"]);
+
+function isWorking(gate: IntakeGate | null): boolean {
+  return gate !== null && gate.error === null && WORKING_STEPS.has(gate.status);
+}
+
+function isWaitingOnUser(gate: IntakeGate | null): boolean {
+  return gate !== null && gate.error === null && USER_STEPS.has(gate.status);
+}
+
 interface TranscriptMessage {
   seq?: number;
   role?: string;
   content: string;
+  data?: { questionReply?: { kind: string } } | null;
 }
 
 export function useIntake(sessionId: string | undefined, messages: readonly TranscriptMessage[]) {
   const sendMessage = useSendMessage(sessionId);
   const [gate, setGate] = useState<IntakeGate | null>(null);
   const [trackedSessionId, setTrackedSessionId] = useState(sessionId);
-  const answersRef = useRef<PlanAnswers | null>(null);
   const activePromptRef = useRef<string | null>(null);
 
   if (trackedSessionId !== sessionId) {
@@ -54,18 +64,24 @@ export function useIntake(sessionId: string | undefined, messages: readonly Tran
   const controls: IntakeControls = {
     gate,
     setGate,
-    answersRef,
     sessionId,
     activePromptRef,
     deliver,
   };
   const afterSeq = () => agentStore.getState().lastSeq;
 
+  const submit = (answers: PlanAnswers) => submitAnswers(controls, answers);
+  const choose = (theme: ThemeOption) => chooseTheme(controls, theme);
+  const approve = () => approvePlan(controls);
+  const revise = (feedback: string) => revisePlan(controls, feedback);
+
   return {
     gate,
-    ask: (prompt: string) => askQuestions(prompt, afterSeq(), controls),
-    approvePlan: () => approvePlan(controls),
-    revisePlan: (feedback: string) => revisePlan(controls, feedback),
+    dockControls: gate
+      ? { gate, isSubmitting: sendMessage.isPending, submit, approvePlan: approve, revisePlan: revise, chooseTheme: choose }
+      : null,
+    ask: (prompt: string, attachments?: readonly Attachment[]) =>
+      askQuestions(prompt, afterSeq(), controls, attachments),
     askAgain: () => {
       if (!gate?.prompt) return;
       if (gate.status === "planning") {
@@ -73,25 +89,31 @@ export function useIntake(sessionId: string | undefined, messages: readonly Tran
         return;
       }
       if (Object.keys(gate.answers).length > 0 || gate.asked.length > 0) {
-        fetchRound(gate.prompt, gate.afterSeq, gate.answers, gate.asked, controls);
+        fetchRound(gate.prompt, gate.afterSeq, gate.answers, gate.asked, controls, gate.attachments);
         return;
       }
-      askQuestions(gate.prompt, gate.afterSeq, controls);
+      askQuestions(gate.prompt, gate.afterSeq, controls, gate.attachments);
     },
-    submit: (answers: PlanAnswers) => submitAnswers(controls, answers),
-    chooseTheme: (theme: ThemeOption) => chooseTheme(controls, theme),
-    retry: () => retryAnswers(controls),
     continueWithoutQuestions: () => skipQuestions(controls),
-    sendNow: (prompt: string, selection?: ElementSelection) => {
+    cancel: (): string | null => {
+      const prompt = gate?.prompt ?? null;
       activePromptRef.current = null;
+      agentStore.getState().clearIntakeSteps();
       setGate(null);
-      deliver(selection ? { prompt, selection } : { prompt });
+      return prompt;
     },
-    dismiss: () => {
+    sendNow: (prompt: string, selection?: ElementSelection, attachments?: readonly Attachment[]) => {
       activePromptRef.current = null;
       setGate(null);
+      deliver({
+        prompt,
+        ...(selection ? { selection } : {}),
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
+      });
     },
     isSubmitting: sendMessage.isPending,
+    isWaitingOnUser: isWaitingOnUser(gate),
+    isWorking: isWorking(gate),
     holdsComposer: isComposerHeld(gate, messages, sendMessage.isPending),
   };
 }

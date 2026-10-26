@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Project } from "../schemas/projectSchemas";
-import { useDeleteProject } from "../hooks/useProjects";
 import { projectApi } from "../api/projectApi";
 import { cn } from "@/shared/lib/cn";
 
@@ -12,8 +11,13 @@ const DOT: Record<Project["status"], string> = {
   ERROR: "bg-danger",
 };
 
-export function ProjectCard({ project }: { project: Project }) {
-  const deleteProject = useDeleteProject();
+export function ProjectCard({
+  project,
+  onDelete,
+}: {
+  project: Project;
+  onDelete?: (project: Project) => void;
+}) {
   const queryClient = useQueryClient();
 
   return (
@@ -36,18 +40,19 @@ export function ProjectCard({ project }: { project: Project }) {
         <span className={cn("size-1.5 rounded-full", DOT[project.status])} />
         {project.status.toLowerCase()}
       </span>
-      <button
-        className="shrink-0 cursor-pointer text-xs font-medium text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-danger"
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (confirm(`Delete project "${project.name}"?`)) {
-            deleteProject.mutate(project.id);
-          }
-        }}
-      >
-        Delete
-      </button>
+      {onDelete && (
+        <button
+          type="button"
+          className="shrink-0 cursor-pointer text-xs font-medium text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:text-rose-400"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onDelete(project);
+          }}
+        >
+          Delete
+        </button>
+      )}
     </Link>
   );
 }

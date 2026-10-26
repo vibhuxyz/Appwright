@@ -1,6 +1,7 @@
 import {
   PlanPreviewSchema,
   PromptQuestionsResponse,
+  type Attachment,
   type PlanPreviewRequest,
   type ElementSelection,
   type PromptAnswerValue,
@@ -27,6 +28,8 @@ export interface SendMessagePayload {
   selection?: ElementSelection;
   theme?: ThemeOption;
   blueprintId?: string;
+  planFeedback?: readonly string[];
+  attachments?: readonly Attachment[];
 }
 
 export const agentApi = {
@@ -59,12 +62,14 @@ export const agentApi = {
     prompt: string,
     sessionId?: string,
     answers?: Readonly<Record<string, PromptAnswerValue>>,
+    attachments?: readonly Attachment[],
   ) =>
     httpClient
       .post("/conversation/questions", {
         prompt,
         sessionId,
         ...(answers && Object.keys(answers).length > 0 ? { answers } : {}),
+        ...(attachments && attachments.length > 0 ? { attachments } : {}),
       })
       .then((body) => {
         const parsed = PromptQuestionsResponse.safeParse(body);
@@ -83,6 +88,15 @@ export const agentApi = {
     httpClient.post<{ ok: boolean; stopped: boolean }>(
       `/conversation/${sessionId}/stop`,
     ),
+  uploadAttachment: (projectId: string, file: File, sessionId?: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const query = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+    return httpClient.postForm<Attachment>(
+      `/v1/projects/${projectId}/attachments/upload${query}`,
+      formData,
+    );
+  },
   enhancePrompt: (prompt: string, signal?: AbortSignal) =>
     httpClient.post<{ enhancedPrompt: string }>(
       "/prompt/enhance",

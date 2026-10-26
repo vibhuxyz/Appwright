@@ -1,9 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { AssetRequestResponse } from "@repo/contracts";
+import { AGENT_WAIT_STATUS, type AssetRequestResponse } from "@repo/contracts";
 import { connectConversationStream } from "@/realtime/connectionManager";
 import { assetKeys } from "@/features/assets/api/query-keys";
+import { environmentKeys } from "@/features/environment";
 import { agentApi } from "../api/agentApi";
+import { agentQuestionKeys } from "../questions";
 import { agentStore } from "../store/agentStore";
 import type { SessionStatus } from "../schemas/agentSchemas";
 
@@ -76,8 +78,12 @@ export function useConversationStream(
             if (frame.status === "RUNNING") {
               agentStore.getState().setRunning(true, frame.detail ?? "AI is working…");
               agentStore.getState().setStopNotice(null);
+            } else if (frame.status === "AWAITING_APPROVAL") {
+              agentStore.getState().setRunning(true, frame.detail ?? "Waiting for your approval");
             } else {
               agentStore.getState().setRunning(false);
+              void queryClient.invalidateQueries({ queryKey: agentQuestionKeys.pending(sessionId) });
+              void queryClient.invalidateQueries({ queryKey: environmentKeys.allPending });
               if (frame.reason && frame.reason !== "completed") {
                 agentStore.getState().setStopNotice({
                   reason: frame.reason,
@@ -92,6 +98,17 @@ export function useConversationStream(
           },
           onUsage: (frame) => {
             onUsageRef.current?.(frame);
+          },
+          onIntegrationConfig: ({ request }) => {
+            void queryClient.invalidateQueries({ queryKey: environmentKeys.pending(request.projectId) });
+            agentStore.getState().setRunning(true, AGENT_WAIT_STATUS.keys);
+          },
+          onIntakeProgress: ({ tool, detail, items }) => {
+            agentStore.getState().pushIntakeStep({ tool, detail, items: items ?? [] });
+          },
+          onAgentQuestion: ({ question }) => {
+            void queryClient.invalidateQueries({ queryKey: agentQuestionKeys.pending(sessionId) });
+            if (question.status === "PENDING") agentStore.getState().setRunning(true, AGENT_WAIT_STATUS.answers);
           },
         },
       );

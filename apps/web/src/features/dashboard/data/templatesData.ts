@@ -31,7 +31,7 @@ export const TEMPLATES: TemplateItem[] = [
     id: "ecommerce-store",
     name: "Ecommerce Store",
     description: "Modern eCommerce store with payments, orders and admin panel.",
-    tags: ["Next.js", "Stripe", "MongoDB"],
+    tags: ["Next.js", "Razorpay", "MongoDB"],
     templateId: "nextjs-fullstack",
     color: "from-amber-500/20 via-orange-500/10 to-transparent",
     accent: "text-amber-400",

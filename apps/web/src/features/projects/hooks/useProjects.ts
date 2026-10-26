@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { projectApi } from "../api/projectApi";
 import type { Project } from "../schemas/projectSchemas";
+import type { CreateProjectRequest } from "@repo/contracts";
 
 export const projectsQueryKey = ["projects"] as const;
 
@@ -22,10 +23,8 @@ export function useProject(id: string) {
 export function useCreateProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, templateId }: { name: string; templateId: string }) =>
-      projectApi.create(name, templateId),
+    mutationFn: (input: CreateProjectRequest) => projectApi.create(input),
     onSuccess: (newProject) => {
-      // Instantly seed both individual and list cache for seamless immediate navigation
       queryClient.setQueryData(["project", newProject.id], newProject);
       queryClient.setQueryData<Project[]>(projectsQueryKey, (old) => {
         if (!old) return [newProject];
@@ -39,8 +38,38 @@ export function useCreateProject() {
 export function useDeleteProject() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => projectApi.remove(id),
-    onSuccess: () => {
+    mutationFn: async (id: string) => {
+      if (id.endsWith("-sample") || id.includes("sample")) {
+        return;
+      }
+      try {
+        await projectApi.remove(id);
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          (err.message.toLowerCase().includes("not found") ||
+            err.message.includes("404"))
+        ) {
+          return;
+        }
+        throw err;
+      }
+    },
+    onMutate: async (deletedId: string) => {
+      await queryClient.cancelQueries({ queryKey: projectsQueryKey });
+      const previousProjects = queryClient.getQueryData<Project[]>(projectsQueryKey);
+      queryClient.setQueryData<Project[]>(projectsQueryKey, (old) =>
+        old ? old.filter((p) => p.id !== deletedId) : [],
+      );
+      return { previousProjects };
+    },
+    onError: (_err, _deletedId, context) => {
+      if (context?.previousProjects) {
+        queryClient.setQueryData(projectsQueryKey, context.previousProjects);
+      }
+    },
+    onSettled: (_data, _error, deletedId) => {
+      queryClient.removeQueries({ queryKey: ["project", deletedId] });
       void queryClient.invalidateQueries({ queryKey: projectsQueryKey });
     },
   });

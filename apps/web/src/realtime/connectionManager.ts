@@ -1,6 +1,9 @@
 import {
+  agentQuestionFrameSchema,
   assetRequestFrameSchema,
   deltaFrameSchema,
+  intakeProgressFrameSchema,
+  integrationConfigFrameSchema,
   messageFrameSchema,
   statusFrameSchema,
   usageFrameSchema,
@@ -38,6 +41,21 @@ export function connectConversationStream(
   source.addEventListener("assetRequest", (e) => {
     const frame = assetRequestFrameSchema.parse(JSON.parse((e as MessageEvent).data));
     handlers.onAssetRequest?.(frame);
+  });
+
+  source.addEventListener("integration_configuration_required", (e) => {
+    const frame = integrationConfigFrameSchema.parse(JSON.parse((e as MessageEvent).data));
+    handlers.onIntegrationConfig?.(frame);
+  });
+
+  source.addEventListener("agent_question", (e) => {
+    const frame = agentQuestionFrameSchema.parse(JSON.parse((e as MessageEvent).data));
+    handlers.onAgentQuestion?.(frame);
+  });
+
+  source.addEventListener("intake_progress", (e) => {
+    const frame = intakeProgressFrameSchema.parse(JSON.parse((e as MessageEvent).data));
+    handlers.onIntakeProgress?.(frame);
   });
 
   return () => source.close();

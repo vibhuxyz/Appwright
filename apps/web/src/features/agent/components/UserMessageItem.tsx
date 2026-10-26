@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, User } from "lucide-react";
 import type { Msg } from "../schemas/agentSchemas";
+import { AttachmentGallery } from "./AttachmentGallery";
 
 const CHAR_THRESHOLD = 260;
 const LINE_THRESHOLD = 5;
@@ -10,6 +11,7 @@ export function UserMessageItem({ msg }: { msg: Msg }) {
 
   const lines = msg.content.split("\n");
   const isTooBig = msg.content.length > CHAR_THRESHOLD || lines.length > LINE_THRESHOLD;
+  const attachments = msg.data?.attachments ?? [];
 
   return (
     <div className="flex max-w-[88%] flex-col items-end gap-1.5 self-end sm:max-w-[80%]">
@@ -43,6 +45,8 @@ export function UserMessageItem({ msg }: { msg: Msg }) {
             )}
           </button>
         )}
+
+        {attachments.length > 0 && <AttachmentGallery attachments={attachments} />}
       </div>
     </div>
   );

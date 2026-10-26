@@ -1,14 +1,17 @@
 import { useState } from "react";
-import { ChevronDown, ExternalLink, Link2, Rocket, LayoutDashboard } from "lucide-react";
+import { ChevronDown, Download, ExternalLink, Link2, Rocket, LayoutDashboard } from "lucide-react";
 import type { Project } from "@/features/projects/schemas/projectSchemas";
 import type { Session } from "@/features/agent/schemas/agentSchemas";
+import { useAuthStore } from "@/stores/authStore";
+import { NewChatButton } from "@/features/agent/composer";
 import { DeployButton } from "@/features/deployments/components/DeployButton";
 import { AppHeader } from "@/app/layouts/AppHeader";
+import { workspaceApi } from "../api/workspaceApi";
 import { PermissionModeSelect } from "./PermissionModeSelect";
 import { SessionSwitcher } from "./SessionSwitcher";
 
 const STATUS: Record<Project["status"], { label: string; dot: string; text: string }> = {
-  READY: { label: "Production", dot: "bg-success", text: "text-success" },
+  READY: { label: "Ready", dot: "bg-success", text: "text-success" },
   BUILDING: { label: "Building", dot: "animate-pulse bg-warning", text: "text-warning" },
   PROVISIONING: {
     label: "Provisioning",
@@ -27,13 +30,16 @@ function ProjectChip({
   projectId,
   session,
   onOpenConsole,
+  onUpgrade,
 }: {
   project: Project | undefined;
   projectId: string;
   session: Session | undefined;
   onOpenConsole?: () => void;
+  onUpgrade?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const user = useAuthStore((s) => s.user);
   const name = project?.name ?? projectId;
   const status = project ? STATUS[project.status] : undefined;
   const url = session?.previewUrl ?? project?.previewUrl ?? null;
@@ -99,6 +105,31 @@ function ProjectChip({
             >
               <Link2 className="size-4" /> Copy share link
             </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                if (user?.plan === "FREE") {
+                  onUpgrade?.();
+                  return;
+                }
+                const safeName = (project?.name || "project")
+                  .toLowerCase()
+                  .replace(/[^a-z0-9_-]/g, "-");
+                void workspaceApi.downloadProject(projectId, session?.id, `${safeName}.zip`);
+              }}
+              className="flex w-full cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-sm text-foreground-secondary transition-colors hover:bg-surface-3 hover:text-foreground"
+            >
+              <span className="flex items-center gap-2">
+                <Download className="size-4 text-[#E3FC18]" /> Download Codebase
+              </span>
+              {user?.plan === "FREE" && (
+                <span className="rounded-sm bg-[#E3FC18]/15 px-1 py-0.5 text-[10px] font-bold text-[#E3FC18]">
+                  PRO
+                </span>
+              )}
+            </button>
             {session && (
               <PermissionModeSelect projectId={projectId} session={session} />
             )}
@@ -122,6 +153,8 @@ export function ProjectHeader({
   onAddCredits,
   onUpgrade,
   onOpenConsole,
+  isNewChatBusy,
+  onNewChat,
 }: {
   projectId: string;
   project: Project | undefined;
@@ -129,6 +162,8 @@ export function ProjectHeader({
   onAddCredits?: () => void;
   onUpgrade?: () => void;
   onOpenConsole?: () => void;
+  isNewChatBusy: boolean;
+  onNewChat: () => void;
 }) {
   return (
     <AppHeader
@@ -136,12 +171,16 @@ export function ProjectHeader({
       onAddCredits={onAddCredits}
       onUpgrade={onUpgrade}
       project={
-        <ProjectChip
-          project={project}
-          projectId={projectId}
-          session={session}
-          onOpenConsole={onOpenConsole}
-        />
+        <div className="flex min-w-0 items-center gap-2">
+          <ProjectChip
+            project={project}
+            projectId={projectId}
+            session={session}
+            onOpenConsole={onOpenConsole}
+            onUpgrade={onUpgrade}
+          />
+          <NewChatButton isBusy={isNewChatBusy} onNewChat={onNewChat} />
+        </div>
       }
       actions={<DeployButton projectId={projectId} icon={<Rocket className="size-4 text-lime" />} />}
     />

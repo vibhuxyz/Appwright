@@ -5,6 +5,7 @@ import type { Session } from "@/features/agent/schemas/agentSchemas";
 import { Panel } from "@/shared/components/ui/Panel";
 import { useAgentStore } from "@/features/agent/store/agentStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useFrameTelemetry } from "@/features/logs";
 import { useInspector } from "../hooks/useInspector";
 import { useSessionPreview } from "../hooks/useSessionPreview";
 import { badgeTextFor, previewErrorMessage, previewView } from "../lib/preview-view";
@@ -46,6 +47,7 @@ export function PreviewPane({ project, session }: PreviewPaneProps) {
   });
 
   useInspector(frameRef, view.currentKey);
+  useFrameTelemetry(frameRef, session?.id);
 
   const reload = () => {
     setReloadKey((k) => k + 1);

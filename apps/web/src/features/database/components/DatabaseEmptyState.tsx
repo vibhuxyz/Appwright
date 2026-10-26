@@ -3,11 +3,13 @@ import { Database, AlertCircle, Sparkles } from "lucide-react";
 export function DatabaseEmptyState({
   templateId,
   isFailed,
+  isReady = true,
   errorMessage,
   onRetry,
 }: {
   templateId?: string;
   isFailed?: boolean;
+  isReady?: boolean;
   errorMessage?: string;
   onRetry?: () => void;
 }) {
@@ -28,7 +30,9 @@ export function DatabaseEmptyState({
           ? "Database Provisioning Issue"
           : isClientOnly
             ? "Frontend-Only Project Template"
-            : "No Database Collections Configured"}
+            : isReady
+              ? "No Database Collections Configured"
+              : "No Database Yet"}
       </h3>
 
       <p className="mt-2 max-w-md text-xs text-muted">
@@ -36,7 +40,9 @@ export function DatabaseEmptyState({
           ? errorMessage ?? "Could not connect or provision the MongoDB database for this project."
           : isClientOnly
             ? "This project was initialized with Vite + React. To use a database, create a project with Next.js Fullstack or ask the AI agent to integrate backend endpoints."
-            : "Your MongoDB database is provisioned and ready. As the agent builds your models and runs seed scripts, your tables and collections will automatically populate here."}
+            : isReady
+              ? "Your MongoDB database is provisioned and ready. As the agent builds your models and runs seed scripts, your tables and collections will automatically populate here."
+              : "This app has no database yet. It is created automatically the first time the app stores data, and its collections will appear here."}
       </p>
 
       {isFailed && onRetry && (

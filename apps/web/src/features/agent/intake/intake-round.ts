@@ -1,6 +1,7 @@
-import type { ThemeOption } from "@repo/contracts";
+import type { Attachment, ThemeOption } from "@repo/contracts";
 import { SKIP_ANSWER, type PlanAnswers, type PlanQuestion } from "@/features/plan";
 import { agentApi } from "../api/agentApi";
+import { agentStore } from "../store/agentStore";
 import { questionsAreInChat } from "./chat-echo";
 import { beginPlanning } from "./plan-round";
 import type { IntakeControls, IntakeGate } from "./types";
@@ -42,9 +43,12 @@ export function fetchRound(
   answers: PlanAnswers,
   asked: readonly PlanQuestion[],
   controls: IntakeControls,
+  attachments?: readonly Attachment[],
 ) {
   const isCurrent = (current: IntakeGate | null) =>
     Boolean(current && current.prompt === prompt && current.afterSeq === afterSeq);
+  const activeAttachments = attachments ?? controls.gate?.attachments;
+  agentStore.getState().clearIntakeSteps();
   controls.setGate({
     prompt,
     status: "checking",
@@ -53,9 +57,10 @@ export function fetchRound(
     answers,
     error: null,
     afterSeq,
+    attachments: activeAttachments,
   });
-  const catalogAnswers = Object.keys(answers).length > 0 ? answers : undefined;
-  void agentApi.questionsFor(prompt, controls.sessionId, catalogAnswers).then(
+  const catalogAnswers = Object.keys(answers).length > 0 ? withDefaults(asked, answers) : undefined;
+  void agentApi.questionsFor(prompt, controls.sessionId, catalogAnswers, activeAttachments).then(
     (round) => {
       if (round.questions.length > 0) {
         controls.setGate((current) => {
@@ -68,6 +73,7 @@ export function fetchRound(
             answers,
             error: null,
             afterSeq,
+            attachments: activeAttachments,
           };
         });
         return;
@@ -76,11 +82,12 @@ export function fetchRound(
         beginPlanning({ prompt, afterSeq, answers, asked }, controls);
         return;
       }
-      if (!isCurrent(controls.gate)) return;
+      if (controls.activePromptRef.current !== prompt) return;
       controls.activePromptRef.current = null;
-      controls.setGate(null);
+      controls.setGate((current) => (current && isCurrent(current) ? { ...current, status: "sent", error: null } : current));
       controls.deliver({
         prompt,
+        ...(activeAttachments && activeAttachments.length > 0 ? { attachments: activeAttachments } : {}),
         ...(asked.length > 0 ? { answers, questions: asked } : {}),
       });
     },
@@ -95,64 +102,69 @@ export function fetchRound(
           answers,
           error: errorText(error),
           afterSeq,
+          attachments: activeAttachments,
         };
       });
     },
   );
 }
 
-export function askQuestions(prompt: string, afterSeq: number, controls: IntakeControls) {
-  controls.answersRef.current = null;
+export function askQuestions(
+  prompt: string,
+  afterSeq: number,
+  controls: IntakeControls,
+  attachments?: readonly Attachment[],
+) {
   controls.activePromptRef.current = prompt;
-  fetchRound(prompt, afterSeq, {}, [], controls);
+  fetchRound(prompt, afterSeq, {}, [], controls, attachments);
 }
 
 export function submitAnswers(controls: IntakeControls, batch: PlanAnswers) {
   if (!controls.gate) return;
   const asked = uniqueQuestions([...controls.gate.asked, ...controls.gate.questions]);
-  const answers = withDefaults(asked, { ...controls.gate.answers, ...batch });
-  controls.answersRef.current = answers;
-  fetchRound(controls.gate.prompt, controls.gate.afterSeq, answers, asked, controls);
+  const answers = { ...controls.gate.answers, ...batch };
+  fetchRound(
+    controls.gate.prompt,
+    controls.gate.afterSeq,
+    answers,
+    asked,
+    controls,
+    controls.gate.attachments,
+  );
 }
 
 export function chooseTheme(controls: IntakeControls, theme: ThemeOption) {
   if (!controls.gate) return;
-  const { prompt, answers, asked, plan } = controls.gate;
+  const { prompt, answers, asked, plan, attachments, planFeedback } = controls.gate;
   controls.setGate({ ...controls.gate, status: "sent", theme, error: null });
   controls.deliver({
     prompt,
     theme,
+    ...(attachments && attachments.length > 0 ? { attachments } : {}),
     ...(asked.length > 0 ? { answers, questions: asked } : {}),
     ...(plan ? { blueprintId: plan.blueprintId } : {}),
-  });
-}
-
-export function retryAnswers(controls: IntakeControls) {
-  if (!controls.gate || !controls.answersRef.current) return;
-  const asked = uniqueQuestions([...controls.gate.asked, ...controls.gate.questions]);
-  controls.setGate({ ...controls.gate, status: "sent", asked, error: null });
-  controls.deliver({
-    prompt: controls.gate.prompt,
-    answers: controls.answersRef.current,
-    questions: asked,
-    ...(controls.gate.theme ? { theme: controls.gate.theme } : {}),
+    ...(planFeedback && planFeedback.length > 0 ? { planFeedback } : {}),
   });
 }
 
 export function skipQuestions(controls: IntakeControls) {
   if (!controls.gate) return;
+  const attachments = controls.gate.attachments;
   controls.setGate({
     ...controls.gate,
     status: "sent",
     questions: [],
     error: null,
   });
-  controls.deliver({ prompt: controls.gate.prompt });
+  controls.deliver({
+    prompt: controls.gate.prompt,
+    ...(attachments && attachments.length > 0 ? { attachments } : {}),
+  });
 }
 
 export function isComposerHeld(
   gate: IntakeGate | null,
-  messages: readonly { seq?: number; role?: string; content: string }[],
+  messages: readonly { seq?: number; role?: string; content: string; data?: { questionReply?: { kind: string } } | null }[],
   isSubmitting: boolean,
 ): boolean {
   const waitingOnTranscript = Boolean(

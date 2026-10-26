@@ -1,21 +1,21 @@
 import { isRepairPrompt } from "@repo/contracts";
 import { useMemo, useState } from "react";
 import type { Session } from "../schemas/agentSchemas";
-import { useAgentStore, agentStore } from "../store/agentStore";
-import { useCreateSession, useUpdateSessionModel } from "../hooks/useSession";
-import { useEnhancePrompt, useStopConversation } from "../hooks/useSendMessage";
-import { AssetRequestCard, useAssetRequests } from "@/features/assets";
+import { useAgentStore } from "../store/agentStore";
+import { useUpdateSessionModel } from "../hooks/useSession";
+import { useStopConversation } from "../hooks/useSendMessage";
+import { useAttachmentUpload } from "../hooks/useAttachmentUpload";
 import { IntakeDock, useIntake } from "../intake";
+import { ChatDock } from "../questions";
 import { deriveActiveStopNotice } from "../utils/deriveStopNotice";
-import { evaluatePrompt } from "../utils/evaluatePrompt";
-import { getPromptSuggestions } from "../utils/promptSuggestions";
 import { Panel } from "@/shared/components/ui/Panel";
 import { SelectionChip, selectionStore } from "@/features/preview";
-import { ChatPaneHeader, PaneComposer } from "../composer";
+import { PaneComposer, useComposerDraft } from "../composer";
 import { MessageList } from "./MessageList";
 import { StopNoticeCard } from "./StopNoticeCard";
 
 const RESUME_PROMPT = "Continue building the remaining tasks in the plan until complete.";
+const ATTACHMENT_ONLY_PROMPT = "Build the application according to the attached reference designs and documents.";
 
 export function ChatPane({
   projectId,
@@ -36,109 +36,67 @@ export function ChatPane({
   const liveStopNotice = useAgentStore((s) => s.stopNotice);
 
   const intake = useIntake(sessionId, messages);
-  const { data: assetRequests = [] } = useAssetRequests(sessionId, running);
-  const pendingAssetRequests = assetRequests.filter((request) => request.status === "PENDING");
+  const [dockReopenRequest, setDockReopenRequest] = useState(0);
   const stopConversation = useStopConversation(sessionId);
-  const enhancePrompt = useEnhancePrompt();
-  const createSession = useCreateSession(projectId);
   const updateModel = useUpdateSessionModel(projectId);
-
-  const [input, setInput] = useState("");
-  const [prevInput, setPrevInput] = useState<string | null>(null);
-  const [enhancedSuccess, setEnhancedSuccess] = useState(false);
-
-  const trimmed = input.trim();
-  const { quality, tip } = evaluatePrompt(trimmed, enhancedSuccess);
-  const suggestions = useMemo(() => getPromptSuggestions(trimmed), [trimmed]);
+  const draft = useComposerDraft(running);
+  const uploads = useAttachmentUpload(projectId, sessionId);
 
   const activeStopNotice = useMemo(
     () => deriveActiveStopNotice(liveStopNotice, messages, userCredits),
     [liveStopNotice, messages, userCredits],
   );
 
+  const stop = () => {
+    if (!intake.isWorking) {
+      stopConversation.mutate();
+      return;
+    }
+    const prompt = intake.cancel();
+    if (prompt && draft.trimmed.length === 0) draft.change(prompt);
+  };
+
   const send = () => {
-    if (!sessionId || !trimmed || running || enhancePrompt.isPending || intake.holdsComposer) return;
-    const prompt = trimmed;
-    setInput("");
-    setPrevInput(null);
-    setEnhancedSuccess(false);
+    if (intake.isWaitingOnUser) {
+      setDockReopenRequest((request) => request + 1);
+      return;
+    }
+    const isBlocked = running || draft.enhancePrompt.isPending || intake.holdsComposer;
+    if (!sessionId || (!draft.trimmed && uploads.attachments.length === 0) || isBlocked) return;
+    const prompt = draft.trimmed || ATTACHMENT_ONLY_PROMPT;
+    const activeAttachments = uploads.attachments;
+    draft.clear();
+    uploads.clearAttachments();
     const selection = selectionStore.getState().selection;
     const alreadyTalking = messages.some((message) => message.role === "user");
     if (selection) selectionStore.getState().clearSelection();
     if (selection || alreadyTalking || isRepairPrompt(prompt)) {
-      intake.sendNow(prompt, selection ?? undefined);
+      intake.sendNow(prompt, selection ?? undefined, activeAttachments);
       return;
     }
-    intake.ask(prompt);
-  };
-
-  const handleEnhance = () => {
-    if (!trimmed || enhancePrompt.isPending || running) return;
-    enhancePrompt.mutate(trimmed, {
-      onSuccess: (res) => {
-        setPrevInput(trimmed);
-        setInput(res.enhancedPrompt);
-        setEnhancedSuccess(true);
-      },
-    });
-  };
-
-  const handleApplySuggestion = (appendText: string) => {
-    setInput((curr) => {
-      const t = curr.trim();
-      return t ? `${t}${appendText}` : appendText.trim();
-    });
-  };
-
-  const startNewChat = () => {
-    if (running || createSession.isPending) return;
-    intake.dismiss();
-    createSession.mutate(undefined, {
-      onSuccess: () => agentStore.getState().reset([], false, ""),
-    });
+    intake.ask(prompt, activeAttachments);
   };
 
   return (
     <Panel className="flex flex-1 flex-col overflow-hidden bg-background">
-      <ChatPaneHeader isBusy={running || createSession.isPending} onNewChat={startNewChat} />
-
       <MessageList
         messages={messages}
         delta={delta}
         running={running}
         statusDetail={statusDetail}
         sessionId={sessionId}
-        onStop={() => stopConversation.mutate()}
+        onStop={stop}
         footer={
           intake.gate ? (
             <IntakeDock
               gate={intake.gate}
               messages={messages}
-              isSubmitting={intake.isSubmitting}
-              onSubmit={intake.submit}
-              onRetry={intake.retry}
               onContinue={intake.continueWithoutQuestions}
               onAskAgain={intake.askAgain}
-              onChooseTheme={intake.chooseTheme}
-              onApprovePlan={intake.approvePlan}
-              onRevisePlan={intake.revisePlan}
             />
           ) : null
         }
       />
-
-      {sessionId && pendingAssetRequests.length > 0 && (
-        <div className="shrink-0 px-3 pt-1">
-          {pendingAssetRequests.map((request) => (
-            <AssetRequestCard
-              key={request.id}
-              assetRequest={request}
-              sessionId={sessionId}
-              projectId={projectId}
-            />
-          ))}
-        </div>
-      )}
 
       {activeStopNotice && !running && (
         <StopNoticeCard
@@ -149,42 +107,47 @@ export function ChatPane({
         />
       )}
 
-      {!intake.holdsComposer && <SelectionChip />}
-
-      {!intake.holdsComposer && (
+      <ChatDock
+        projectId={projectId}
+        sessionId={sessionId}
+        intake={intake.dockControls}
+        messages={messages}
+        running={running}
+        reopenRequest={dockReopenRequest}
+        onSendLate={(text) => intake.sendNow(text)}
+      >
+        <SelectionChip />
         <PaneComposer
-          input={input}
-          trimmed={trimmed}
-          running={running}
-          isEnhancing={enhancePrompt.isPending}
-          enhancedSuccess={enhancedSuccess}
-          enhanceError={enhancePrompt.error?.message ?? null}
-          quality={quality}
-          tip={tip}
-          suggestions={suggestions}
-          canUndo={prevInput !== null}
+          input={draft.input}
+          trimmed={draft.trimmed}
+          running={running || intake.isWorking}
+          isPaused={intake.holdsComposer && !intake.isWaitingOnUser && !intake.isWorking}
+          isEnhancing={draft.enhancePrompt.isPending}
+          enhancedSuccess={draft.enhancedSuccess}
+          enhanceError={draft.enhancePrompt.error?.message ?? null}
+          quality={draft.quality}
+          tip={draft.tip}
+          suggestions={draft.suggestions}
+          canUndo={draft.canUndo}
           model={session?.model}
-          onUndo={() => {
-            if (prevInput !== null) {
-              setInput(prevInput);
-              setPrevInput(null);
-              setEnhancedSuccess(false);
-            }
-          }}
-          onApplySuggestion={handleApplySuggestion}
+          attachments={uploads.attachments}
+          isUploading={uploads.isUploading}
+          uploadError={uploads.uploadError}
+          onUndo={draft.undo}
+          onApplySuggestion={draft.applySuggestion}
           onModelChange={(model) => {
             if (session) updateModel.mutate({ sessionId: session.id, model });
           }}
-          onChange={(value) => {
-            setInput(value);
-            setEnhancedSuccess(false);
-          }}
+          onChange={draft.change}
           onSubmit={send}
-          onEnhance={handleEnhance}
-          onStopEnhance={enhancePrompt.cancel}
-          onStop={() => stopConversation.mutate()}
+          onEnhance={draft.enhance}
+          onStopEnhance={draft.enhancePrompt.cancel}
+          onStop={stop}
+          onAddFiles={uploads.uploadFiles}
+          onRemoveAttachment={uploads.removeAttachment}
+          onPaste={uploads.handlePaste}
         />
-      )}
+      </ChatDock>
     </Panel>
   );
 }

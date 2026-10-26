@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import type { Msg, StopNotice } from "../schemas/agentSchemas";
 
+export type IntakeTool = "request" | "questions" | "planner";
+
+export interface IntakeStep {
+  tool: IntakeTool;
+  detail: string;
+  items: readonly string[];
+}
+
 interface AgentState {
   messages: Msg[];
   delta: string;
@@ -8,12 +16,17 @@ interface AgentState {
   statusDetail: string;
   stopNotice: StopNotice | null;
   lastSeq: number;
+  intakeSteps: readonly IntakeStep[];
   reset: (messages: Msg[], running: boolean, statusDetail: string) => void;
   appendMessage: (message: Msg) => void;
   setRunning: (running: boolean, statusDetail?: string) => void;
   setDelta: (delta: string | ((prev: string) => string)) => void;
   setStopNotice: (notice: StopNotice | null) => void;
+  pushIntakeStep: (step: IntakeStep) => void;
+  clearIntakeSteps: () => void;
 }
+
+const MAX_INTAKE_STEPS = 60;
 
 // Streaming agent state is highly realtime — hundreds of events per run — so
 // it lives here rather than in TanStack Query, which is for settled server
@@ -32,6 +45,7 @@ export const useAgentStore = create<AgentState>((set) => ({
   statusDetail: "",
   stopNotice: null,
   lastSeq: -1,
+  intakeSteps: [],
 
   reset: (messages, running, statusDetail) =>
     set({
@@ -41,6 +55,7 @@ export const useAgentStore = create<AgentState>((set) => ({
       delta: "",
       stopNotice: null,
       lastSeq: messages.at(-1)?.seq ?? -1,
+      intakeSteps: [],
     }),
 
   appendMessage: (message) =>
@@ -59,6 +74,13 @@ export const useAgentStore = create<AgentState>((set) => ({
       delta: typeof delta === "function" ? delta(state.delta) : delta,
     })),
   setStopNotice: (stopNotice) => set({ stopNotice }),
+  pushIntakeStep: (step) =>
+    set((state) => {
+      const isSame = (existing: IntakeStep) => existing.tool === step.tool && existing.detail === step.detail;
+      if (!state.intakeSteps.some(isSame)) return { intakeSteps: [...state.intakeSteps, step].slice(-MAX_INTAKE_STEPS) };
+      return { intakeSteps: state.intakeSteps.map((existing) => (isSame(existing) ? step : existing)) };
+    }),
+  clearIntakeSteps: () => set({ intakeSteps: [] }),
 }));
 
 export const agentStore = useAgentStore;

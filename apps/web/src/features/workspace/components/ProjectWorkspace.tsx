@@ -3,10 +3,12 @@ import { useBillingModalStore } from "@/features/billing/store/billingModalStore
 import { useProject } from "@/features/projects/hooks/useProject";
 import { useSession } from "@/features/agent/hooks/useSession";
 import { useConversationStream } from "@/features/agent/hooks/useConversationStream";
+import { useNewChat } from "@/features/agent/hooks/useNewChat";
 import { ChatPane } from "@/features/agent/components/ChatPane";
 import { PreviewPane } from "@/features/preview/components/PreviewPane";
 import { PlanTab } from "@/features/plan";
 import { AssetsPane } from "@/features/assets";
+import { LogsPane } from "@/features/logs";
 import { ErrorBoundary } from "@/shared/components/ErrorBoundary";
 import { SplitPane } from "@/shared/components/ui/SplitPane";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
@@ -15,8 +17,11 @@ import { WorkspaceTabs } from "./WorkspaceTabs";
 import { FilesPane } from "./FilesPane";
 import { EditorPane } from "./EditorPane";
 import { DiffPane } from "./DiffPane";
+import { CodeSubscriptionPaywall } from "./CodeSubscriptionPaywall";
+import { DatabasePane } from "./DatabasePane";
 import { PlaceholderPane } from "./PlaceholderPane";
 import { useTouchedFiles } from "../hooks/useTouchedFiles";
+import { ProjectEnvironmentView } from "@/features/environment";
 
 export function ProjectWorkspace({
   projectId,
@@ -32,6 +37,7 @@ export function ProjectWorkspace({
   const activeTab = useWorkspaceStore((s) => s.activeTab);
   const openAddCredits = useBillingModalStore((s) => s.openAddCredits);
   const openUpgrade = useBillingModalStore((s) => s.openUpgrade);
+  const newChat = useNewChat(projectId);
 
   useConversationStream(session?.id, session?.status, (usage) => {
     if (usage.creditsRemaining !== undefined) updateCredits(usage.creditsRemaining);
@@ -40,16 +46,18 @@ export function ProjectWorkspace({
   const touched = useTouchedFiles();
   const userCredits = user?.credits ?? 0;
 
-  // Code and Preview are mutually exclusive: only the chosen one is mounted,
-  // so the preview iframe is not silently running behind the editor.
   const rightPane = () => {
     switch (activeTab) {
       case "code":
+        if (user?.plan === "FREE") {
+          return <CodeSubscriptionPaywall onUpgrade={openUpgrade} />;
+        }
         return (
           <div className="flex min-h-0 min-w-0 flex-1 gap-3">
             <FilesPane
               projectId={projectId}
               sessionId={session?.id}
+              projectName={project?.name}
               touched={touched}
             />
             <EditorPane projectId={projectId} sessionId={session?.id} />
@@ -64,21 +72,9 @@ export function ProjectWorkspace({
       case "assets":
         return <AssetsPane projectId={projectId} />;
       case "database":
-        return (
-          <PlaceholderPane
-            title="Database"
-            version="V4"
-            description="Tables, rows and migrations for the generated app land with the full-stack template."
-          />
-        );
+        return <DatabasePane projectId={projectId} projectName={project?.name} templateId={project?.templateId} />;
       case "logs":
-        return (
-          <PlaceholderPane
-            title="Logs"
-            version="V3"
-            description="Sandbox build and dev-server output streams here once the cloud orchestrator owns the runtime."
-          />
-        );
+        return <LogsPane sessionId={session?.id} />;
       case "analytics":
         return (
           <PlaceholderPane
@@ -95,6 +91,10 @@ export function ProjectWorkspace({
             description="Project name, template, environment variables and approval rules."
           />
         );
+      case "connectors":
+        return <ProjectEnvironmentView projectId={projectId} projectName={project?.name ?? projectId} section="connectors" />;
+      case "secrets":
+        return <ProjectEnvironmentView projectId={projectId} projectName={project?.name ?? projectId} section="secrets" />;
     }
   };
 
@@ -107,6 +107,8 @@ export function ProjectWorkspace({
         onAddCredits={openAddCredits}
         onUpgrade={openUpgrade}
         onOpenConsole={onOpenConsole}
+        isNewChatBusy={newChat.isBusy}
+        onNewChat={newChat.start}
       />
 
       <div className="flex min-h-0 flex-1 p-4">
@@ -118,6 +120,7 @@ export function ProjectWorkspace({
           left={
             <ErrorBoundary>
               <ChatPane
+                key={session?.id ?? "no-session"}
                 projectId={projectId}
                 session={session}
                 userCredits={userCredits}

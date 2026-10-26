@@ -1,8 +1,4 @@
-import {
-  BuildBlueprintResponse,
-  DesignDirectionsResponse,
-  LatestBlueprintRunResponse,
-} from "@repo/contracts";
+import { LatestBlueprintRunResponse } from "@repo/contracts";
 import { httpClient } from "@/shared/lib/httpClient";
 import { planContractSchema } from "../schemas/plan-contract";
 import {
@@ -27,14 +23,6 @@ export const planApi = {
     httpClient
       .get(`/v1/sessions/${sessionId}/blueprint-run`, signal)
       .then((body) => (body === null ? null : LatestBlueprintRunResponse.parse(body))),
-  buildBlueprint: (sessionId: string, prompt: string, directionId?: string) =>
-    httpClient
-      .post(`/sessions/${sessionId}/blueprint`, { prompt, ...(directionId ? { directionId } : {}) })
-      .then(BuildBlueprintResponse.parse),
   stopRun: (runId: string) =>
     httpClient.post<{ ok: boolean; stopped: boolean }>(`/v1/runs/${runId}/stop`),
-  getDesignDirections: (prompt: string, signal?: AbortSignal) =>
-    httpClient
-      .get(`/v1/design-directions?prompt=${encodeURIComponent(prompt)}`, signal)
-      .then((body) => DesignDirectionsResponse.parse(body).directions),
 };

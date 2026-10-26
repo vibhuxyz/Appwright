@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, File, Loader2, Terminal } from "lucide-react";
-import type { Msg } from "../schemas/agentSchemas";
 import { cn } from "@/shared/lib/cn";
+import type { Msg } from "../schemas/agentSchemas";
 
 // Tools that act on a single file get the file-row treatment — path on the
 // left, outcome on the right. Everything else stays a collapsible raw row.

@@ -1,5 +1,11 @@
-import { CheckCircle2, ChevronRight, Activity } from "lucide-react";
+import { CheckCircle2, ChevronRight, Activity, AlertCircle } from "lucide-react";
+import type { EnvironmentIntegrationView } from "@repo/contracts";
 import { ProjectDatabaseStatus } from "@/features/projects/components/ProjectDatabaseStatus";
+import {
+  TONE_TEXT_CLASS,
+  integrationStatusPresentation,
+  useEnvironmentOverview,
+} from "@/features/environment";
 import type {
   ProjectOverviewDatabase,
   ProjectOverviewHealth,
@@ -12,6 +18,18 @@ interface ProjectConsoleHealthProps {
   database?: ProjectOverviewDatabase | null;
   previewUrl?: string | null;
   onOpenDatabase?: () => void;
+  onOpenEnvironment?: () => void;
+}
+
+const RUNTIME_ENVIRONMENT = "development";
+
+function formatStatus(view: EnvironmentIntegrationView | undefined): { label: string; color: string; isFailing: boolean } {
+  const presentation = integrationStatusPresentation(view?.status ?? "not_required");
+  return {
+    label: presentation.label,
+    color: TONE_TEXT_CLASS[presentation.tone],
+    isFailing: presentation.tone === "danger",
+  };
 }
 
 export function ProjectConsoleHealth({
@@ -19,7 +37,9 @@ export function ProjectConsoleHealth({
   templateId,
   health,
   onOpenDatabase,
+  onOpenEnvironment,
 }: ProjectConsoleHealthProps) {
+  const { data: envOverview } = useEnvironmentOverview(projectId, RUNTIME_ENVIRONMENT);
   const isDevRunning = Boolean(health?.devServer.running);
   const overallStatus = health?.overallStatus ?? "healthy";
 
@@ -44,27 +64,36 @@ export function ProjectConsoleHealth({
     },
   }[overallStatus];
 
+  const storageIntegration = envOverview?.integrations.find((i) => i.provider === "cloudinary");
+  const authIntegration = envOverview?.integrations.find((i) => i.provider === "auth");
+
+  const storageStatus = formatStatus(storageIntegration);
+  const authStatus = formatStatus(authIntegration);
+
   const systemServices = [
     {
       id: "preview",
       name: "Local Dev Server",
       desc: isDevRunning && health?.devServer.url ? health.devServer.url : "Dev server idle",
       status: isDevRunning ? "Online" : "Idle",
-      statusColor: isDevRunning ? "text-emerald-400" : "text-muted",
+      statusColor: isDevRunning ? "text-success" : "text-muted",
+      isFailing: false,
     },
     {
-      id: "ai-engine",
-      name: "AI Agent Engine",
-      desc: "Model inference and workspace task executor",
-      status: "Operational",
-      statusColor: "text-emerald-400",
+      id: "storage",
+      name: "Media Storage (Cloudinary)",
+      desc: storageIntegration?.lastError ?? "Asset uploads & CDN delivery",
+      status: storageStatus.label,
+      statusColor: storageStatus.color,
+      isFailing: storageStatus.isFailing,
     },
     {
-      id: "assets",
-      name: "Media Asset Storage",
-      desc: "Cloudinary CDN integration",
-      status: "Configured",
-      statusColor: "text-emerald-400",
+      id: "auth",
+      name: "Authentication (Auth.js)",
+      desc: authIntegration?.lastError ?? "Session security & credentials",
+      status: authStatus.label,
+      statusColor: authStatus.color,
+      isFailing: authStatus.isFailing,
     },
   ];
 
@@ -99,10 +128,15 @@ export function ProjectConsoleHealth({
           {systemServices.map((svc) => (
             <div
               key={svc.id}
-              className="flex items-center justify-between rounded-xl border border-border/40 bg-surface/40 p-3 transition-colors hover:border-border/80 hover:bg-surface/70"
+              onClick={onOpenEnvironment}
+              className={`flex items-center justify-between rounded-xl border border-border/40 bg-surface/40 p-3 transition-colors hover:border-border/80 hover:bg-surface/70 ${onOpenEnvironment ? "cursor-pointer" : ""}`}
             >
               <div className="flex items-center gap-3">
-                <CheckCircle2 className={`size-4 shrink-0 ${svc.statusColor}`} />
+                {svc.isFailing ? (
+                  <AlertCircle className={`size-4 shrink-0 ${svc.statusColor}`} />
+                ) : (
+                  <CheckCircle2 className={`size-4 shrink-0 ${svc.statusColor}`} />
+                )}
                 <div>
                   <p className="text-xs font-semibold text-foreground">{svc.name}</p>
                   <p className="text-[11px] text-muted">{svc.desc}</p>

@@ -10,6 +10,8 @@ export const WORKSPACE_TABS = [
   "logs",
   "analytics",
   "settings",
+  "connectors",
+  "secrets",
 ] as const;
 
 export type WorkspaceTab = (typeof WORKSPACE_TABS)[number];

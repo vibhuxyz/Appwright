@@ -57,6 +57,7 @@ export function ProjectDatabaseView({
       ) : collections.length === 0 ? (
         <DatabaseEmptyState
           templateId={templateId}
+          isReady={overview?.status === "ready"}
           onRetry={() => void refetch()}
         />
       ) : (

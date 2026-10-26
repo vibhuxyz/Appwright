@@ -6,6 +6,7 @@ import {
   Rocket,
   Code2,
 } from "lucide-react";
+import { RuntimeEnvironmentBadge } from "@/features/projects/runtime-environment";
 import type { Project } from "@/features/projects/schemas/projectSchemas";
 
 export function ProjectConsoleProjectHeader({
@@ -38,7 +39,7 @@ export function ProjectConsoleProjectHeader({
       : "Vite and React application with Tailwind CSS";
 
   return (
-    <div className="border-b border-border/60 bg-[#0E1119] px-8 py-6">
+    <div className="border-b border-border/60 bg-background px-8 py-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
         {/* Project info */}
         <div className="flex items-start gap-4">
@@ -50,18 +51,10 @@ export function ProjectConsoleProjectHeader({
               <h1 className="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
                 {projectName}
               </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-400">
-                <span
-                  className={`size-1.5 rounded-full ${
-                    status === "READY"
-                      ? "bg-emerald-400"
-                      : status === "BUILDING"
-                        ? "animate-pulse bg-amber-400"
-                        : "bg-blue-400"
-                  }`}
-                />
-                {status === "READY" ? "Production" : status}
-              </span>
+              <RuntimeEnvironmentBadge
+                status={status}
+                hasProductionDeployment={project?.hasProductionDeployment ?? false}
+              />
             </div>
 
             <div className="mt-1 flex items-center gap-2 text-xs text-muted">

@@ -1,18 +1,9 @@
 import { useState } from "react";
 import { LayoutGrid, List, Plus } from "lucide-react";
 import type { Project } from "@/features/projects/schemas/projectSchemas";
+import { DeleteProjectModal } from "@/features/projects/components/DeleteProjectModal";
 import { ProjectGridCard } from "./ProjectGridCard";
 import { cn } from "@/shared/lib/cn";
-
-const SAMPLE_PROJECTS: Project[] = [
-  { id: "ai-studio-sample", name: "ai-studio", templateId: "nextjs-fullstack", status: "READY", previewUrl: null, createdAt: new Date().toISOString() },
-  { id: "ecommerce-sample", name: "ecommerce", templateId: "nextjs-fullstack", status: "BUILDING", previewUrl: null, createdAt: new Date().toISOString() },
-  { id: "content-hub-sample", name: "content-hub", templateId: "nextjs-fullstack", status: "READY", previewUrl: null, createdAt: new Date().toISOString() },
-  { id: "finance-dashboard-sample", name: "finance-dashboard", templateId: "vite-react", status: "READY", previewUrl: null, createdAt: new Date().toISOString() },
-  { id: "mobile-app-sample", name: "mobile-app", templateId: "vite-react", status: "BUILDING", previewUrl: null, createdAt: new Date().toISOString() },
-  { id: "marketing-site-sample", name: "marketing-site", templateId: "nextjs-fullstack", status: "READY", previewUrl: null, createdAt: new Date().toISOString() },
-  { id: "internal-tools-sample", name: "internal-tools", templateId: "vite-react", status: "READY", previewUrl: null, createdAt: new Date().toISOString() },
-];
 
 export function DashboardProjectsSection({
   projects,
@@ -24,10 +15,10 @@ export function DashboardProjectsSection({
   onOpenCreate: () => void;
 }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
 
-  // Show user's projects, plus sample showcase projects to match design
-  const allProjects = projects && projects.length > 0 ? projects : SAMPLE_PROJECTS;
-  const filteredProjects = allProjects.filter((p) =>
+  const userProjects = projects ?? [];
+  const filteredProjects = userProjects.filter((p) =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
@@ -43,7 +34,6 @@ export function DashboardProjectsSection({
           </p>
         </div>
 
-        {/* View toggle switcher only (search box moved to top header) */}
         <div className="flex items-center rounded-xl border border-border/80 bg-surface p-1">
           <button
             type="button"
@@ -68,29 +58,69 @@ export function DashboardProjectsSection({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {/* Create new project dashed card */}
+      <div
+        className={cn(
+          viewMode === "grid"
+            ? "grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            : "flex flex-col gap-3",
+        )}
+      >
         <button
           type="button"
           onClick={onOpenCreate}
-          className="group flex min-h-55 cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border/80 bg-surface/40 p-5 text-center transition-all hover:border-lime hover:bg-surface/80"
+          className={cn(
+            "group flex cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-border/80 bg-surface/40 p-5 text-center transition-all hover:border-lime hover:bg-surface/80",
+            viewMode === "grid"
+              ? "min-h-55 flex-col"
+              : "min-h-20 flex-row gap-4 justify-start px-6",
+          )}
         >
-          <div className="grid size-10 place-items-center rounded-xl bg-surface-2 text-foreground transition-all group-hover:bg-lime group-hover:text-black">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-foreground transition-all group-hover:bg-lime group-hover:text-black">
             <Plus className="size-5" />
           </div>
-          <span className="mt-3 text-sm font-bold text-foreground group-hover:text-lime">
-            Create new project
-          </span>
-          <span className="mt-0.5 text-xs text-muted">
-            Start from scratch or a template
-          </span>
+          <div className={cn(viewMode === "list" && "text-left")}>
+            <span className="block text-sm font-bold text-foreground group-hover:text-lime">
+              Create new project
+            </span>
+            <span className="mt-0.5 block text-xs text-muted">
+              Start from scratch or a template
+            </span>
+          </div>
         </button>
 
-        {/* Filtered project cards */}
         {filteredProjects.map((project) => (
-          <ProjectGridCard key={project.id} project={project} />
+          <ProjectGridCard
+            key={project.id}
+            project={project}
+            onDelete={setProjectToDelete}
+          />
         ))}
+
+        {userProjects.length === 0 && (
+          <div
+            className={cn(
+              "flex items-center justify-center text-center",
+              viewMode === "grid"
+                ? "sm:col-span-1 lg:col-span-2 xl:col-span-3 min-h-55"
+                : "py-6",
+            )}
+          >
+            <p className="text-sm font-medium text-muted">No projects yet</p>
+          </div>
+        )}
+
+        {userProjects.length > 0 && filteredProjects.length === 0 && searchQuery && (
+          <div className="col-span-full py-10 text-center">
+            <p className="text-sm text-muted">No projects found matching &ldquo;{searchQuery}&rdquo;</p>
+          </div>
+        )}
       </div>
+
+      <DeleteProjectModal
+        isOpen={projectToDelete !== null}
+        project={projectToDelete}
+        onClose={() => setProjectToDelete(null)}
+      />
     </section>
   );
 }

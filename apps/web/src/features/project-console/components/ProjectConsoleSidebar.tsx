@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   Activity,
+  CreditCard,
   ChevronDown,
   Coins,
   Crown,
@@ -15,7 +16,6 @@ import {
   Radio,
   ScrollText,
   Settings,
-  Sparkles,
   Users,
   Webhook,
 } from "lucide-react";
@@ -26,13 +26,15 @@ import { formatCreditsToDollars } from "@/features/billing/schemas/billingSchema
 
 const NAV_ITEMS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
-  { id: "auth", label: "Authentication", icon: Users },
+  { id: "connectors", label: "Connectors", icon: Webhook, badge: "New" },
+  { id: "payments", label: "Payments", icon: CreditCard },
+  { id: "environment", label: "Secrets", icon: KeyRound },
   { id: "databases", label: "Databases", icon: Database },
+  { id: "auth", label: "Authentication", icon: Users },
   { id: "storage", label: "Storage", icon: HardDrive },
   { id: "functions", label: "Functions", icon: FileCode2 },
   { id: "messaging", label: "Messaging", icon: MessageSquare },
   { id: "realtime", label: "Realtime", icon: Radio },
-  { id: "ai", label: "AI / Integrations", icon: Sparkles, badge: "New" },
   { id: "settings", label: "Settings", icon: Settings },
 ] as const;
 
