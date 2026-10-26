@@ -2294,6 +2294,118 @@ action that branches from the current chat, not a change to New Chat.
 
 ---
 
+## Decision 74: Environment data is per environment, end to end ✅ ACTIVE _(2026-10-25, target: integrations platform)_
+
+**Decision:** `GET /v1/projects/:id/environment` takes `?environment=` and returns only that
+environment plus `all` rows, built by pure functions in `packages/db/src/environment-view/`. Each
+integration's status and credential source ("Appwright test key" / "Your key" / "Not set") come
+from its `ProjectIntegrationEnvironment` row. The database source comes from `ProjectDatabase` or
+your own `MONGODB_URI`. `ProjectIntegration.status` is only a summary
+(`summarizeIntegrationStatus`). `testIntegration` no longer writes anything; `runIntegrationTest`
+records the tested environment only. The workspace badge reads "Development" until a production
+deployment exists (`hasProductionDeployment`, derived from `vercelProjectId`). Writes to variables
+and the email provider must name an environment; preflight and Vercel sync no longer default to
+`production`.
+
+**Why:** the header turned build status `READY` into "Production". The overview returned every
+environment's rows and filtered on the client. Any test, including preflight, overwrote one
+project-level status. All three tabs showed the same values.
+
+**What we gave up:** the overview response shape changed (`integrations` is now a per-environment
+view, plus `environment` and `database`). Every web consumer moved in the same change; there is no
+compatibility shim.
+
+**Revisit when:** a project can have more than one production deployment target, which would make
+`vercelProjectId !== null` too weak a signal for "Production".
+
+---
+
+## Decision 75: Agent questions and integration requests are DB-backed waits inside the run ✅ ACTIVE _(2026-10-25, target: agent loop)_
+
+**Decision:** two per-job tools, `ask_user` and `request_integration`, are built as closures and
+added to `ALL_TOOLS` in the chat loop. Each writes a row (`agent_questions` /
+`integration_requests`), publishes an SSE frame, and polls the row with `pollUntil` until it is
+answered, connected, dismissed, or out of time. The wait is capped at 10 / 15 minutes and by the
+loop deadline minus a 2-minute margin. On dismiss or timeout the tool returns the default options,
+and the agent continues and says which defaults it used. The web shows one dock that replaces the
+composer. Free-text answers reach the model fenced as `<user-answer>` data. `ask_user` refuses
+questions that ask for secrets.
+
+**Why:** the user wants the agent to clarify before building (what a payment is for, what happens
+after checkout) and to never ask for keys in chat. A row survives reloads, remounts, and API
+restarts. Holding the question in process memory would not.
+
+**What we gave up:** waiting time counts against the 30-minute loop deadline and the 45-minute
+sandbox wall clock, and the sandbox stays up while the user decides. The secret-question filter is
+a keyword heuristic, not a guarantee.
+
+**Revisit when:** a run hits its deadline while a question is open. Then pause the deadline during
+waits, which needs a `loop.ts` and sandbox change.
+
+---
+
+## Decision 76: The Appwright-managed MongoDB is allowed in production ✅ ACTIVE _(2026-10-25, amends the managed-credentials rule)_
+
+**Decision:** `isManagedCredentialAllowed` allows `mongodb` in every environment, never allows
+`google-oauth`, and allows email, Razorpay, and Cloudinary test keys only in development and
+preview. A production database with no URI of your own tests as "configured — created on first
+deploy" and passes preflight. If you supply your own production `MONGODB_URI`, deploy uses it and
+does not provision the platform database.
+
+**Why:** the platform database is a per-project, per-environment database that deploy already
+provisions (`routes/vercel.ts`). It is not a shared test account, so the "test keys stay out of
+production" rule does not apply to it.
+
+**What we gave up:** production data lives on the shared platform cluster unless you choose your own
+URI.
+
+**Revisit when:** platform cluster quotas or isolation needs make a dedicated production cluster
+necessary.
+
+---
+
+## Decision 77: Builds wait for integration choices before writing code ✅ ACTIVE _(2026-10-25, target: blueprint path)_
+
+**Decision:** before the build starts, both the agent's blueprint path (`prepareBuildEnvironment`)
+and the API's Plan-tab path (`awaitRequiredIntegrations`) open an `integration_requests` row for
+each required integration that is not connected in development. They then wait up to 10 minutes
+for the user to pick a test key or their own key. After the wait, the development database is
+provisioned unless the user chose their own, and the env is re-injected. Integrations that were
+dismissed or not chosen in time are reported in chat, and the build continues without them.
+
+**Why:** the user chose "wait for my choice". Waiting means the right keys are in `.env.local`
+before generated code runs, and the dock is the only thing asking.
+
+**What we gave up:** a build with required integrations no longer starts instantly. Auto-answer
+(Appwright test keys) is the one-click way through.
+
+**Revisit when:** users routinely dismiss the card, which would mean the wait adds friction without
+value. Then make it opt-in per project.
+
+
+---
+
+## Decision 78: Model behaviour is tested with evals, cheapest grader first ✅ ACTIVE _(2026-10-27, target: intake, agent loop)_
+
+**Decision:** behaviour that depends on a model is covered by evals, not scripted unit tests.
+Offline evals (catalog, `FakeProvider`, recorded output) need no key and run first. Live evals use
+a real model, run several trials, and are read, not trusted on one run. The matrix of what to use
+where is in [EVALS.md](./EVALS.md). Two suites exist: `apps/api/evals/intake` and
+`packages/agent-evals`. Intake changes from the first run: `work-showcase` and `site-language` are
+optional; the contacts question shows only the fields the business needs (email and WhatsApp for a
+marketing page, all four for a local business); `contactsAreFilled` checks only the requested
+fields; a simple app gets at most 4 questions; "website for <Name>" counts as naming the business.
+
+**Why:** a bootcamp landing page got 7 questions and a four-field required contact form. A scripted
+test would have asserted today's output. An eval asserts the rule ("ask what changes the build").
+
+**What we gave up:** live evals cost tokens and are noisy; a timeout looks like a failure unless
+read. `site-language` and `work-showcase` are no longer asked by default, so a Hindi-first or
+portfolio-led site needs the user to say so in the prompt.
+
+**Revisit when:** a case is flaky at three trials, or users keep correcting an assumed default.
+---
+
 ## Open — not yet decided
 
 These block work when they're reached. Each needs an entry above before the relevant slice starts.

@@ -186,6 +186,13 @@ gate is the first real consumer of the `"review"` policy V1.2 built but never en
       chat's `agent/<id>` branch and worktree instead of branching from `main`, so unmerged work
       carries over and no new worktree, install or dev server is created. Chats sharing a worktree
       run one at a time (409 `WORKTREE_BUSY`). Amends D8. See [D73](./DECISIONS.md).
+- [x] **D74–D77 added 2026-10-25** — **environment truth, test keys, and agent questions.**
+      The workspace badge says Development until a deployment exists. The environment overview is
+      per environment (status, credential source, database source). Each integration first asks
+      "Appwright test key or my own key". The agent can pause with `ask_user` /
+      `request_integration`, shown in a dock that replaces the prompt box. Builds wait for
+      integration choices. See [D74–D77](./DECISIONS.md) and
+      [Session 07](./sessions/SESSION_07.md).
 - [x] Slice 1 — `Message`, `AgentEvent` (with `seq`), `StopReason`, `Budget`, `AgentEventSink` in `packages/agent-core/src/types.ts`
 - [x] Slice 2 — provider abstraction (`providers/types.ts`), `FakeProvider`, `OpenAiProvider` (real, streaming, fetch-based, no SDK dep)
 - [x] Slice 3 — tools (`list_files`, `read_file`, `write_file`, `edit_file`, `grep`, `bash`), path fence + deny-list, `wrapUntrusted`, `deps.allow.json` guard
@@ -272,6 +279,7 @@ Every version has **one** acceptance test. No partial credit. Never skip a rung.
 | **[DECISIONS.md](./DECISIONS.md)**           | 53 decisions with trade-offs, plus 14 open questions that block work when reached     |
 | **[ENGINEERING_STANDARD.md](./ENGINEERING_STANDARD.md)** | Lab identity, the four engineering questions, benchmark/failure/invariant rules, engineering gate (D71) |
 | **[INVARIANTS.md](./INVARIANTS.md)**         | What must always be true, what enforces it, and whether it's actually tested          |
+| **[EVALS.md](./EVALS.md)**                   | Which eval to use where (no key vs live), what exists, the eval → fix → record loop (D78) |
 | **[CODE_QUALITY.md](./CODE_QUALITY.md)**     | How we write code here — patterns from `ref-ai/packages`. Keep it open while coding   |
 | **[CRASH_COURSE.md](./CRASH_COURSE.md)**     | Every concept explained so far, six lines each, dated. Written the moment it's taught |
 | **[LEARNING.md](./LEARNING.md)**             | What to learn at each version, and what's actually been mastered                      |
