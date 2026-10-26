@@ -1,4 +1,12 @@
-import type { Attachment, ElementSelection, ThemeOption } from "@repo/contracts";
+import {
+  CREATIVE_CHOICE_NEEDS,
+  IMAGE_CHOICE_AUTO,
+  IMAGE_CHOICE_KEY,
+  isDecideForMe,
+  type Attachment,
+  type ElementSelection,
+  type ThemeOption,
+} from "@repo/contracts";
 import { enqueueJob, prisma, type Job, type Prisma } from "@repo/db";
 import {
   requirementTurns,
@@ -9,6 +17,9 @@ import {
 import { createSessionWorktree } from "../workspace/manager";
 import { publishMessage } from "../stream/sse";
 import { serializeRow } from "./message-mapper";
+
+const PLAN_APPROVED_AUTO_DESIGN_TEXT =
+  "Plan approved. Decide the design for me: build with the plan's own design system, no design picker.";
 
 export interface EnqueueConversationOptions {
   sessionId: string;
@@ -106,17 +117,16 @@ export async function enqueueConversation(
     },
   });
   await recordRequirementTurns(answers, questions, persistTurn);
+  const planChoice = {
+    ...(blueprintId ? { blueprintId } : {}),
+    ...(planFeedback && planFeedback.length > 0 ? { planFeedback } : {}),
+    ...(isDecideForMe(answers, CREATIVE_CHOICE_NEEDS.images) ? { [IMAGE_CHOICE_KEY]: IMAGE_CHOICE_AUTO } : {}),
+  };
   if (theme) {
     const turn = themeTurn(theme);
-    await persistTurn({
-      type: "text",
-      ...turn,
-      data: {
-        ...turn.data,
-        ...(blueprintId ? { blueprintId } : {}),
-        ...(planFeedback && planFeedback.length > 0 ? { planFeedback } : {}),
-      },
-    });
+    await persistTurn({ type: "text", ...turn, data: { ...turn.data, ...planChoice } });
+  } else if (blueprintId) {
+    await persistTurn({ role: "user", type: "text", content: PLAN_APPROVED_AUTO_DESIGN_TEXT, data: { intake: true, ...planChoice } });
   }
   await createSessionWorktree(projectId, worktreeSessionId);
   return enqueueJob({ sessionId, projectId });

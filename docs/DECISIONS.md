@@ -2491,6 +2491,41 @@ data is stored, so it can't be blurred.
 
 ---
 
+## Decision 81: Ask "I'll choose / Decide for me" for design and images before generating or asking ✅ ACTIVE _(2026-10-27, target: intake, blueprint path)_
+
+**Decision:** the first planning round of intake always ends with two fixed questions,
+**Design** and **Images**, each answered "I'll choose" or "Decide for me". They come from
+`CREATIVE_CHOICE_QUESTIONS` in `packages/contracts/src/creative-choice/` and are appended by
+`withCreativeChoiceQuestions` (api). Both default to "Decide for me", and a skipped answer counts
+as that.
+
+- **Design, decide for me:** approving the plan sends the build straight away. The design-system
+  picker is never opened, so no theme options are generated, and the plan's own theme is used.
+  The approval is saved as an intake row carrying `blueprintId`. Before this, `blueprintId` was
+  only saved with a picked theme, so a build with no theme would have planned again from scratch.
+- **Images, decide for me:** the approval row carries `imageChoice: "auto"`. The worker still
+  creates the image request but posts no image question. The web client calls the existing
+  `POST /asset-requests/:id/stock` once, so every section gets a matching photo, and it hides
+  that request from the image dock. If any slot fails, the request goes back to the normal dock,
+  so the build can't wait on a request nobody sees.
+- **I'll choose** keeps the old flow for that half: the design picker, or the per-section image
+  dock.
+
+**Why:** the user asked that Appwright first ask whether they want to choose design and images
+or have Appwright decide. With "decide for me" there should be no generating options and no
+asking, for both design and section images.
+
+**What we gave up:**
+- Two more questions on every new app.
+- Auto image filling is started by the browser. If no tab is open when the image request
+  arrives, the build waits until one is, the same as the manual flow today.
+- "Decide for me" on design uses the planner's theme, not the best of four generated options.
+
+**Revisit when:** builds stall waiting on auto images with no open tab. Then move the stock fill
+into `packages/assets` so the worker can run it itself, which is a file move that needs approval.
+
+---
+
 ## Open — not yet decided
 
 These block work when they're reached. Each needs an entry above before the relevant slice starts.

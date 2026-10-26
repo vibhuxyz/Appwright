@@ -134,3 +134,14 @@ export * from "./attachment";
 export * from "./specification";
 export * from "./type";
 export type { ProjectMemoryRows } from "./project-memory";
+export {
+  CHOOSE_MYSELF_OPTION,
+  CREATIVE_CHOICE_NEEDS,
+  CREATIVE_CHOICE_QUESTIONS,
+  DECIDE_FOR_ME_OPTION,
+  IMAGE_CHOICE_AUTO,
+  IMAGE_CHOICE_KEY,
+  hasCreativeChoice,
+  isDecideForMe,
+  type CreativeChoiceNeed,
+} from "./creative-choice";

@@ -37,6 +37,7 @@ import { checkpointSession } from "./checkpoint";
 import { currentTurnRows, currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
 import { HostMirrorRuntime } from "./host-mirror-runtime";
+import { isAutoImageChoice } from "./image-choice";
 import { injectProjectRuntimeEnv } from "./inject-project-env";
 import { createJobInteractiveTools } from "./interactive-tools";
 import { createPersist, publishStatus } from "./persist";
@@ -198,6 +199,7 @@ export async function executeAgentJob(
           signal: controller.signal,
           persist,
           approvedBlueprintId: approvedBlueprintIdFromRows(currentTurnRows(priorRows)),
+          isAutoImageChoice: isAutoImageChoice(currentTurnRows(priorRows)),
         })
       : undefined;
 

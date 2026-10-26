@@ -3,6 +3,7 @@ import { SKIP_ANSWER, type PlanAnswers, type PlanQuestion } from "@/features/pla
 import { agentApi } from "../api/agentApi";
 import { agentStore } from "../store/agentStore";
 import { questionsAreInChat } from "./chat-echo";
+import { deliverPlan } from "./deliver-plan";
 import { beginPlanning } from "./plan-round";
 import type { IntakeControls, IntakeGate } from "./types";
 
@@ -134,17 +135,7 @@ export function submitAnswers(controls: IntakeControls, batch: PlanAnswers) {
 }
 
 export function chooseTheme(controls: IntakeControls, theme: ThemeOption) {
-  if (!controls.gate) return;
-  const { prompt, answers, asked, plan, attachments, planFeedback } = controls.gate;
-  controls.setGate({ ...controls.gate, status: "sent", theme, error: null });
-  controls.deliver({
-    prompt,
-    theme,
-    ...(attachments && attachments.length > 0 ? { attachments } : {}),
-    ...(asked.length > 0 ? { answers, questions: asked } : {}),
-    ...(plan ? { blueprintId: plan.blueprintId } : {}),
-    ...(planFeedback && planFeedback.length > 0 ? { planFeedback } : {}),
-  });
+  deliverPlan(controls, theme);
 }
 
 export function skipQuestions(controls: IntakeControls) {

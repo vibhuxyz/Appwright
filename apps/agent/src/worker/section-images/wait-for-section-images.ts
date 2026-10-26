@@ -9,6 +9,7 @@ import { publishStatus, type PersistFields } from "../persist";
 
 const IMAGE_REQUEST_INTRO =
   "Choose an image for each section: upload your own, generate one, or decide for me and I will pick a matching photo for that section and this business.";
+const AUTO_IMAGES_STATUS = "Picking a matching photo for each section…";
 
 function pendingSlots(slots: readonly AssetSlot[]): AssetSlot[] {
   return slots.filter((slot) => slot.status !== "RESOLVED" && slot.status !== "SKIPPED");
@@ -19,16 +20,21 @@ export async function waitForSectionImages(input: {
   assetRequest: AssetRequestResponse | null;
   signal: AbortSignal;
   persist: (fields: PersistFields) => Promise<unknown>;
+  isAutoChoice: boolean;
 }): Promise<"resolved" | "cancelled"> {
   const { sessionId, assetRequest, signal, persist } = input;
   if (!assetRequest || assetRequest.status === "RESOLVED") return "resolved";
-  await persist({
-    role: "assistant",
-    type: "text",
-    content: IMAGE_REQUEST_INTRO,
-    data: { questionSet: imageQuestionSet(IMAGE_REQUEST_INTRO, pendingSlots(assetRequest.slots)) },
-  });
-  publishStatus(sessionId, "RUNNING", "Waiting for section images…");
+  if (input.isAutoChoice) {
+    publishStatus(sessionId, "RUNNING", AUTO_IMAGES_STATUS);
+  } else {
+    await persist({
+      role: "assistant",
+      type: "text",
+      content: IMAGE_REQUEST_INTRO,
+      data: { questionSet: imageQuestionSet(IMAGE_REQUEST_INTRO, pendingSlots(assetRequest.slots)) },
+    });
+    publishStatus(sessionId, "RUNNING", "Waiting for section images…");
+  }
   try {
     await waitUntilAssetRequestResolved(assetRequest.id, signal);
   } catch (error) {

@@ -1,6 +1,8 @@
+import { CREATIVE_CHOICE_NEEDS, isDecideForMe } from "@repo/contracts";
 import type { PlanAnswers, PlanQuestion } from "@/features/plan";
 import { agentApi } from "../api/agentApi";
 import { agentStore } from "../store/agentStore";
+import { deliverPlan } from "./deliver-plan";
 import type { IntakeControls, IntakeGate } from "./types";
 
 interface PlanningInput {
@@ -70,5 +72,9 @@ export function revisePlan(controls: IntakeControls, feedback: string) {
 
 export function approvePlan(controls: IntakeControls) {
   if (!controls.gate?.plan) return;
+  if (isDecideForMe(controls.gate.answers, CREATIVE_CHOICE_NEEDS.design)) {
+    deliverPlan(controls);
+    return;
+  }
   controls.setGate({ ...controls.gate, status: "choosing-theme", error: null });
 }

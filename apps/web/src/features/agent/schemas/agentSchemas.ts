@@ -1,5 +1,6 @@
 import {
   AttachmentSchema,
+  IMAGE_CHOICE_AUTO,
   QuestionReplyDataSchema,
   QuestionSetDataSchema,
   ThemeOptionSchema,
@@ -60,6 +61,7 @@ export const msgSchema = z.object({
       questionReply: QuestionReplyDataSchema.optional().catch(undefined),
       theme: ThemeOptionSchema.optional().catch(undefined),
       blueprintId: z.string().optional(),
+      imageChoice: z.literal(IMAGE_CHOICE_AUTO).optional().catch(undefined),
       planFeedback: z.array(z.string()).optional().catch(undefined),
       transcriptOnly: z.boolean().optional(),
     })

@@ -6,6 +6,7 @@ import { projectHasBuiltApp } from "./has-built-app";
 import { INTAKE_PROGRESS, type IntakeProgress } from "./progress-steps";
 import { intakeAction, isRepairPrompt, type IntakeAction } from "./repair-prompt";
 import { isNewAppRequest } from "./is-new-app-request";
+import { withCreativeChoiceQuestions } from "./with-creative-choice-questions";
 
 type IntakeRequest = z.infer<typeof PromptQuestionsRequest>;
 
@@ -30,7 +31,8 @@ export async function runIntakeRound(input: {
     return { questions: [], action };
   }
   onProgress(INTAKE_PROGRESS.writingQuestions);
-  const questions = await generateIntakeQuestions(request.prompt, provider, AbortSignal.timeout(QUESTIONS_TIMEOUT_MS), request.answers ?? {});
+  const generated = await generateIntakeQuestions(request.prompt, provider, AbortSignal.timeout(QUESTIONS_TIMEOUT_MS), request.answers ?? {});
+  const questions = withCreativeChoiceQuestions(generated, request.answers);
   if (questions.length > 0) {
     onProgress({ tool: "questions", detail: `Wrote ${questions.length} questions`, items: questions.map((question) => `${question.label} — ${question.text}`) });
   }

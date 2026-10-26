@@ -57,6 +57,7 @@ export interface RunBlueprintPathOptions {
   signal: AbortSignal;
   persist: (fields: PersistFields) => Promise<unknown>;
   approvedBlueprintId?: string;
+  isAutoImageChoice: boolean;
 }
 
 function runningTasksStatus(titles: ReadonlySet<string>): string {
@@ -192,7 +193,13 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
 
   await persist({ role: "assistant", type: "text", content: planMessage(approved, isSinglePass) });
 
-  const images = await waitForSectionImages({ sessionId, assetRequest, signal, persist });
+  const images = await waitForSectionImages({
+    sessionId,
+    assetRequest,
+    signal,
+    persist,
+    isAutoChoice: options.isAutoImageChoice,
+  });
   if (images === "cancelled") return { kind: "ran", stopReason: "cancelled" };
 
   if (isSinglePass) {
