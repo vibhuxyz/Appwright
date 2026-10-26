@@ -1,4 +1,4 @@
-import type { Provider, ProviderChunk, ToolSpec } from "./providers/types";
+import type { Provider, ProviderChunk, TokenUsage, ToolSpec } from "./providers/types";
 import type { AgentEventSink, Message } from "./types";
 
 export interface PendingToolCall {
@@ -13,7 +13,7 @@ export interface CollectedTurn {
   text: string;
   toolCalls: PendingToolCall[];
   stopReason: ProviderChunk & { type: "stop" };
-  usage?: { inputTokens: number; outputTokens: number };
+  usage?: TokenUsage;
   providerMeta?: unknown;
 }
 
@@ -29,7 +29,7 @@ export async function collectTurn(
   let text = "";
   const toolCalls: PendingToolCall[] = [];
   let stop: (ProviderChunk & { type: "stop" }) | undefined;
-  let usage: { inputTokens: number; outputTokens: number } | undefined;
+  let usage: TokenUsage | undefined;
 
   for await (const chunk of provider.stream(messages, toolSpecs, { signal })) {
     if (chunk.type === "text_delta") {
@@ -52,6 +52,7 @@ export async function collectTurn(
       usage = {
         inputTokens: chunk.inputTokens,
         outputTokens: chunk.outputTokens,
+        ...(chunk.cachedInputTokens ? { cachedInputTokens: chunk.cachedInputTokens } : {}),
       };
     } else if (chunk.type === "stop") {
       stop = chunk;

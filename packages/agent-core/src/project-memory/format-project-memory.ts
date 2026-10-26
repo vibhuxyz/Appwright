@@ -1,4 +1,10 @@
-import type { ProjectMemoryRows } from "@repo/contracts";
+import {
+  isInRevertedTurn,
+  isUserPromptRow,
+  type ProjectMemoryRows,
+  type SessionSeqRow,
+  type SessionTurnRange,
+} from "@repo/contracts";
 import { HEADINGS, MAX_PROJECT_MEMORY_BYTES, MEMORY_PREAMBLE, PROJECT_MEMORY_TAG, SECTION_LIMITS } from "./constants";
 import {
   acceptanceItems,
@@ -24,16 +30,26 @@ function byteLength(text: string): number {
   return Buffer.byteLength(text, "utf8");
 }
 
+function splitByRevert<T extends SessionSeqRow>(items: readonly T[], turns: readonly SessionTurnRange[]) {
+  const reverted = items.filter((item) => isInRevertedTurn(item, turns));
+  const live = items.filter((item) => !isInRevertedTurn(item, turns));
+  return { reverted, live };
+}
+
 function memoryLines(rows: ProjectMemoryRows): string[] {
-  const ledger = buildWorkLedger(rows.toolCallRows);
+  const users = splitByRevert(rows.userRows, rows.revertedTurns);
+  const revertedPrompts = users.reverted.filter((row) => isUserPromptRow({ ...row, role: "user", type: "text" }));
+  const ledger = buildWorkLedger(splitByRevert(rows.toolCallRows, rows.revertedTurns).live);
+  const assistantRows = splitByRevert(rows.assistantRows, rows.revertedTurns).live;
   const blueprint = rows.blueprint;
   return [
-    ...section(HEADINGS.confirmed, confirmedItems(rows.userRows), SECTION_LIMITS.confirmed),
+    ...section(HEADINGS.confirmed, confirmedItems(users.live), SECTION_LIMITS.confirmed),
+    ...section(HEADINGS.reverted, confirmedItems(revertedPrompts), SECTION_LIMITS.reverted),
     ...section(HEADINGS.open, openItems(rows), SECTION_LIMITS.open),
     ...section(HEADINGS.assumed, assumedItems(rows.questions), SECTION_LIMITS.assumed),
     ...(blueprint ? section(HEADINGS.goal, goalItems(blueprint), SECTION_LIMITS.confirmed) : []),
     ...(blueprint ? section(HEADINGS.tasks, taskItems(blueprint), SECTION_LIMITS.tasks) : []),
-    ...section(HEADINGS.verification, verificationItems(rows.assistantRows), SECTION_LIMITS.verification),
+    ...section(HEADINGS.verification, verificationItems(assistantRows), SECTION_LIMITS.verification),
     ...section(HEADINGS.changedFiles, changedFileItems(ledger), SECTION_LIMITS.changedFiles),
     ...(blueprint ? section(HEADINGS.acceptance, acceptanceItems(blueprint), SECTION_LIMITS.acceptance) : []),
     ...(blueprint ? section(HEADINGS.pages, pageItems(blueprint), SECTION_LIMITS.pages) : []),

@@ -49,7 +49,13 @@ export { formatProjectMemory } from "./project-memory";
 export { loadStackStandards } from "./standards";
 export { planTasks, formatPlanForAgent } from "./planner";
 export { verifyTypeScript, type VerifyResult } from "./verify";
-export { isTranscriptOnlyRow, serializeRow, toCoreMessage, type MessageRow } from "./transcript";
+export {
+  compactEarlierTurns,
+  isTranscriptOnlyRow,
+  serializeRow,
+  toCoreMessage,
+  type MessageRow,
+} from "./transcript";
 export { resolveStopNotice, type StopNotice } from "./notices";
 export {
   createCapabilityRegistry,

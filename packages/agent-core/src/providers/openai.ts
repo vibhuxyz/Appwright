@@ -1,7 +1,8 @@
 import type { Message } from "../types";
 import { parseToolArgs } from "./parse-tool-args";
 import { INTERRUPTED_TOOL_RESULT, repairToolPairing } from "./tool-pairing";
-import type { Provider, ProviderChunk, ToolSpec } from "./types";
+import { cachedPromptTokens } from "./cached-prompt-tokens";
+import type { Provider, ProviderChunk, TokenUsage, ToolSpec } from "./types";
 
 // OpenAiProvider — the one real provider for V0 (Slice 2). Talks to the Chat
 // Completions streaming endpoint directly over fetch; no SDK dependency, so
@@ -380,7 +381,7 @@ export class OpenAiProvider implements Provider {
     // chunk that carries no choices; Gemini repeats a *cumulative* total on
     // every chunk. Last-write-wins is correct for both, and yielding once
     // at the end means the loop never double-counts a turn.
-    let lastUsage: { inputTokens: number; outputTokens: number } | undefined;
+    let lastUsage: TokenUsage | undefined;
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -408,6 +409,7 @@ export class OpenAiProvider implements Provider {
           lastUsage = {
             inputTokens: parsed.usage.prompt_tokens ?? 0,
             outputTokens: parsed.usage.completion_tokens ?? 0,
+            cachedInputTokens: cachedPromptTokens(parsed.usage),
           };
         }
 

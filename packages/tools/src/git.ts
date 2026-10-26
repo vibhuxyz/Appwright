@@ -151,15 +151,6 @@ export function mergeSession(
   return withRepoLock(repoDir, () => mergeSessionLocked(repoDir, branchName));
 }
 
-export async function revertSession(worktreeDir: string): Promise<boolean> {
-  try {
-    await $`git -C ${worktreeDir} reset --hard HEAD~1`.quiet();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export interface GitCommitInfo {
   sha: string;
   shortSha: string;

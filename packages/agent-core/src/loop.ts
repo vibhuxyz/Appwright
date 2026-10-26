@@ -171,11 +171,7 @@ export async function runAgentLoop(
       );
 
       if (usage) {
-        const costUsdThisTurn = costUsd(
-          billedModel,
-          usage.inputTokens,
-          usage.outputTokens,
-        );
+        const costUsdThisTurn = costUsd(billedModel, usage);
         totalCostUsd += costUsdThisTurn;
         await emit({
           type: "usage",
@@ -184,6 +180,7 @@ export async function runAgentLoop(
           model: billedModel,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
+          ...(usage.cachedInputTokens ? { cachedInputTokens: usage.cachedInputTokens } : {}),
           costUsd: costUsdThisTurn,
         });
       } else {

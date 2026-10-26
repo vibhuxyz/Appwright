@@ -8,6 +8,12 @@ export interface ToolSpec {
   argsSchema: unknown; // JSON Schema, not a Zod schema — providers don't know Zod
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cachedInputTokens?: number;
+}
+
 export type ProviderChunk =
   | { type: "text_delta"; delta: string }
   // `providerMeta` is an opaque blob the provider asked us to hand back
@@ -25,7 +31,7 @@ export type ProviderChunk =
   // Real token counts, reported once at the end of a stream. Optional by
   // design: FakeProvider never sends it, and a provider that stops
   // reporting usage must degrade to "cost unknown", not to a crash.
-  | { type: "usage"; inputTokens: number; outputTokens: number }
+  | ({ type: "usage" } & TokenUsage)
   | {
       type: "stop";
       reason: "end_turn" | "tool_use" | "length";

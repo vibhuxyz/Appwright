@@ -5,19 +5,23 @@ import {
   mergeSession,
   resolveConflicts,
   ResolveConflictsRequest,
-  revertSession,
 } from "@repo/tools";
 import { sessionBranchName } from "@repo/workspace";
 import { ownedSessionWorktree } from "../ownership";
+import { revertLastTurn } from "../revert-turn";
 import {
   projectRepoPath,
   removeSessionWorktree,
   sessionServerKey,
-  sessionWorktreePath,
   stopDevServer,
 } from "../workspace/manager";
 
 export const gitRouter = Router();
+
+function requestIdOf(res: { getHeader(name: string): unknown }): string {
+  const value = res.getHeader("x-request-id");
+  return typeof value === "string" ? value : "";
+}
 
 gitRouter.get("/session/:id/diff", async (req, res) => {
   const owned = await ownedSessionWorktree(req.params.id, req.userId!);
@@ -92,10 +96,11 @@ gitRouter.post("/session/:id/revert", async (req, res) => {
     return res.status(404).json({ error: "not found" });
   }
 
-  const worktreeDir = sessionWorktreePath(
-    owned.projectId,
-    owned.worktreeSessionId,
-  );
-  const ok = await revertSession(worktreeDir);
-  res.json({ ok });
+  const result = await revertLastTurn(owned.projectId, owned.worktreeSessionId);
+  if (!result.ok) {
+    return res.status(result.status).json({
+      error: { code: result.code, message: result.message, details: {}, requestId: requestIdOf(res) },
+    });
+  }
+  res.json({ ok: true, revertedTurn: result.revertedTurn });
 });

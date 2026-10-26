@@ -10,7 +10,7 @@ import {
   sessionWorktreePath,
   WORKSPACES_DIR,
 } from "../src/workspace/manager";
-import { diffSession, mergeSession, revertSession } from "@repo/tools";
+import { diffSession, mergeSession } from "@repo/tools";
 
 describe("V2 Isolation & Control Integration (Slices 1, 2, 3)", () => {
   const testProjectId = `test-v2-proj-${Date.now()}`;

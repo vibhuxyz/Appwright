@@ -108,6 +108,7 @@ const usageEvent = z.object({
   model: z.string(),
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
+  cachedInputTokens: z.number().int().nonnegative().optional(),
   costUsd: z.number().nonnegative(),
 });
 

@@ -6,6 +6,7 @@ export const MAX_PATH_CHARS = 200;
 
 export const SECTION_LIMITS = {
   confirmed: 15,
+  reverted: 10,
   assumed: 10,
   open: 10,
   tasks: 40,
@@ -30,6 +31,7 @@ export const MEMORY_PREAMBLE = [
 
 export const HEADINGS = {
   confirmed: "## Confirmed by the user (newest first)",
+  reverted: "## Reverted by the user (this work was undone; do not redo it unless the user asks again)",
   open: "## Open questions (still waiting for the user)",
   assumed: "## Assumed defaults (the user did not answer)",
   goal: "## Goal (planned)",

@@ -9,8 +9,6 @@ import {
   resolveModelForPlan,
   resolveStopNotice,
   runAgentLoop,
-  isTranscriptOnlyRow,
-  toCoreMessage,
   type Message as CoreMessage,
   type Provider,
 } from "@repo/agent-core";
@@ -36,11 +34,13 @@ import { isBrowserCheckEnabled, runBrowserCheckStep } from "./browser-check-step
 import { checkpointSession } from "./checkpoint";
 import { currentTurnRows, currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
+import { historyMessages } from "./history-messages";
 import { HostMirrorRuntime } from "./host-mirror-runtime";
 import { isAutoImageChoice } from "./image-choice";
 import { injectProjectRuntimeEnv } from "./inject-project-env";
 import { createJobInteractiveTools } from "./interactive-tools";
 import { createPersist, publishStatus } from "./persist";
+import { recordTurnCommit } from "./record-turn-commit";
 import { reportSandboxStartFailure } from "./report-sandbox-start-failure";
 import { runBlueprintPath } from "./run-blueprint-path";
 import { shouldRunBlueprintPath } from "./should-run-blueprint";
@@ -165,7 +165,7 @@ export async function executeAgentJob(
     log.info("project memory assembled", { sessionId: session.id, memoryBytes: Buffer.byteLength(memorySection, "utf8") });
     const systemPrompt = await buildSystemPrompt(runtime, { memorySection });
     const systemMessage: CoreMessage = { role: "user", type: "text", content: systemPrompt };
-    const messages: CoreMessage[] = [systemMessage, ...effectiveRows.filter((row) => !isTranscriptOnlyRow(row)).map(toCoreMessage)];
+    const messages: CoreMessage[] = [systemMessage, ...historyMessages(effectiveRows)];
 
     const { emit } = createEmitAdapter({ sessionId: session.id, userId, persist });
 
@@ -331,9 +331,13 @@ export async function executeAgentJob(
       stopReason = notice.stopReason;
     }
 
+    const triggeringPrompt = priorRows.at(-1)?.content ?? "";
+    await runtime.flush();
+    const turnCommit = await recordTurnCommit({ sessionId: session.id, worktreeDir, prompt: triggeringPrompt });
+    log.info("turn commit", { sessionId: session.id, ...turnCommit });
+
     if (stopReason !== "fatalError") {
       try {
-        const triggeringPrompt = priorRows.at(-1)?.content ?? "";
         await checkpointSession(sandbox, triggeringPrompt);
 
         if (verificationPassed) {

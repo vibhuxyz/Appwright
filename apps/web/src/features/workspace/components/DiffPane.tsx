@@ -58,12 +58,12 @@ export function DiffPane({ sessionId }: DiffPaneProps) {
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={revertMutation.isPending || diffs.length === 0}
+            disabled={revertMutation.isPending}
             onClick={() => revertMutation.mutate()}
             className="flex items-center gap-1.5 rounded-lg border border-border-soft bg-surface-2 px-3 py-1.5 text-xs font-medium text-foreground-secondary transition hover:bg-surface-3 disabled:opacity-50"
           >
             <RotateCcw className="size-3.5" />
-            <span>Revert Checkpoint</span>
+            <span>{revertMutation.isPending ? "Undoing…" : "Undo last turn"}</span>
           </button>
           <button
             type="button"
@@ -76,6 +76,12 @@ export function DiffPane({ sessionId }: DiffPaneProps) {
           </button>
         </div>
       </div>
+
+      {revertMutation.error && (
+        <p role="alert" className="border-b border-border-soft px-4 py-2 text-xs text-danger">
+          {revertMutation.error.message}
+        </p>
+      )}
 
       {mergeResult && (
         <MergeStatusBanner

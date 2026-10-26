@@ -1,4 +1,5 @@
 import { providerFor } from "./openai";
+import type { TokenUsage } from "./types";
 
 // USD per 1M tokens. Deliberately a plain table and not an API lookup — no
 // host publishes prices programmatically, so the only honest options are a
@@ -6,7 +7,10 @@ import { providerFor } from "./openai";
 interface Price {
   in: number;
   out: number;
+  cachedIn?: number;
 }
+
+const TOKENS_PER_PRICE_UNIT = 1_000_000;
 
 const PRICES: Record<string, Price> = {
   "gpt-5.4": { in: 1.25, out: 10 },
@@ -26,8 +30,8 @@ const PRICES: Record<string, Price> = {
   "claude-haiku-5-5": { in: 0.1, out: 0.5 },
   "deepseek-chat": { in: 0.28, out: 0.42 },
   "deepseek-reasoner": { in: 0.28, out: 0.42 },
-  "deepseek-flash": { in: 0.3, out: 1.2 },
-  "deepseek-v4-pro": { in: 0.66, out: 1.98 },
+  "deepseek-flash": { in: 0.3, out: 1.2, cachedIn: 0.006 },
+  "deepseek-v4-pro": { in: 0.66, out: 1.98, cachedIn: 0.044 },
 };
 
 // An unpriced model must not read as free. A run that costs nothing can
@@ -48,11 +52,11 @@ export function priceFor(model: string): Price {
   return PRICES[model] ?? FALLBACKS[providerFor(model)] ?? FALLBACKS.openai!;
 }
 
-export function costUsd(
-  model: string,
-  inputTokens: number,
-  outputTokens: number,
-): number {
+export function costUsd(model: string, usage: TokenUsage): number {
   const price = priceFor(model);
-  return (inputTokens * price.in + outputTokens * price.out) / 1_000_000;
+  const cachedTokens = Math.min(Math.max(usage.cachedInputTokens ?? 0, 0), usage.inputTokens);
+  const cachedPrice = price.cachedIn ?? price.in;
+  const uncachedTokens = usage.inputTokens - cachedTokens;
+  const total = uncachedTokens * price.in + cachedTokens * cachedPrice + usage.outputTokens * price.out;
+  return total / TOKENS_PER_PRICE_UNIT;
 }

@@ -53,8 +53,8 @@ describe("usage accounting", () => {
     expect(priceFor("gpt-9-not-released-yet").in).toBeGreaterThan(0);
     expect(priceFor("claude-not-in-table-yet").in).toBeGreaterThan(0);
     expect(priceFor("deepseek-not-in-table-yet").in).toBeGreaterThan(0);
-    expect(costUsd("gpt-5.4-mini", 1_000_000, 0)).toBeCloseTo(0.25, 6);
-    expect(costUsd("gpt-5.4-mini", 0, 1_000_000)).toBeCloseTo(2, 6);
+    expect(costUsd("gpt-5.4-mini", { inputTokens: 1_000_000, outputTokens: 0 })).toBeCloseTo(0.25, 6);
+    expect(costUsd("gpt-5.4-mini", { inputTokens: 0, outputTokens: 1_000_000 })).toBeCloseTo(2, 6);
   });
 
   test("a provider that reports usage emits one usage event carrying a real cost", async () => {
@@ -75,7 +75,7 @@ describe("usage accounting", () => {
       model: "gpt-5.4-mini",
       inputTokens: 1000,
       outputTokens: 500,
-      costUsd: costUsd("gpt-5.4-mini", 1000, 500),
+      costUsd: costUsd("gpt-5.4-mini", { inputTokens: 1000, outputTokens: 500 }),
     });
   });
 

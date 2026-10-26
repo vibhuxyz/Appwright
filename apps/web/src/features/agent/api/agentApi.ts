@@ -109,7 +109,7 @@ export const agentApi = {
   mergeSession: (sessionId: string) =>
     httpClient.post<MergeResult>(`/session/${sessionId}/merge`, {}),
   revertSession: (sessionId: string) =>
-    httpClient.post<{ ok: boolean }>(`/session/${sessionId}/revert`, {}),
+    httpClient.post<{ ok: true }>(`/session/${sessionId}/revert`, {}),
 
   listApprovals: (sessionId: string) =>
     httpClient.get<Approval[]>(`/approvals/${sessionId}`),

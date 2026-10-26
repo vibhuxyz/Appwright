@@ -1,5 +1,5 @@
 import type { Message } from "../types";
-import type { Provider, ProviderChunk, ToolSpec } from "./types";
+import type { Provider, ProviderChunk, TokenUsage, ToolSpec } from "./types";
 
 // FakeProvider — scripted responses, built BEFORE the real provider (per the
 // version doc: this is how you test truncation, tool errors, and the exit
@@ -13,7 +13,7 @@ import type { Provider, ProviderChunk, ToolSpec } from "./types";
 // tool-call turn. Making it a separate kind meant only text turns could
 // cost money, and the loop's cost ceiling was untestable as a result.
 export type ScriptedTurn = {
-  usage?: { inputTokens: number; outputTokens: number };
+  usage?: TokenUsage;
 } & (
   | { kind: "text"; text: string }
   | { kind: "toolCall"; toolCallId: string; toolName: string; args: unknown }

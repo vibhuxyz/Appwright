@@ -2,52 +2,33 @@ import type { ProjectMemoryRows } from "@repo/contracts";
 import { prisma } from "../lib/prisma";
 import {
   MEMORY_TOOL_NAMES,
+  NEWEST_FIRST,
   PENDING_STATUS,
   PROJECT_MEMORY_LIMITS,
   UNRESOLVED_QUESTION_STATUSES,
 } from "./constants";
+import { loadLatestLiveBlueprint } from "./load-blueprint";
+import { parseRevertedTurns, toTurnRanges } from "./reverted-turns";
 
-const NEWEST_FIRST = [{ createdAt: "desc" as const }, { id: "desc" as const }];
-
-async function loadLatestBlueprint(projectId: string): Promise<ProjectMemoryRows["blueprint"]> {
-  const blueprint = await prisma.blueprint.findFirst({
-    where: { session: { projectId } },
+async function loadRevertedTurns(projectId: string) {
+  const markers = await prisma.message.findMany({
+    where: { session: { projectId }, data: { path: ["revertMarker"], equals: true } },
     orderBy: NEWEST_FIRST,
-    select: {
-      id: true,
-      intent: true,
-      pages: true,
-      features: true,
-      requirements: true,
-      tasks: {
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        take: PROJECT_MEMORY_LIMITS.maxTasks,
-        select: { title: true, status: true, owns: true },
-      },
-    },
+    take: PROJECT_MEMORY_LIMITS.maxRevertMarkers,
+    select: { sessionId: true, data: true },
   });
-  if (!blueprint) return undefined;
-  const approvals = await prisma.message.count({
-    where: { session: { projectId }, data: { path: ["blueprintId"], equals: blueprint.id } },
-  });
-  return {
-    intent: blueprint.intent,
-    pages: blueprint.pages,
-    features: blueprint.features,
-    requirements: blueprint.requirements,
-    tasks: blueprint.tasks,
-    isApproved: approvals > 0,
-  };
+  return parseRevertedTurns(markers);
 }
 
 export async function loadProjectMemoryRows(projectId: string): Promise<ProjectMemoryRows> {
   const inProject = { session: { projectId } };
+  const revertedTurns = await loadRevertedTurns(projectId);
   const [userRows, toolCallRows, blueprint, questions, pendingIntegrations, assistantRows] = await Promise.all([
     prisma.message.findMany({
       where: { ...inProject, role: "user", type: "text" },
       orderBy: NEWEST_FIRST,
       take: PROJECT_MEMORY_LIMITS.maxUserRows,
-      select: { content: true, data: true, createdAt: true },
+      select: { sessionId: true, seq: true, content: true, data: true, createdAt: true },
     }),
     prisma.message.findMany({
       where: {
@@ -57,9 +38,9 @@ export async function loadProjectMemoryRows(projectId: string): Promise<ProjectM
       },
       orderBy: NEWEST_FIRST,
       take: PROJECT_MEMORY_LIMITS.maxToolCallRows,
-      select: { type: true, data: true },
+      select: { sessionId: true, seq: true, type: true, data: true },
     }),
-    loadLatestBlueprint(projectId),
+    loadLatestLiveBlueprint(projectId, revertedTurns),
     prisma.agentQuestion.findMany({
       where: { ...inProject, status: { in: [...UNRESOLVED_QUESTION_STATUSES] } },
       orderBy: NEWEST_FIRST,
@@ -76,8 +57,16 @@ export async function loadProjectMemoryRows(projectId: string): Promise<ProjectM
       where: { ...inProject, role: "assistant", type: "text" },
       orderBy: NEWEST_FIRST,
       take: PROJECT_MEMORY_LIMITS.maxRecentAssistantRows,
-      select: { data: true, createdAt: true },
+      select: { sessionId: true, seq: true, data: true, createdAt: true },
     }),
   ]);
-  return { userRows, toolCallRows, blueprint, questions, pendingIntegrations, assistantRows };
+  return {
+    userRows,
+    toolCallRows,
+    blueprint,
+    questions,
+    pendingIntegrations,
+    assistantRows,
+    revertedTurns: toTurnRanges(revertedTurns),
+  };
 }

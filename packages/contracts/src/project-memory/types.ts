@@ -1,6 +1,13 @@
+import type { SessionTurnRange } from "../revert-marker";
+
+interface SessionRow {
+  readonly sessionId: string;
+  readonly seq: number;
+}
+
 export interface ProjectMemoryRows {
-  readonly userRows: readonly { content: string; data: unknown; createdAt: Date }[];
-  readonly toolCallRows: readonly { type: string; data: unknown }[];
+  readonly userRows: readonly (SessionRow & { content: string; data: unknown; createdAt: Date })[];
+  readonly toolCallRows: readonly (SessionRow & { type: string; data: unknown })[];
   readonly blueprint?: {
     readonly intent: unknown;
     readonly pages: unknown;
@@ -11,5 +18,6 @@ export interface ProjectMemoryRows {
   };
   readonly questions: readonly { status: string; questions: unknown }[];
   readonly pendingIntegrations: readonly { provider: string; reason: string }[];
-  readonly assistantRows: readonly { data: unknown; createdAt: Date }[];
+  readonly assistantRows: readonly (SessionRow & { data: unknown; createdAt: Date })[];
+  readonly revertedTurns: readonly SessionTurnRange[];
 }

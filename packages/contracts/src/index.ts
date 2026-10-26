@@ -145,3 +145,17 @@ export {
   isDecideForMe,
   type CreativeChoiceNeed,
 } from "./creative-choice";
+export {
+  RevertedTurnSchema,
+  TurnCheckpointSchema,
+  checkpointShaOf,
+  isInRevertedTurn,
+  isUserPromptRow,
+  revertedTurnOf,
+  turnStartSeq,
+  type RevertedTurn,
+  type SessionSeqRow,
+  type SessionTurnRange,
+  type TurnCheckpoint,
+  type TurnRow,
+} from "./revert-marker";

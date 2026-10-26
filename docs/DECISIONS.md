@@ -2526,6 +2526,108 @@ into `packages/assets` so the worker can run it itself, which is a file move tha
 
 ---
 
+## Decision 82: Earlier turns are sent as text only, and cached input is billed at the cache price ✅ ACTIVE _(2026-10-27, target: agent loop, billing; amends D40 replay)_
+
+**Decision:**
+- **Earlier turns go to the model as text only.** Each run sends the current turn whole: the
+  user's message, tool calls, results, and reasoning for DeepSeek's in-turn tool loop. Every
+  earlier turn is sent as its text messages only (`compactEarlierTurns`, used by
+  `historyMessages` in the worker). Old tool calls and results are dropped; project memory (D80)
+  already lists the files and tasks they produced. Old reasoning is dropped; DeepSeek says it
+  ignores it. An old attachment becomes a one-line note naming it.
+- **Cache hits are billed at the cache price.** `costUsd` now takes the cached input tokens the
+  provider reports (DeepSeek `prompt_cache_hit_tokens`, OpenAI-style
+  `prompt_tokens_details.cached_tokens`). It prices them at the model's `cachedIn` rate.
+  `deepseek-flash` is $0.006 per 1M and `deepseek-v4-pro` is $0.044 per 1M, the peak rates from
+  DeepSeek's pricing page on 2026-10-27, matching how the table already prices those two models.
+  A model with no published cache price still bills cached tokens at its full input price. The
+  usage event now carries `cachedInputTokens`.
+
+**Why:** session `cmvpnbb9p…` (deepseek-flash) used 24.1M input tokens and 0.3M output, and its
+"Continue building" run hit the $5 run cap. At that run's start, the replayed history was 7.3 MB:
+- 4.99 MB was one attached image, sent at `detail: high` on every call;
+- 1.49 MB was saved reasoning;
+- most of the rest was old tool traffic.
+
+With this change the same history is **265 KB**, measured with `historyMessages` on the real
+rows. The cap was also counting re-sent, cached prefixes at the full $0.30/M, which is 50× the
+real $0.006/M. So the $5 cap, and the credits charged, overstated the real bill.
+
+**What we gave up:**
+- A "Continue building" run no longer sees the paused run's tool calls. It works from project
+  memory and the paused run's text, and re-reads files it needs; the D79 guard dedupes those
+  reads within the run.
+- An image attached in an earlier turn is no longer visible to the model.
+- Credits charged per run go down for DeepSeek. This is a billing change, approved by the user
+  on 2026-10-27.
+
+**Not changed, flagged:**
+- `deepseek-v4-pro`'s table price ($0.66/$1.98) is DeepSeek's **off-peak** rate; peak is
+  $1.32/$3.96. Leaving it is a pricing decision for the user.
+- Cache-hit counts were never stored, so the real saving on past sessions can't be computed.
+  The usage event now carries them, but no column stores them yet. Adding one is a migration.
+
+**Revisit when:** a continued run visibly loses track of the paused run's work. Then also keep
+the last earlier turn whole, within a byte budget.
+
+---
+
+## Decision 83: Every agent turn is a host commit; revert undoes exactly one turn and memory forgets it ✅ ACTIVE _(2026-10-27, target: V2 revert, D44, D80; user-approved)_
+
+**Found:**
+- **Turn commits never reached the host.** The per-turn checkpoint was committed only inside the
+  sandbox. Session `cmvpnbb9p…` had 3 asset commits and **57 uncommitted files** on the host.
+- **Revert could wipe the whole site.** `POST /session/:id/revert` ran
+  `git reset --hard HEAD~1` on the host, which drops the last asset commit and **every
+  uncommitted file**.
+- **"Merged to main" did not merge the code.** It merged only those asset commits.
+- **Memory kept describing undone work.** Revert left the message rows, so memory and replayed
+  history still showed the reverted turn.
+
+**Decision:**
+1. **Commit each turn on the host.** After every run, fatal ones too, the worker calls
+   `commitTurn` (`packages/tools/src/turn-commit/`). It stages everything except `**/.env*`,
+   re-adds `.env.example`, and saves `checkpoint: { sha, isTurnCommit }` on the turn's last
+   assistant row. Asset commits use the same `commitTurn`; they used to `git add .`, which
+   included `.env.local` in `vite-react` projects.
+2. **Revert undoes exactly one turn** (`apps/api/src/revert-turn/`). It finds the newest turn
+   checkpoint across chats sharing the worktree (D73) that has not been reverted yet. It refuses
+   with a clear reason and changes nothing when:
+   - a run is active (`RUN_ACTIVE`);
+   - the worktree has uncommitted non-env changes (`DIRTY`);
+   - the commit is not on the branch (`NOT_ON_BRANCH`);
+   - later changes depend on the turn (`CONFLICT`);
+   - there is no saved turn to undo (`NOTHING_TO_REVERT`).
+
+   Otherwise it runs `git revert` (a new commit, history kept). If the turn was on `main`, it
+   merges the branch into `main` so `main` matches the chat.
+3. **Revert writes one append-only marker row**, transcript-only, with `revertMarker` and the
+   turn's `fromSeq`/`toSeq`/times. Memory (D80) and history (D82) skip rows in reverted turns.
+   Memory lists the reverted request under "Reverted by the user (… do not redo it unless the
+   user asks again)". A Blueprint created inside a reverted turn is no longer "the plan".
+
+**Why:** memory that describes undone work is worse than no memory. A revert that can delete
+the project is worse than no revert.
+
+**What we gave up:**
+- Turns from before this change have no checkpoint, so they can't be reverted ("nothing to
+  undo"). This is safe, not destructive.
+- A turn that later turns depend on can't be undone alone; that's a 409, never a forced reset.
+- If the merge to `main` fails after the chat's revert succeeds, the revert stands and the
+  marker records `mainError`.
+
+**Tests:** `apps/api/test/revert-turn.test.ts`, against real git and Postgres:
+- env files are never committed;
+- a dirty worktree is refused with nothing deleted;
+- the last turn is undone in the chat and on `main`, and recorded;
+- memory shows the request as reverted;
+- a second revert undoes the turn before it;
+- with nothing left, the reply is "nothing to undo".
+
+Pure tests cover the memory and history filters.
+
+---
+
 ## Open — not yet decided
 
 These block work when they're reached. Each needs an entry above before the relevant slice starts.

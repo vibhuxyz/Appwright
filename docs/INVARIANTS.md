@@ -21,6 +21,9 @@
 | No code file is written that imports a package absent from `package.json` | D79 | `guardTools` (`tools/src/run-guard`) | ✅ `run-guard.test.ts` |
 | An existing file is never overwritten by `write_file` unless it was read in the same run | D79 | `guardTools` | ✅ `run-guard.test.ts` |
 | Project memory never exceeds `MAX_PROJECT_MEMORY_BYTES` and cannot close its own tag | D80, D33 | `formatProjectMemory` | ✅ `agent-core/test/project-memory.test.ts` |
+| A revert never deletes uncommitted work; it undoes exactly one saved turn or changes nothing | D83 | `revertTurn` preflight (dirty / not-on-branch / conflict) | ✅ `apps/api/test/revert-turn.test.ts` |
+| No `.env*` file except `.env.example` is ever committed by the platform | D83 | `commitTurn` pathspec | ✅ `apps/api/test/revert-turn.test.ts` |
+| Rows of a reverted turn never reach project memory or replayed history | D83 | `isInRevertedTurn` in `formatProjectMemory` and `historyMessages` | ✅ memory + history tests |
 | Project memory never contains another project's data | D80 | `loadProjectMemoryRows` scoped by `projectId` | ✅ `apps/agent/test/project-memory.test.ts` |
 | Planned or assumed items are never labelled as confirmed by the user | D80 | label derived from the source table, not a model | ✅ `agent-core/test/project-memory.test.ts` |
 
