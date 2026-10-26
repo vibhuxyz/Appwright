@@ -29,6 +29,7 @@ __pycache__/
 
 # ─── Generated project workspaces (the agent's working copies) ───
 /workspaces/
+apps/api/.workspaces/
 
 # ─── Testing ───
 coverage
