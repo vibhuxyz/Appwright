@@ -18,8 +18,11 @@ function listSourceFiles(dir: string): string[] {
 }
 
 const providerKinds = process.env.E2B_API_KEY ? ["local", "e2b"] : ["local"];
+const LOCAL_TEST_TIMEOUT_MS = 5_000;
+const REMOTE_SANDBOX_TEST_TIMEOUT_MS = 60_000;
 
 describe.each(providerKinds)("sandbox provider contract (SANDBOX_PROVIDER=%s)", (kind) => {
+  const timeoutMs = kind === "e2b" ? REMOTE_SANDBOX_TEST_TIMEOUT_MS : LOCAL_TEST_TIMEOUT_MS;
   const original = process.env.SANDBOX_PROVIDER;
   process.env.SANDBOX_PROVIDER = kind;
   const provider = createSandboxProviderFromEnv();
@@ -43,13 +46,13 @@ describe.each(providerKinds)("sandbox provider contract (SANDBOX_PROVIDER=%s)", 
     const exec = await sandbox.exec({ argv: ["echo", "boundary"] });
     expect(exec.code).toBe(0);
     expect(exec.stdout.trim()).toBe("boundary");
-  });
+  }, timeoutMs);
 
   it("answers reserved browser routes with 501", async () => {
     const sandbox = await provider.create({ projectId: `contract-${kind}`, workspaceDir });
     const response = await fetch(`${sandbox.baseUrl}/v1/browser/navigate`, { method: "POST" });
     expect(response.status).toBe(501);
-  });
+  }, timeoutMs);
 });
 
 describe("sandbox boundary", () => {
