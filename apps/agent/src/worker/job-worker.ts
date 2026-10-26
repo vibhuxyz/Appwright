@@ -8,6 +8,7 @@ import {
   resolveModelForPlan,
   resolveStopNotice,
   runAgentLoop,
+  isTranscriptOnlyRow,
   toCoreMessage,
   type Message as CoreMessage,
   type Provider,
@@ -19,7 +20,7 @@ import {
 } from "@repo/cache";
 import { loadMissingAssetsNotice } from "@repo/assets";
 import { applyTheme, chosenThemeFromRows } from "@repo/blueprint";
-import { AGENT_LOOP_LIMITS, loopSpendLimits } from "@repo/contracts";
+import { AGENT_LOOP_LIMITS, loopSpendLimits, type Attachment } from "@repo/contracts";
 import { prisma, type Job } from "@repo/db";
 import { classify, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
@@ -36,6 +37,7 @@ import { currentTurnRows, currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
 import { HostMirrorRuntime } from "./host-mirror-runtime";
 import { injectProjectRuntimeEnv } from "./inject-project-env";
+import { createJobInteractiveTools } from "./interactive-tools";
 import { createPersist, publishStatus } from "./persist";
 import { reportSandboxStartFailure } from "./report-sandbox-start-failure";
 import { runBlueprintPath } from "./run-blueprint-path";
@@ -156,7 +158,7 @@ export async function executeAgentJob(
     const effectiveRows = await withSelectionApplied(priorRows, worktreeDir);
     const systemPrompt = await buildSystemPrompt(runtime);
     const systemMessage: CoreMessage = { role: "user", type: "text", content: systemPrompt };
-    const messages: CoreMessage[] = [systemMessage, ...effectiveRows.map(toCoreMessage)];
+    const messages: CoreMessage[] = [systemMessage, ...effectiveRows.filter((row) => !isTranscriptOnlyRow(row)).map(toCoreMessage)];
 
     const { emit } = createEmitAdapter({ sessionId: session.id, userId, persist });
 
@@ -172,23 +174,29 @@ export async function executeAgentJob(
       decisionResult,
     );
 
-    if (planInDetail) {
-      stopReason = await runBlueprintPath({
-        prompt: currentTurnText(effectiveRows),
-        projectId: job.projectId,
-        sessionId: session.id,
-        worktreeSessionId,
-        model: sessionModel,
-        credits: user.credits,
-        userId,
-        userPlan: user.plan,
-        theme: chosenTheme,
-        runtime,
-        signal: controller.signal,
-        persist,
-        approvedBlueprintId: approvedBlueprintIdFromRows(currentTurnRows(priorRows)),
-      });
+    const userRow = currentTurnRows(priorRows).find((r) => r.role === "user");
+    const turnAttachments = (userRow?.data as { attachments?: Attachment[] } | null | undefined)?.attachments;
+    const blueprintOutcome = planInDetail
+      ? await runBlueprintPath({
+          prompt: currentTurnText(effectiveRows),
+          attachments: turnAttachments,
+          projectId: job.projectId,
+          sessionId: session.id,
+          worktreeSessionId,
+          model: sessionModel,
+          credits: user.credits,
+          userId,
+          userPlan: user.plan,
+          theme: chosenTheme,
+          runtime,
+          signal: controller.signal,
+          persist,
+          approvedBlueprintId: approvedBlueprintIdFromRows(currentTurnRows(priorRows)),
+        })
+      : undefined;
 
+    if (blueprintOutcome?.kind === "ran") {
+      stopReason = blueprintOutcome.stopReason;
       if (stopReason === "completed") {
         await runtime.flush();
         const verify = await runVerifyStep({
@@ -216,19 +224,31 @@ export async function executeAgentJob(
         }
       }
     } else {
+      if (blueprintOutcome?.kind === "single-pass") {
+        messages.push({ role: "user", type: "text", content: blueprintOutcome.brief });
+      }
       const verifyHistory: VerifyOutcome[] = [];
 
       for (let attempt = 0; attempt <= MAX_VERIFY_ATTEMPTS; attempt++) {
+        const deadlineAt = Date.now() + AGENT_LOOP_LIMITS.loopDeadlineMs;
+        const interactiveTools = createJobInteractiveTools({
+          projectId: job.projectId,
+          sessionId: session.id,
+          worktreeSessionId,
+          signal: controller.signal,
+          deadlineAt,
+          persist,
+        });
         stopReason = await runAgentLoop({
           messages,
-          tools: ALL_TOOLS,
+          tools: [...ALL_TOOLS, ...interactiveTools],
           provider: provider ?? new OpenAiProvider({ model: sessionModel }),
           runtime,
           emit,
           budget: {
             maxIterations: AGENT_LOOP_LIMITS.maxIterations,
             ...loopSpendLimits(user.credits),
-            deadline: Date.now() + AGENT_LOOP_LIMITS.loopDeadlineMs,
+            deadline: deadlineAt,
           },
           signal: controller.signal,
           sessionId: session.id,

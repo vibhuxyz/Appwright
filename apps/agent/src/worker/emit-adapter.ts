@@ -28,6 +28,12 @@ export function createEmitAdapter(opts: EmitAdapterOptions): {
   const { sessionId, userId, persist } = opts;
   let textBuffer = "";
 
+  const flushText = async (): Promise<void> => {
+    const text = textBuffer.trim();
+    textBuffer = "";
+    if (text) await persist({ role: "assistant", type: "text", content: text });
+  };
+
   const emit = async (event: AgentEvent): Promise<void> => {
     switch (event.type) {
       case "text_delta":
@@ -35,6 +41,7 @@ export function createEmitAdapter(opts: EmitAdapterOptions): {
         publishDelta(sessionId, event.delta);
         break;
       case "tool_call_start":
+        await flushText();
         publishStatus(sessionId, "RUNNING", `Running ${event.toolName}…`);
         await persist({
           role: "assistant",
@@ -106,10 +113,7 @@ export function createEmitAdapter(opts: EmitAdapterOptions): {
         break;
       }
       case "agent_end":
-        if (textBuffer) {
-          await persist({ role: "assistant", type: "text", content: textBuffer });
-          textBuffer = "";
-        }
+        await flushText();
         break;
     }
   };

@@ -8,10 +8,14 @@ export function isIntakeTurn(row: TurnRow): boolean {
   return Boolean(row.data && typeof row.data === "object" && (row.data as { intake?: boolean }).intake === true);
 }
 
+function hasQuestionReply(row: TurnRow): boolean {
+  return Boolean(row.data && typeof row.data === "object" && "questionReply" in row.data);
+}
+
 export function currentTurnRows<T extends TurnRow>(rows: readonly T[]): readonly T[] {
   for (let index = rows.length - 1; index >= 0; index--) {
     const row = rows[index];
-    if (row && row.role === "user" && !isIntakeTurn(row)) return rows.slice(index);
+    if (row && row.role === "user" && !isIntakeTurn(row) && !hasQuestionReply(row)) return rows.slice(index);
   }
   return rows;
 }

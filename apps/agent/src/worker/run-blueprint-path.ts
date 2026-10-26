@@ -1,20 +1,35 @@
-import { OpenAiProvider, plannerModel, type Runtime } from "@repo/agent-core";
-import { createAssetRequest, waitUntilAssetRequestResolved } from "@repo/assets";
-import { creditsToCents, creditsToUsd, type PlanId, type ThemeOption } from "@repo/contracts";
+import {
+  OpenAiProvider,
+  analyzeMultimodalPrompt,
+  plannerModel,
+  type Runtime,
+} from "@repo/agent-core";
+import { createAssetRequest } from "@repo/assets";
+import {
+  creditsToCents,
+  creditsToUsd,
+  type Attachment,
+  type PlanId,
+  type ProjectSpecification,
+  type ThemeOption,
+} from "@repo/contracts";
 import {
   buildBlueprint,
   executeBlueprintRun,
+  isSinglePassBlueprint,
   loadApprovedBlueprint,
   persistBlueprint,
   startBlueprintRun,
   type ApprovedBlueprint,
 } from "@repo/blueprint";
 import { publishChannel, sessionChannel, type SseAssetRequestFrame } from "@repo/cache";
-import { provisionProjectDatabase } from "@repo/db";
-import { injectProjectRuntimeEnv } from "./inject-project-env";
+import { formatSpecificationSummary } from "./format-spec-summary";
 import { createEmitAdapter } from "./emit-adapter";
+import { prepareBuildEnvironment } from "./integrations";
 import { publishStatus } from "./persist";
 import type { PersistFields } from "./persist";
+import { waitForSectionImages } from "./section-images";
+import { prepareSinglePassBrief, singlePassPlanMessage } from "./single-pass";
 
 const RUN_OUTCOME_TO_STOP_REASON = {
   completed: "completed",
@@ -23,8 +38,13 @@ const RUN_OUTCOME_TO_STOP_REASON = {
   budget_exhausted: "budgetExceeded",
 } as const;
 
+export type BlueprintPathOutcome =
+  | { kind: "ran"; stopReason: string }
+  | { kind: "single-pass"; brief: string };
+
 export interface RunBlueprintPathOptions {
   prompt: string;
+  attachments?: readonly Attachment[];
   projectId: string;
   sessionId: string;
   worktreeSessionId: string;
@@ -55,82 +75,54 @@ async function freshPlan(
   prompt: string,
   theme: ThemeOption | undefined,
   userPlan: PlanId,
+  attachments?: readonly Attachment[],
+  persist?: (fields: PersistFields) => Promise<unknown>,
 ): Promise<ApprovedBlueprint> {
-  const plan = await buildBlueprint(prompt, {
-    theme,
-    provider: new OpenAiProvider({ model: plannerModel(userPlan) }),
-  });
-  return { plan, persisted: await persistBlueprint(sessionId, plan) };
-}
-
-export async function runBlueprintPath(options: RunBlueprintPathOptions): Promise<string> {
-  const {
-    prompt,
-    projectId,
-    sessionId,
-    worktreeSessionId,
-    model,
-    credits,
-    userId,
-    userPlan,
-    theme,
-    runtime,
-    signal,
-    persist,
-  } = options;
-
-  const { plan, persisted } = options.approvedBlueprintId
-    ? await approvedPlan(options.approvedBlueprintId, theme)
-    : await freshPlan(sessionId, prompt, theme, userPlan);
-  if (plan.blueprint.stack.db === "mongodb") {
-    await provisionProjectDatabase({
-      projectId,
-      environment: "development",
-      actorUserId: userId,
+  let specification: ProjectSpecification | undefined;
+  if (attachments && attachments.length > 0) {
+    publishStatus(sessionId, "RUNNING", "Analyzing request and reference attachments…");
+    const analysis = await analyzeMultimodalPrompt({
+      prompt,
+      attachments,
+      model: plannerModel(userPlan),
     });
-    await injectProjectRuntimeEnv({ projectId, worktreeSessionId, runtime });
-  }
-
-  const runId = await startBlueprintRun({
-    sessionId,
-    blueprintVersion: persisted.blueprintVersion,
-    budgetUsd: creditsToUsd(credits),
-  });
-
-  const assetRequest = await createAssetRequest(sessionId, projectId, persisted.blueprintId, plan.blueprint);
-  if (assetRequest) {
-    const frame: SseAssetRequestFrame = { kind: "assetRequest", assetRequest };
-    await publishChannel(sessionChannel(sessionId), frame);
-  }
-
-  await persist({
-    role: "assistant",
-    type: "text",
-    content: `Plan:\n${persisted.tasks.map((task, i) => `${i + 1}. ${task.title}`).join("\n")}`,
-  });
-
-  if (assetRequest && assetRequest.status !== "RESOLVED") {
-    await persist({
-      role: "assistant",
-      type: "text",
-      content:
-        "Choose an image for each section: upload your own, generate one, or decide for me and I will pick a matching photo for that section and this business.",
-    });
-    publishStatus(sessionId, "RUNNING", "Waiting for section images…");
-    try {
-      await waitUntilAssetRequestResolved(assetRequest.id, signal);
-    } catch {
-      if (signal.aborted) return "cancelled";
-      throw new Error("Waiting for section images failed");
+    if (analysis.ok) {
+      specification = analysis.specification;
+      if (persist) {
+        await persist({
+          role: "assistant",
+          type: "text",
+          content: formatSpecificationSummary(specification),
+        });
+      }
     }
   }
 
+  const plan = await buildBlueprint(prompt, {
+    theme,
+    specification,
+    provider: new OpenAiProvider({ model: plannerModel(userPlan) }),
+  });
+  return { plan, persisted: await persistBlueprint(sessionId, plan, { specification }) };
+}
+
+function planMessage(approved: ApprovedBlueprint, isSinglePass: boolean): string {
+  if (isSinglePass) return singlePassPlanMessage(approved.plan.blueprint.pages.map((page) => page.route));
+  return `Plan:\n${approved.persisted.tasks.map((task, i) => `${i + 1}. ${task.title}`).join("\n")}`;
+}
+
+async function runPlannedTasks(options: RunBlueprintPathOptions, approved: ApprovedBlueprint): Promise<string> {
+  const { sessionId, worktreeSessionId, projectId, model, credits, userId, userPlan, runtime, signal, persist } = options;
+  const runId = await startBlueprintRun({
+    sessionId,
+    blueprintVersion: approved.persisted.blueprintVersion,
+    budgetUsd: creditsToUsd(credits),
+  });
   publishStatus(sessionId, "RUNNING", "Plan formulated. Building tasks…");
 
-  const titleById = new Map(persisted.tasks.map((task) => [task.id, task.title]));
+  const titleById = new Map(approved.persisted.tasks.map((task) => [task.id, task.title]));
   const reportedTasks = new Set<string>();
   const runningTitles = new Set<string>();
-
   const { emit: conversationEmit } = createEmitAdapter({ sessionId, userId, persist });
 
   const summary = await executeBlueprintRun(
@@ -170,4 +162,42 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
 
   if (!summary) return "fatalError";
   return RUN_OUTCOME_TO_STOP_REASON[summary.outcome];
+}
+
+export async function runBlueprintPath(options: RunBlueprintPathOptions): Promise<BlueprintPathOutcome> {
+  const { prompt, projectId, sessionId, worktreeSessionId, userId, userPlan, theme, runtime, signal, persist } = options;
+
+  const approved = options.approvedBlueprintId
+    ? await approvedPlan(options.approvedBlueprintId, theme)
+    : await freshPlan(sessionId, prompt, theme, userPlan, options.attachments, persist);
+  const { plan, persisted } = approved;
+  const preparation = await prepareBuildEnvironment({
+    projectId,
+    sessionId,
+    worktreeSessionId,
+    userId,
+    needsDatabase: plan.blueprint.stack.db === "mongodb",
+    runtime,
+    signal,
+    persist,
+  });
+  if (preparation === "cancelled") return { kind: "ran", stopReason: "cancelled" };
+
+  const isSinglePass = isSinglePassBlueprint(plan.blueprint);
+  const assetRequest = await createAssetRequest(sessionId, projectId, persisted.blueprintId, plan.blueprint);
+  if (assetRequest) {
+    const frame: SseAssetRequestFrame = { kind: "assetRequest", assetRequest };
+    await publishChannel(sessionChannel(sessionId), frame);
+  }
+
+  await persist({ role: "assistant", type: "text", content: planMessage(approved, isSinglePass) });
+
+  const images = await waitForSectionImages({ sessionId, assetRequest, signal, persist });
+  if (images === "cancelled") return { kind: "ran", stopReason: "cancelled" };
+
+  if (isSinglePass) {
+    publishStatus(sessionId, "RUNNING", "Plan formulated. Building the site in one pass…");
+    return { kind: "single-pass", brief: await prepareSinglePassBrief(sessionId, plan.blueprint) };
+  }
+  return { kind: "ran", stopReason: await runPlannedTasks(options, approved) };
 }

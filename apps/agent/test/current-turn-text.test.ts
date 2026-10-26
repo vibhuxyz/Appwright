@@ -19,6 +19,14 @@ describe("currentTurnRows", () => {
     ];
     expect(currentTurnRows(rows)).toHaveLength(2);
   });
+
+  it("never starts a turn at a saved question reply", () => {
+    const rows = [
+      { role: "user", content: "Add Razorpay", data: null },
+      { role: "user", content: "User skipped", data: { questionReply: { outcome: "skipped" }, transcriptOnly: true } },
+    ];
+    expect(currentTurnRows(rows).map((row) => row.content)).toEqual(["Add Razorpay", "User skipped"]);
+  });
 });
 
 describe("currentTurnText", () => {

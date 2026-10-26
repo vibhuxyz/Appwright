@@ -1,9 +1,10 @@
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
-import { tryGetProjectRuntimeEnv } from "@repo/db";
+import { resolveSandboxRuntimeEnv } from "@repo/db";
 import { createLogger } from "@repo/logger";
 import { sessionWorktreePath } from "@repo/workspace";
 import type { Runtime } from "@repo/agent-core";
+import { INTEGRATION_GATEWAY_URL } from "./integrations";
 
 const log = createLogger("agent-job");
 
@@ -19,9 +20,10 @@ export async function injectProjectRuntimeEnv(input: {
   worktreeSessionId: string;
   runtime: Runtime;
 }): Promise<void> {
-  const vars = await tryGetProjectRuntimeEnv({
+  const vars = await resolveSandboxRuntimeEnv({
     projectId: input.projectId,
     environment: "development",
+    gatewayApiUrl: INTEGRATION_GATEWAY_URL,
   });
   if (Object.keys(vars).length === 0) return;
 
