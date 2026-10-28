@@ -9,6 +9,7 @@ const TEMPLATE_GLOBALS = readFileSync(
   path.resolve(import.meta.dir, "../../../templates/nextjs-fullstack/src/app/globals.css"),
   "utf8",
 );
+const VITE_INDEX_CSS = readFileSync(path.resolve(import.meta.dir, "../../../templates/vite-react/src/index.css"), "utf8");
 
 function memoryRuntime(files: Record<string, string>): { runtime: Runtime; files: Record<string, string> } {
   const runtime: Runtime = {
@@ -36,9 +37,20 @@ describe("applyTheme", () => {
     expect(written.sort()).toEqual(["src/app/globals.css", "src/app/theme.css"]);
     expect(files["src/app/theme.css"]).toContain(`--primary: ${theme.palette.primary};`);
     expect(files["src/app/theme.css"]).toContain(theme.fonts.heading);
+    expect(files["src/app/theme.css"]).toContain("::selection {\n  background: var(--primary);");
     const globals = files["src/app/globals.css"] ?? "";
     expect(globals.startsWith('@import url("https://fonts.googleapis.com/css2?')).toBe(true);
     expect(globals.indexOf('@import "./tokens.css";')).toBeLessThan(globals.indexOf('@import "./theme.css";'));
+  });
+
+  test("themes a Vite project through src/index.css and src/theme.css", async () => {
+    if (!theme) throw new Error("no preset theme");
+    const { runtime, files } = memoryRuntime({ "src/index.css": VITE_INDEX_CSS });
+    const written = await applyTheme(runtime, theme);
+    expect(written.sort()).toEqual(["src/index.css", "src/theme.css"]);
+    expect(files["src/theme.css"]).toContain(`--primary: ${theme.palette.primary};`);
+    const index = files["src/index.css"] ?? "";
+    expect(index.indexOf('@import "./tokens.css";')).toBeLessThan(index.indexOf('@import "./theme.css";'));
   });
 
   test("is idempotent and replaces the previous theme", async () => {

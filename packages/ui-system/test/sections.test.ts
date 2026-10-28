@@ -70,17 +70,27 @@ describe("fixtures", () => {
       "local-business",
       "saas-marketing",
       "portfolio",
+      "fashion-store",
       "dashboard",
     ]);
     const local = results[0];
     const saas = results[1];
     const portfolio = results[2];
-    const dashboard = results[3];
+    const fashion = results[3];
+    const dashboard = results[4];
     expect(local?.pages[0]?.sectionIds).toContain("hero.split-image");
     expect(local?.pages[0]?.sectionIds).toContain("location.panel");
     expect(local?.pages[0]?.sectionIds).not.toContain("categories.scroller");
     expect(local?.pages[0]?.sectionIds).not.toContain("proof.quote-band");
-    expect(saas?.pages[0]?.sectionIds).toContain("features.alternating");
+    expect(saas?.pages[0]?.sectionIds).toContain("hero.spotlight");
+    expect(saas?.pages[0]?.sectionIds).toContain("features.bento");
+    expect(local?.pages[0]?.sectionIds).toContain("features.alternating");
+    expect(portfolio?.pages[0]?.sectionIds).toContain("hero.editorial");
+    expect(portfolio?.shell.navigationId).toBe("nav.overlay-menu");
+    expect(fashion?.pages[0]?.sectionIds).toContain("hero.cinematic");
+    expect(fashion?.pages[0]?.sectionIds).toContain("commerce.product-rail");
+    expect(fashion?.pages[1]?.sectionIds).toContain("commerce.product-grid");
+    expect(fashion?.shell.announcementId).toBe("promo.bar");
     expect(saas?.pages[0]?.sectionIds).not.toContain("location.panel");
     expect(saas?.pages[1]?.sectionIds).toContain("pricing.columns");
     expect(dashboard?.pages[1]?.sectionIds).toEqual(["data.table"]);

@@ -1,4 +1,4 @@
-import { accepted } from "../registry";
+import { accepted, acceptedPattern } from "../registry";
 
 export const MIDDLE_SECTIONS = [
   accepted({
@@ -66,7 +66,7 @@ export const MIDDLE_SECTIONS = [
     width: "content",
     componentName: "Gallery",
   }),
-  accepted({
+  acceptedPattern({
     id: "proof.quote-band",
     name: "Verified quotes",
     description: "A quote band that stays empty until the user supplies real attribution.",
@@ -80,7 +80,7 @@ export const MIDDLE_SECTIONS = [
     responsive: "The quote measure stays narrow.",
     interactions: ["No star widgets unless the user supplied a rating"],
     width: "full",
-    componentName: "Testimonials",
+    componentName: "QuoteBand",
   }),
   accepted({
     id: "pricing.columns",

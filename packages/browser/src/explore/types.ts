@@ -8,7 +8,14 @@ export interface ExploreOptions {
   readonly outputDir: string;
   readonly viewports?: readonly Viewport[];
   readonly interact?: boolean;
+  readonly captureAll?: boolean;
   readonly onActivity?: (label: string) => void;
+}
+
+export interface PageShot {
+  readonly route: string;
+  readonly viewport: string;
+  readonly file: string;
 }
 
 export interface ExploreReport {
@@ -18,6 +25,7 @@ export interface ExploreReport {
   readonly buttonsClicked: number;
   readonly findings: readonly Finding[];
   readonly screenshots: readonly string[];
+  readonly pageShots: readonly PageShot[];
   readonly notes: readonly string[];
 }
 
@@ -29,4 +37,5 @@ export interface DiscoveredLink {
 export interface VisitResult {
   readonly findings: readonly Finding[];
   readonly links: readonly DiscoveredLink[];
+  readonly screenshot?: string;
 }

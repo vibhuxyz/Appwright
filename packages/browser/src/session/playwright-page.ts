@@ -19,6 +19,7 @@ import { SCROLL_STEP_SCRIPT, SCROLL_TOP_SCRIPT, scrollScript } from "./scroll-sc
 import type { BrowserPage, NavigationResult, ObservedEvents, PageMeasurements } from "./types";
 
 const NETWORK_ERROR_MARKER = "net::ERR_";
+const FONTS_READY_SCRIPT = "document.fonts.ready.then(() => true)";
 
 function isTimeoutError(error: unknown): boolean {
   return error instanceof Error && error.name === "TimeoutError";
@@ -81,6 +82,7 @@ export class PlaywrightPage implements BrowserPage {
   async screenshot(filePath: string): Promise<void> {
     await mkdir(dirname(filePath), { recursive: true });
     if (this.stopWatch) await this.page.evaluate(HIDE_CURSOR_SCRIPT);
+    await this.page.evaluate(FONTS_READY_SCRIPT);
     try {
       await this.page.screenshot({ path: filePath, fullPage: true, animations: "disabled" });
     } finally {

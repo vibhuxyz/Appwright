@@ -9,26 +9,48 @@ export { emitTokensCss } from "./emit/css";
 export { emitTailwindTheme, scaleSuffixes } from "./emit/tailwind";
 export { uiSystemPromptSection } from "./prompt";
 export {
+  EFFECTS,
+  PATTERNS,
+  PATTERNS_TARGET_DIR,
+  VENDORED_EFFECTS,
+  effectById,
+  patternById,
+  patternImportPath,
+  planPatternDelivery,
+} from "./patterns";
+export type { ArtDirection, DeliveredFile, EffectEntry, PatternDelivery, PatternEntry, ScrollLevel } from "./patterns";
+export { formatSkills, selectSkills } from "./skills";
+export type { DesignSkillId, LoadedSkill, SkillSignals, SkillsBlock } from "./skills";
+export {
   EMPTY_SECTION_FILTER,
   FIXTURES,
   GENERATED_STACK,
   SECTION_CATALOG,
+  SIGNATURE_IDEAS,
   SOURCE_DECISIONS,
   applyComposition,
   applyReview,
   compositionEvidence,
   compositionFingerprint,
   critique,
+  experienceEffectIds,
+  experienceSeed,
   filterSections,
   findRenderedSections,
+  formatComposition,
   formatEvidenceBrief,
+  formatExperience,
   formatSectionBrief,
+  formatShellBrief,
   ingestionAllowed,
   isEligible,
   isStackCompatible,
   measureFixture,
   measureFixtures,
   parseReviews,
+  planComposition,
+  planExperience,
+  imageTreatmentFor,
   rankSections,
   scoreSection,
   sectionById,
@@ -39,13 +61,18 @@ export {
 } from "./sections";
 export type {
   CheckEvidence,
+  ComposedSection,
+  ExperienceStrategy,
   FixtureResult,
+  ImageTreatment,
   QualityCheck,
+  PageCompositionPlan,
   RankContext,
   SectionEntry,
   SectionFilter,
   SectionReview,
   ShellChoice,
+  SignatureIdea,
   SourceDecision,
   ThemeFit,
 } from "./sections";

@@ -30,6 +30,24 @@ const CHECKS: readonly QualityCheck[] = [
   },
 ];
 
+const PATTERN_CHECKS: readonly QualityCheck[] = [
+  {
+    id: "license",
+    status: "passed",
+    detail: "Original Appwright layout. Motion effects it imports are vendored from Aceternity UI or React Bits and listed in SOURCE_DECISIONS.",
+  },
+  {
+    id: "stack",
+    status: "passed",
+    detail: "React 19, Tailwind 4 semantic tokens, framer-motion and gsap from the templates. Type-checked with packages/ui-system/patterns/tsconfig.json.",
+  },
+  ...CHECKS.slice(2),
+];
+
+export function acceptedPattern(draft: SectionDraft): SectionEntry {
+  return { ...accepted(draft), patternId: draft.id, checks: PATTERN_CHECKS };
+}
+
 export function accepted(draft: SectionDraft): SectionEntry {
   return {
     ...draft,

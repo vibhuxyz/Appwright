@@ -1,4 +1,5 @@
 import type { ProjectType, SectionPurpose } from "@repo/contracts";
+import type { ArtDirection } from "../registry";
 
 const MAX_PURPOSES = 8;
 const PRIVATE_ROUTE = /^\/(admin|dashboard|account|settings)(\/|$)/;
@@ -11,6 +12,21 @@ const HOME: Record<ProjectType, readonly SectionPurpose[]> = {
   wallet: ["hero", "features", "faq", "cta"],
   other: ["hero", "features", "cta"],
 };
+
+const DIRECTION_HOME: Partial<Record<ArtDirection, readonly SectionPurpose[]>> = {
+  commerce: ["hero", "categories", "product-showcase", "brand", "story", "cta"],
+  editorial: ["hero", "brand", "gallery", "portfolio", "story", "contact"],
+  product: ["hero", "features", "story", "product-showcase", "faq", "cta"],
+};
+
+function homePurposes(projectType: ProjectType, direction: ArtDirection | undefined): readonly SectionPurpose[] {
+  const directed = direction ? DIRECTION_HOME[direction] : undefined;
+  return directed ?? HOME[projectType];
+}
+
+export function wantsPlayful(text: string): boolean {
+  return /\b(playful|interactive|experimental|playground|drag\w*|creative studio)\b/i.test(text);
+}
 
 export function wantsTestimonials(text: string): boolean {
   return /\b(testimonial|reviews|social proof)\b/i.test(text);
@@ -53,14 +69,19 @@ function publicPurposes(text: string, projectType: ProjectType): SectionPurpose[
   return ["features", "cta"];
 }
 
-function isHome(route: string, text: string): boolean {
+export function isHome(route: string, text: string): boolean {
   const root = route === "/" || route.endsWith("/home");
   return root && !/\b(dashboard|admin|sign in|login)\b/i.test(text);
 }
 
-export function purposesFor(route: string, text: string, projectType: ProjectType): SectionPurpose[] {
+export function purposesFor(
+  route: string,
+  text: string,
+  projectType: ProjectType,
+  direction?: ArtDirection,
+): SectionPurpose[] {
   if (PRIVATE_ROUTE.test(route)) return privatePurposes(text);
-  if (isHome(route, text)) return withSignals(HOME[projectType], text);
+  if (isHome(route, text)) return withSignals(homePurposes(projectType, direction), text);
   if (/\b(table|records|list)\b/i.test(text)) return ["data-table"];
   return publicPurposes(text, projectType).slice(0, MAX_PURPOSES);
 }

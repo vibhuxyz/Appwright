@@ -14,6 +14,8 @@ export interface PageMeasurements {
   readonly overflowing: readonly string[];
   readonly brokenImages: readonly string[];
   readonly unlabelledControls: readonly string[];
+  readonly clippedText: readonly string[];
+  readonly overlappingText: readonly string[];
   readonly links: readonly string[];
 }
 

@@ -15,6 +15,8 @@ export const SEVERITY_BY_KIND = {
   "horizontal-overflow": "error",
   "broken-image": "error",
   "unlabelled-control": "warning",
+  "clipped-text": "warning",
+  "overlapping-text": "warning",
   "empty-page": "error",
   "broken-link": "error",
   "form-server-error": "error",

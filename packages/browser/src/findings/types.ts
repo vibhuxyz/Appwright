@@ -7,6 +7,8 @@ export const FINDING_KINDS = [
   "horizontal-overflow",
   "broken-image",
   "unlabelled-control",
+  "clipped-text",
+  "overlapping-text",
   "empty-page",
   "broken-link",
   "form-server-error",

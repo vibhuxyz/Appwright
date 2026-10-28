@@ -1,7 +1,7 @@
-import { accepted } from "../registry";
+import { accepted, acceptedPattern } from "../registry";
 
 export const CLOSE_SECTIONS = [
-  accepted({
+  acceptedPattern({
     id: "faq.stack",
     name: "Question stack",
     description: "A short list of questions using native disclosure.",
@@ -62,7 +62,7 @@ export const CLOSE_SECTIONS = [
     interactions: ["Submit confirms without inventing a subscriber count"],
     width: "content",
   }),
-  accepted({
+  acceptedPattern({
     id: "cta.band",
     name: "Closing band",
     description: "One closing action on an inverse surface.",
@@ -73,7 +73,7 @@ export const CLOSE_SECTIONS = [
     layoutPattern: "band",
     contentFields: ["heading", "one action"],
     responsive: "The action wraps under the heading.",
-    interactions: ["One primary action"],
+    interactions: ["One primary action", "Key word underlines once in view"],
     width: "full",
   }),
 ];

@@ -22,9 +22,12 @@ function checked(findings: readonly Finding[]): BrowserCheckResult {
       buttonsClicked: 0,
       findings,
       screenshots: findings.flatMap((f) => (f.screenshot ? [f.screenshot] : [])),
+      pageShots: [],
       notes: [],
     },
     skippedRoutes: [{ path: "src/app/blog/[slug]/page.tsx", reason: "dynamic segment needs real data" }],
+    risk: "visual",
+    viewports: ["mobile", "desktop"],
   };
 }
 

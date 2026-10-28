@@ -31,6 +31,8 @@ import { withSelectionApplied } from "./apply-selection";
 import { approvedBlueprintIdFromRows } from "./approved-blueprint-id";
 import { autoMergeSession } from "./auto-merge-session";
 import { isBrowserCheckEnabled, runBrowserCheckStep } from "./browser-check-step";
+import { createRepairTurn, reviewNewPages, runBrowserRepair } from "./browser-repair";
+import { worktreeChangeScope } from "./browser-scope";
 import { checkpointSession } from "./checkpoint";
 import { currentTurnRows, currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
@@ -308,12 +310,26 @@ export async function executeAgentJob(
     }
 
     if (verificationPassed && isBrowserCheckEnabled()) {
-      await runBrowserCheckStep({
-        projectId: job.projectId,
-        sessionId: session.id,
-        worktreeDir,
+      const browser = { projectId: job.projectId, sessionId: session.id, worktreeDir, persist };
+      const check = await runBrowserCheckStep(browser);
+      const repair = await runBrowserRepair({
+        check,
+        issues: await reviewNewPages({ check, ...browser }),
+        changedPaths: (await worktreeChangeScope(worktreeDir))?.changedPaths ?? [],
         persist,
+        recheck: (scope) => runBrowserCheckStep({ ...browser, recheck: scope }),
+        runRepairTurn: createRepairTurn({
+          messages,
+          provider: provider ?? new OpenAiProvider({ model: sessionModel }),
+          runtime,
+          emit,
+          signal: controller.signal,
+          sessionId: session.id,
+          userId,
+          worktreeDir,
+        }),
       });
+      log.info("browser repair", { sessionId: session.id, repair });
     }
 
     if (stopReason !== "completed" && !verifyGaveUp) {

@@ -2628,6 +2628,163 @@ Pure tests cover the memory and history filters.
 
 ---
 
+## Decision 84: Sections ship as real code chosen by art direction, and browser findings get one repair ✅ ACTIVE _(2026-10-27, target: V4 design, D46, D51, D53; user-approved)_
+
+**Found:**
+- **The catalog had no code.** Each of the 24 sections (`packages/ui-system/src/sections/catalog`)
+  was one line of description, so the agent wrote every section from scratch and most pages
+  became the same three-card grid.
+- **The theme's voice, dos and don'ts never reached the coding agent.** Only colours did.
+- **Browser findings were never read by anyone but the user.** Mobile was dropped whenever a run
+  was scoped, and nothing reviewed how a page looked.
+
+**Decision:**
+1. **Pattern code** lives in `packages/ui-system/patterns/` (14 sections plus `shared/`), typed
+   against the templates with `bun --filter @repo/ui-system check-patterns`. Motion effects
+   are vendored from Aceternity UI and React Bits by `bin/vendor-effects.ts`. The script
+   rewrites `motion/react` to `framer-motion` (already in both templates), fails if an exact
+   patch stops matching, and skips anything that needs three, ogl or `@gsap/react`.
+2. **Art direction picks the sections, not the model.** `detectArtDirection` (`editorial`,
+   `commerce`, `product`, `local`, `classic`) adds a ranking bonus. Sections that list
+   directions are eligible only under those directions, so `local` and `classic` composition
+   is unchanged. The shell gets an overlay nav, an editorial footer or a promo bar the same way.
+3. **Only the chosen code ships.** Before a page or app-shell task, `deliverPatterns`
+   (`packages/blueprint/src/patterns`) writes that task's patterns, their effects and
+   `shared/` into `src/components/patterns/`, with `"use client"` in Next projects. The
+   section brief names the import.
+4. **Design skills load only when needed** (`packages/ui-system/skills/*.md`, 12 KB cap,
+   4 KB per skill). Art direction loads for UI tasks, layout for pages, motion when a pattern
+   moves, assets when images are listed, and quality review on a repair.
+5. **Browser verification follows risk.** `classifyChange`: no source change skips it; logic-only
+   checks desktop; a UI change checks mobile and desktop; a new page checks all three sizes with
+   full-page screenshots. New warnings: clipped text and overlapping text.
+6. **One repair.** Blocking findings (overflow, broken image, page or console error, empty page,
+   HTTP error), plus "severe" issues from the vision review of new pages
+   (`gemini-3.7-flash`, Zod-checked, one JSON repair), become one repair turn. Then only those
+   routes and sizes are rechecked. What remains is reported; there is no second attempt.
+
+7. **One motion vocabulary.** `patterns/shared/motion.ts` holds the only easing curves,
+   durations and staggers. A test fails on a hand-written curve, `transition-all` or a scale
+   from 0. The rules are paraphrased from ui-skills.com (Emil Kowalski's animate,
+   animation-performance and apple-design, Jakub Krehel's better-ui, MengTo's masked-reveal and
+   marquee-loop, iart-ai's accessible-animation, pbakaus's animate). They live in
+   `skills/motion-design.md` and `skills/visual-quality-review.md`:
+   - decide first whether something should animate at all;
+   - strong ease-out, exits faster than entrances;
+   - buttons press to `scale-96`;
+   - reduced motion as tiers, not a switch;
+   - a pause control on any loop longer than 5 seconds.
+
+   `MaskedText` provides the word-mask headline reveal without GSAP's SplitText.
+
+**Why:** a library is not enough. The agent needs finished, tested compositions, and something
+deterministic choosing which ones fit the brief.
+
+**What we gave up:**
+- Aceternity UI and React Bits licences were not reviewed, by the owner's choice (personal
+  learning project). `SOURCE_DECISIONS` records this, and it must be revisited before any
+  commercial use.
+- The vision review costs a Gemini call per new-page run. The cost is logged, not charged to
+  the user. Set `VISUAL_REVIEW=false` to turn it off.
+- Text-only edits still count as a "visual" change, because paths alone cannot tell copy from
+  layout.
+- The Vite template never receives `theme.css`, which only targets `src/app/globals.css`, so
+  `font-heading` falls back there.
+
+**Evals:** `bun --filter @repo/agent-evals eval:design [--update-baselines] [--vision]`:
+- builds the five example pages (`patterns/examples`) inside the Next template;
+- runs the real browser check;
+- grades the sections that rendered and the findings (sample links are ignored);
+- compares against the baselines in `packages/agent-evals/baselines/`.
+
+Vision scores are reported apart from pass or fail.
+
+---
+
+## Decision 85: A 2D experience engine on top of D84: one signature moment per page, effects as a registry, interactions tested ✅ ACTIVE _(2026-10-27, target: V4 design, D84; user-approved, 2D only)_
+
+**Found:**
+- Sections were ranked one at a time, so a page could stack two dense grids or two loud
+  animations.
+- Effects existed only as vendored files behind patterns; nothing described what an effect
+  costs, how it behaves on touch or with reduced motion, or when the planner may pick it.
+- The design eval measured pixels, never interaction. Running it with reduced motion exposed
+  three real bugs:
+  - hydration error #418 on every Next page with reduced motion on;
+  - `"use client"` was added to constant modules, so server pages got functions instead of
+    class names;
+  - the reveal hook stayed hidden when reduced motion arrived after hydration.
+
+**Decision:**
+1. **One effect registry.** `EffectEntry` (`ui-system/src/patterns/types.ts`) holds category,
+   triggers, directions, file, requires, dependencies, options, level (reveal, choreography,
+   interactive), performance tier, touch, reduced-motion and fallback behaviour, and the test
+   ids that cover it. The list `EFFECTS` has 7 vendored entries (with `vendor` fetch info for
+   `bin/vendor-effects.ts`) and 15 of our own. Our own effects use Canvas 2D, SVG, framer-motion
+   and CSS: parallax, highlight-text, draw-path, image-compare, grain, draggable-cards,
+   pointer-drift, tilt-card, particle-field, ambient-gradient, scroll-expand, scroll-shape and
+   hover-glow. ScrollExpand, ScrollShape and HoverGlow re-implement techniques studied in
+   adrianhajdin/award-winning-website (no code copied; that repo has no licence).
+2. **Nine more patterns** (23 in total): `hero.playground`, `gallery.collage`,
+   `story.case-study`, `commerce.campaign-banner`, `commerce.featured-collection`,
+   `stats.band`, plus code for `proof.quote-band`, `faq.stack` and `cta.band`.
+   - `hero.playground` is chosen only when the brief says playful, interactive, experimental
+     or creative studio.
+   - The manifest moved into `src/patterns/manifest/` (core and creative lists).
+3. **Page composition plan** (`sections/compose`). Each page gets a direction (now stored on
+   `Page.artDirection`), a visual strategy, a role per section (anchor, support, conversion),
+   density and constraints.
+   - Ranking adds sequence fit: dense after dense loses points, a change of density gains.
+     Two expressive sections in a row, or more than two per page, are repaired.
+   - `critique` reports duplicates, three dense sections in a row and expressive overload.
+4. **Experience strategy** (`sections/experience`) picks one signature idea from the
+   direction, the brief and the sections actually chosen, for example the commerce campaign
+   that opens on scroll, the studio drag stage, or before/after for renovation briefs. It
+   also chooses up to two supporting effects, a motion level per section, one treatment per
+   image role (entrance, hover, scroll; `Media` gained `focalPoint`, `entrance` and `hover`),
+   and the mobile and performance rules. The brief prints it, and delivery ships exactly those
+   effects (`planPatternDelivery(patternIds, effectIds)`), reporting unknown ids.
+5. **Skills.** `creative-interactions` loads when the plan has a pointer, canvas or scroll
+   scene.
+   - Art direction gained concept-first (essence, tension, signature), 10:1 type scale, the
+     blur test and accent discipline, from the MIT top-design skill.
+   - Motion caps runs at 1.2 s.
+   - Lenis, scroll hijack, `cursor: none` and 3D were not adopted.
+6. **Runtime guardrails.**
+   - Reduced motion is read through `usePrefersReducedMotion` (useSyncExternalStore with a
+     server snapshot) to avoid hydration mismatch.
+   - Reveals never hide content before hydration or without JavaScript (`useRevealState`).
+   - Continuous effects stop off screen and in hidden tabs.
+   - Pointer listeners stay on the element.
+   - Only `.tsx` files get `"use client"`.
+   - Fixed colours live only in `shared/on-image.ts`.
+   - `theme.css` also brands `::selection` and now reaches Vite (`src/theme.css`).
+7. **Quality gate.**
+   - Copy-only diffs skip the browser (`copyOnlyPaths`: same code shape, similar text length,
+     never class strings).
+   - Shared theme, token or global CSS counts as page risk.
+   - The repair prompt names changed files, screenshot evidence, a no-unrelated-edits rule and
+     the exact recheck scope; what remains is listed after the one repair.
+   - The vision rubric (`visual-review@2`) adds composition, colour, rhythm, distinctiveness
+     and mobile, and leaves motion to measured checks.
+8. **Evals.**
+   - Eight cases. The new ones are creative-studio, campaign-commerce and product-lab.
+   - Baselines are captured with reduced motion and fonts ready, so noise is 0.03% or less.
+   - Real Chromium interaction checks: drag and keyboard moves a card, the compare slider
+     answers arrow keys, the canvas is still under reduced motion and moving otherwise, every
+     heading is visible after scrolling (desktop, and phone with reduced motion), and every
+     phone tap target is at least 24 px. The tap-target check caught four undersized controls
+     in D84 patterns.
+
+**What we gave up:**
+- The signature idea is chosen by rules, not by a model; a model-written concept is a
+  follow-up.
+- Image focal points are applied when known, but the asset pipeline does not detect them yet.
+- Patterns are typed against the Next template only; Vite is out of scope for this decision.
+- Interaction checks run one page at a time to keep animation timing stable (about 20 s).
+
+---
+
 ## Open — not yet decided
 
 These block work when they're reached. Each needs an entry above before the relevant slice starts.

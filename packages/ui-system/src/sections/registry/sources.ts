@@ -91,6 +91,32 @@ export const SOURCE_DECISIONS: readonly SourceDecision[] = [
     decision: "adopt",
     reason: "Written for Appwright tokens. No third-party section source was copied.",
   },
+  {
+    id: "aceternity-ui",
+    repository: "https://ui.aceternity.com/registry",
+    author: "Aceternity",
+    license: "not reviewed",
+    revision: "registry JSON fetched 2026-10-27 by packages/ui-system/bin/vendor-effects.ts",
+    commercialUse: false,
+    modification: true,
+    redistribution: false,
+    decision: "adopt",
+    reason:
+      "Owner decision 2026-10-27: personal learning project, licence not checked. Only motion effects are vendored into patterns/effects, never whole sections. Review the licence before any commercial use.",
+  },
+  {
+    id: "react-bits",
+    repository: "https://reactbits.dev/r",
+    author: "David Haz",
+    license: "not reviewed",
+    revision: "registry JSON (TS + Tailwind variants) fetched 2026-10-27 by packages/ui-system/bin/vendor-effects.ts",
+    commercialUse: false,
+    modification: true,
+    redistribution: false,
+    decision: "adopt",
+    reason:
+      "Owner decision 2026-10-27: personal learning project, licence not checked. Only motion effects are vendored into patterns/effects. Review the licence before any commercial use.",
+  },
 ];
 
 export function sourceById(id: string): SourceDecision | undefined {

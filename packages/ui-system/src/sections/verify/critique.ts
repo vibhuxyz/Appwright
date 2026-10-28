@@ -1,6 +1,28 @@
 import type { PlannedSection } from "@repo/contracts";
+import { sectionById } from "../catalog";
+import { MAX_DENSE_RUN, MAX_EXPRESSIVE_SECTIONS, densityOfLayout, motionOf } from "../compose";
 
 const MAX_ISSUES = 8;
+
+function sequenceIssues(sections: readonly PlannedSection[]): string[] {
+  const issues: string[] = [];
+  const seen = new Set<string>();
+  let denseRun = 0;
+  let expressive = 0;
+  let previousExpressive = false;
+  for (const section of sections) {
+    if (seen.has(section.sectionId)) issues.push(`section ${section.sectionId} appears twice`);
+    seen.add(section.sectionId);
+    denseRun = densityOfLayout(section.layoutPattern) === "high" ? denseRun + 1 : 0;
+    if (denseRun === MAX_DENSE_RUN + 1) issues.push(`${MAX_DENSE_RUN + 1} dense sections in a row ending at ${section.sectionId}`);
+    const isExpressive = motionOf(sectionById(section.sectionId) ?? {}) === "expressive";
+    if (isExpressive && previousExpressive) issues.push(`expressive motion twice in a row at ${section.sectionId}`);
+    if (isExpressive) expressive += 1;
+    previousExpressive = isExpressive;
+  }
+  if (expressive > MAX_EXPRESSIVE_SECTIONS) issues.push(`${expressive} expressive motion sections; keep ${MAX_EXPRESSIVE_SECTIONS} at most`);
+  return issues;
+}
 
 export function critique(sections: readonly PlannedSection[]): string[] {
   const issues: string[] = [];
@@ -27,5 +49,5 @@ export function critique(sections: readonly PlannedSection[]): string[] {
   }
   const heroAt = sections.findIndex((section) => section.purpose === "hero");
   if (heroAt > 0) issues.push("hero is not first");
-  return issues.slice(0, MAX_ISSUES);
+  return [...issues, ...sequenceIssues(sections)].slice(0, MAX_ISSUES);
 }

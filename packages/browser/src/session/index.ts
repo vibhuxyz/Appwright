@@ -1,4 +1,4 @@
-export { launchPlaywrightSession } from "./launch-playwright-session";
+export { launchPlaywrightSession, type SessionOptions } from "./launch-playwright-session";
 export { BrowserUnavailableError } from "./types";
 export type {
   BadResponse,

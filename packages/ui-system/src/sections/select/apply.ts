@@ -1,7 +1,8 @@
 import type { Blueprint, DesignBlock, Page, ProjectType } from "@repo/contracts";
-import type { SectionEntry } from "../registry";
+import { detectArtDirection } from "../direction";
+import type { ArtDirection, SectionEntry } from "../registry";
 import { chooseAll } from "./choose";
-import { purposesFor, wantsTestimonials } from "./purposes";
+import { isHome, purposesFor, wantsPlayful, wantsTestimonials } from "./purposes";
 import type { RankContext } from "./rank";
 import { repairLayouts } from "./repair";
 import { assignRhythm } from "./rhythm";
@@ -26,28 +27,44 @@ function labelsFor(entries: readonly SectionEntry[]): string[] {
   return labels;
 }
 
-function composePage(page: Page, design: DesignBlock, projectType: ProjectType): Page {
+interface PageContext {
+  design: DesignBlock;
+  projectType: ProjectType;
+  direction: ArtDirection;
+}
+
+function composePage(page: Page, { design, projectType, direction }: PageContext): Page {
   const text = `${page.purpose} ${page.components.join(" ")}`;
   const context: RankContext = {
     projectType,
     style: design.style,
     density: design.density,
     allowTestimonials: wantsTestimonials(text),
+    allowPlayful: wantsPlayful(`${text} ${design.style}`),
     previousLayout: null,
+    direction,
+    isHome: isHome(page.route, text),
   };
-  const chosen = repairLayouts(chooseAll(purposesFor(page.route, text, projectType), context), context);
+  const chosen = repairLayouts(chooseAll(purposesFor(page.route, text, projectType, direction), context), context);
   return {
     ...page,
+    artDirection: direction,
     components: mergeLabels(page.components, labelsFor(chosen)),
     sections: assignRhythm(chosen, design.density, design.style, projectType),
   };
 }
 
+export function directionFor(blueprint: Pick<Blueprint, "intent" | "pages">, projectType: ProjectType): ArtDirection {
+  const text = [blueprint.intent.domain, blueprint.intent.type, ...blueprint.pages.map((page) => page.purpose)].join(" ");
+  return detectArtDirection(text, projectType);
+}
+
 export function applyComposition(blueprint: Blueprint, projectType: ProjectType): Blueprint {
   const resolved = blueprint.projectType && blueprint.projectType !== "other" ? blueprint.projectType : projectType;
+  const context: PageContext = { design: blueprint.design, projectType: resolved, direction: directionFor(blueprint, resolved) };
   return {
     ...blueprint,
     projectType: resolved,
-    pages: blueprint.pages.map((page) => composePage(page, blueprint.design, resolved)),
+    pages: blueprint.pages.map((page) => composePage(page, context)),
   };
 }

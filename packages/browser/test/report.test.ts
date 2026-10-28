@@ -5,7 +5,7 @@ import { formatReport, hasErrors } from "../src/report";
 import { truncateSnapshot } from "../src/snapshot";
 
 function reportWith(findings: ExploreReport["findings"]): ExploreReport {
-  return { routes: ["/", "/menu"], pagesChecked: 6, formsTested: 2, buttonsClicked: 3, findings, screenshots: [], notes: [] };
+  return { routes: ["/", "/menu"], pagesChecked: 6, formsTested: 2, buttonsClicked: 3, findings, screenshots: [], pageShots: [], notes: [] };
 }
 
 describe("formatReport", () => {

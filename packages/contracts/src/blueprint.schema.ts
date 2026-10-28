@@ -69,11 +69,15 @@ export const EntitySchema = z.object({
 });
 export type Entity = z.infer<typeof EntitySchema>;
 
+export const ArtDirectionSchema = z.enum(["editorial", "commerce", "product", "local", "classic"]);
+export type ArtDirection = z.infer<typeof ArtDirectionSchema>;
+
 export const PageSchema = z.object({
   route: z.string().min(1),
   purpose: z.string().min(1),
   components: z.array(z.string()).default([]),
   sections: z.array(PlannedSectionSchema).max(SECTION_PLAN_LIMITS.maxSectionsPerPage).optional(),
+  artDirection: ArtDirectionSchema.optional(),
 });
 export type Page = z.infer<typeof PageSchema>;
 

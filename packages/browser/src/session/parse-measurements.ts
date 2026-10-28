@@ -8,6 +8,8 @@ const MeasurementsSchema = z.object({
   overflowing: z.array(z.string()),
   brokenImages: z.array(z.string()),
   unlabelledControls: z.array(z.string()),
+  clippedText: z.array(z.string()),
+  overlappingText: z.array(z.string()),
   links: z.array(z.string()),
 });
 

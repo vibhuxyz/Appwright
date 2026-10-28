@@ -71,7 +71,7 @@ describe("assetHintsFor", () => {
   });
 
   it("appears in the task prompt", () => {
-    const task = { type: "PAGE", title: "Page /: Home", owns: ["a"], reads: [], acceptance: [], assetHints: assetHintsFor("Page /: Home", [[HERO]]), entities: [], pages: [], features: [], design: DEFAULT_DESIGN_BLOCK };
+    const task = { projectId: "project-1", type: "PAGE", title: "Page /: Home", owns: ["a"], reads: [], acceptance: [], assetHints: assetHintsFor("Page /: Home", [[HERO]]), entities: [], pages: [], features: [], design: DEFAULT_DESIGN_BLOCK };
 
     expect(buildTaskPrompt(task, undefined)).toContain("Images this page needs:");
   });

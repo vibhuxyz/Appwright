@@ -86,3 +86,5 @@ export {
   type MultimodalAnalysisInput,
   type MultimodalAnalysisResult,
 } from "./multimodal";
+export { MAX_SHOT_BYTES, VISUAL_REVIEW_MODEL, reviewScreenshots } from "./visual-review";
+export type { ReviewResult, ReviewShot, ShotRef, VisualIssue, VisualReview } from "./visual-review";

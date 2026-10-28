@@ -1,4 +1,8 @@
 export { SECTION_CATALOG, sectionById } from "./catalog";
+export { formatComposition, planComposition } from "./compose";
+export type { ComposedSection, PageCompositionPlan, VisualStrategy } from "./compose";
+export { SIGNATURE_IDEAS, experienceEffectIds, experienceSeed, formatExperience, imageTreatmentFor, planExperience } from "./experience";
+export type { ExperienceStrategy, ImageTreatment, SignatureIdea } from "./experience";
 export { FIXTURES, measureFixture, measureFixtures } from "./fixtures";
 export type { FixturePageResult, FixtureResult } from "./fixtures";
 export { EMPTY_SECTION_FILTER, filterSections, applyReview, parseReviews } from "./preview";
@@ -23,5 +27,6 @@ export {
   findRenderedSections,
   formatEvidenceBrief,
   formatSectionBrief,
+  formatShellBrief,
 } from "./verify";
 export type { CheckEvidence, RenderedSectionCheck } from "./verify";

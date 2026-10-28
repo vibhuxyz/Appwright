@@ -14,7 +14,7 @@ async function waitForFrame(frames: readonly Buffer[]): Promise<void> {
 describe("playwright live frames", () => {
   test("sends jpeg frames from the check browser", async () => {
     const frames: Buffer[] = [];
-    const session = await launchPlaywrightSession({ onFrame: (jpeg) => frames.push(jpeg) });
+    const session = await launchPlaywrightSession({ live: { onFrame: (jpeg) => frames.push(jpeg) } });
     const page = await session.openPage({ name: "desktop", width: 800, height: 600 });
     try {
       await page.navigate("data:text/html,<button>Plan a visit</button>");

@@ -1,6 +1,7 @@
 import type { AssetSlot, Blueprint } from "@repo/contracts";
-import { formatSectionBrief } from "@repo/ui-system";
+import { formatSectionBrief, formatShellBrief } from "@repo/ui-system";
 import { describeAssetSlot } from "../asset-hints";
+import { shellSectionIdsFor, type PatternDeliveryResult } from "../patterns";
 import { PAGE_UI_ACCEPTANCE, PLANNED_PAGE_ACCEPTANCE } from "../build-task-prompt";
 import {
   BRIEF_TAG,
@@ -30,12 +31,12 @@ function componentLine(components: readonly string[]): string {
   return `Components: ${shown.join(", ")}${hidden > 0 ? ` (+${hidden} more)` : ""}`;
 }
 
-function pageLines(page: BriefPage, design: Blueprint["design"]): string[] {
+function pageLines(page: BriefPage, design: Blueprint["design"], projectId: string): string[] {
   return [
     ``,
     `Page ${page.route}: ${flatten(page.purpose, MAX_BRIEF_PURPOSE_CHARS)}`,
     componentLine(page.components),
-    ...formatSectionBrief(page, design),
+    ...formatSectionBrief(page, design, projectId),
   ];
 }
 
@@ -66,6 +67,11 @@ function acceptanceLines(blueprint: Blueprint): string[] {
   return [``, `Acceptance criteria (all must hold when you finish):`, ...criteria.map((criterion) => `- ${criterion}`)];
 }
 
+function shellLines(blueprint: Blueprint, delivery: PatternDeliveryResult): string[] {
+  const deliveredIds = new Set(delivery.patternIds);
+  return formatShellBrief(shellSectionIdsFor(blueprint).filter((id) => deliveredIds.has(id)));
+}
+
 function fitToBudget(lines: readonly string[], maxBytes: number): { kept: string[]; cutLines: number } {
   const kept: string[] = [];
   let usedBytes = 0;
@@ -85,13 +91,16 @@ function escapeBriefTag(text: string): string {
 export function buildSinglePassBrief(input: {
   blueprint: Blueprint;
   slots: readonly AssetSlot[];
+  projectId: string;
+  delivery: PatternDeliveryResult;
 }): SinglePassBrief {
-  const { blueprint, slots } = input;
+  const { blueprint, slots, projectId, delivery } = input;
   const lines = [
     `The plan is approved and the theme is applied. Build the site now from this brief.`,
     ...SINGLE_PASS_RULES.map((rule) => `- ${rule}`),
+    ...shellLines(blueprint, delivery),
     `Pages to build (link only to these routes):`,
-    ...blueprint.pages.flatMap((page) => pageLines(page, blueprint.design)),
+    ...blueprint.pages.flatMap((page) => pageLines(page, blueprint.design, projectId)),
     ...slotLines(slots),
     ...acceptanceLines(blueprint),
   ];

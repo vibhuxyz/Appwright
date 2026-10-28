@@ -1,8 +1,15 @@
 import { THEME_FONTS, fontStack, googleFontsUrl, type ThemeFontName, type ThemeOption } from "@repo/contracts";
 
 const SINGLE_WEIGHT = "400";
-export const THEME_CSS_PATH = "src/app/theme.css";
-export const GLOBALS_CSS_PATH = "src/app/globals.css";
+export interface ThemeStylesheet {
+  readonly globalsPath: string;
+  readonly themePath: string;
+}
+
+export const THEME_STYLESHEETS: readonly ThemeStylesheet[] = [
+  { globalsPath: "src/app/globals.css", themePath: "src/app/theme.css" },
+  { globalsPath: "src/index.css", themePath: "src/theme.css" },
+];
 
 const THEME_IMPORT_LINE = '@import "./theme.css";';
 const TOKENS_IMPORT = /^@import\s+["']\.\/tokens\.css["'];[ \t]*$/m;
@@ -59,6 +66,11 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: ${heading};${headingWeightRule(fonts.heading)}
+}
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 `;
 }

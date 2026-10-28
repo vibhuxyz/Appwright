@@ -1,1 +1,1 @@
-export { changedWorktreePaths } from "./changed-paths";
+export { addedPathsFromStatus, worktreeChangeScope } from "./changed-paths";

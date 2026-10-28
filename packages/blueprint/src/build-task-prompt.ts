@@ -1,4 +1,5 @@
 import { formatEvidenceBrief, formatSectionBrief } from "@repo/ui-system";
+import { formatArtDirection } from "./art-direction";
 import { pageRouteOf } from "./asset-hints";
 import type { TaskDetail } from "./load-task-detail";
 
@@ -27,6 +28,7 @@ const GATEWAY_TASK_TYPES: ReadonlySet<string> = new Set(["auth", "payment", "api
 export interface TaskPromptContext {
   readonly standards?: string;
   readonly projectTree?: readonly string[];
+  readonly skills?: string;
 }
 
 function pageFor(task: TaskDetail) {
@@ -65,7 +67,7 @@ function compositionLines(task: TaskDetail): string[] {
   const type = task.type.toLowerCase();
   if (type === "page") {
     const page = pageFor(task);
-    return page ? formatSectionBrief(page, task.design) : [];
+    return page ? formatSectionBrief(page, task.design, task.projectId) : [];
   }
   if (type === "app-shell") {
     return [
@@ -130,6 +132,8 @@ export function buildTaskPrompt(
     lines.push(``, `Acceptance criteria (all must hold when you finish):`);
     lines.push(...acceptance.map((criterion) => `- ${criterion}`));
   }
+  const artDirection = formatArtDirection(task.design, task.type);
+  if (artDirection.length > 0) lines.push(``, ...artDirection);
   const composition = compositionLines(task);
   if (composition.length > 0) {
     lines.push(``, ...composition);
@@ -155,6 +159,7 @@ export function buildTaskPrompt(
       }
     }
   }
+  if (context.skills) lines.push(``, context.skills);
   if (previousError) {
     lines.push(``, `The previous attempt failed: ${previousError}`, `Fix that and try again.`);
   }

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { collectionRouteSource, generateAdminCrud, generateModelFile } from "@repo/admin-crud";
 import type { Runtime } from "@repo/agent-core";
-import type { Entity } from "@repo/contracts";
+import { DEFAULT_DESIGN_BLOCK, type Entity } from "@repo/contracts";
 import { buildTaskPrompt } from "../src/build-task-prompt";
 import { generateDataModelAttempt } from "../src/generate-data-model-attempt";
 import { generateDeployAttempt } from "../src/generate-deploy-attempt";
@@ -28,7 +28,7 @@ function recordingRuntime(): { runtime: Runtime; written: Map<string, string> } 
 }
 
 function taskWith(overrides: Partial<TaskDetail>): TaskDetail {
-  return { entities: [], features: [], owns: [], reads: [], acceptance: [], assetHints: [], ...overrides } as unknown as TaskDetail;
+  return { entities: [], features: [], owns: [], reads: [], acceptance: [], assetHints: [], design: DEFAULT_DESIGN_BLOCK, ...overrides } as unknown as TaskDetail;
 }
 
 describe("generateModelFile", () => {

@@ -19,3 +19,12 @@ export {
   type SessionSlots,
   type SinglePassBrief,
 } from "./single-pass";
+export {
+  deliverBlueprintPatterns,
+  PatternDeliveryError,
+  shellSectionIdsFor,
+  type BlueprintDeliveryOptions,
+  type PatternDeliveryResult,
+} from "./patterns";
+export { createRunTaskGenerator, type RunTaskGeneratorOptions } from "./run-task-generator";
+export { buildTaskDetail, type TaskDetail, type TaskDetailSource } from "./build-task-detail";

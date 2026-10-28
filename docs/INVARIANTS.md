@@ -24,6 +24,15 @@
 | A revert never deletes uncommitted work; it undoes exactly one saved turn or changes nothing | D83 | `revertTurn` preflight (dirty / not-on-branch / conflict) | ✅ `apps/api/test/revert-turn.test.ts` |
 | No `.env*` file except `.env.example` is ever committed by the platform | D83 | `commitTurn` pathspec | ✅ `apps/api/test/revert-turn.test.ts` |
 | Rows of a reverted turn never reach project memory or replayed history | D83 | `isInRevertedTurn` in `formatProjectMemory` and `historyMessages` | ✅ memory + history tests |
+| A generated app receives only the pattern files its chosen sections need | D84 | `planPatternDelivery` | ✅ `ui-system/test/patterns.test.ts`, `blueprint/test/design-delivery.test.ts` |
+| Every catalog section with code renders its own `data-section` marker and guards motion with reduced motion | D84 | manifest + pattern source | ✅ `ui-system/test/patterns.test.ts` |
+| A browser repair runs at most once per turn and never reports a pass the recheck did not measure | D84 | `runBrowserRepair` | ✅ `apps/agent/test/browser-repair.test.ts` |
+| Visual-review output is labelled AI judgement and never mixed with measured findings | D84 | `formatRepairPrompt`, `reviewNewPages`, design eval report | ✅ `apps/agent/test/browser-repair.test.ts` |
+| A page plans at most one signature effect plus two supporting effects, and delivery ships only those | D85 | `planExperience`, `planPatternDelivery` | ✅ `ui-system/test/experience.test.ts`, `ui-system/test/effects.test.ts` |
+| Every effect declares touch, reduced-motion and fallback behaviour, and continuous effects stop off screen | D85 | `EFFECTS` registry + effect source | ✅ `ui-system/test/effects.test.ts` |
+| Reduced motion never hides content or causes a hydration mismatch | D85 | `usePrefersReducedMotion`, `useRevealState` | ✅ design eval `content-after-scroll`, `ui-system/test/patterns.test.ts` |
+| Only component files are marked `"use client"`, so server pages can import pattern constants | D85 | `readPatternFiles` | ✅ `ui-system/test/patterns.test.ts` |
+| A copy-only edit does not start a browser run | D85 | `copyOnlyPaths`, `classifyChange` | ✅ `browser/test/copy-only.test.ts` |
 | Project memory never contains another project's data | D80 | `loadProjectMemoryRows` scoped by `projectId` | ✅ `apps/agent/test/project-memory.test.ts` |
 | Planned or assumed items are never labelled as confirmed by the user | D80 | label derived from the source table, not a model | ✅ `agent-core/test/project-memory.test.ts` |
 

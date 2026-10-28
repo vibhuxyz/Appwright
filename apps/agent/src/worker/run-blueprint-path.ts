@@ -204,7 +204,7 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
 
   if (isSinglePass) {
     publishStatus(sessionId, "RUNNING", "Plan formulated. Building the site in one pass…");
-    return { kind: "single-pass", brief: await prepareSinglePassBrief(sessionId, plan.blueprint) };
+    return { kind: "single-pass", brief: await prepareSinglePassBrief(sessionId, projectId, plan.blueprint, runtime) };
   }
   return { kind: "ran", stopReason: await runPlannedTasks(options, approved) };
 }

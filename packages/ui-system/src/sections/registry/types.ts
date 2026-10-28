@@ -1,4 +1,7 @@
 import type { DesignBlock, ProjectType, SectionPurpose, SectionWidth } from "@repo/contracts";
+import type { ArtDirection } from "../../patterns";
+
+export type { ArtDirection };
 
 export interface SectionAsset {
   purpose: string;
@@ -33,6 +36,9 @@ export interface SectionEntry {
   accessibility: readonly string[];
   width: SectionWidth;
   componentName?: string;
+  directions?: readonly ArtDirection[];
+  placement?: "home" | "inner";
+  patternId?: string;
   quality: "accepted";
   tailwindMajor: 4;
   reactMajor: 19;

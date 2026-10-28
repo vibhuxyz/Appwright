@@ -75,6 +75,17 @@ export const FIXTURES: readonly { name: string; blueprint: Blueprint }[] = [
     }),
   },
   {
+    name: "fashion-store",
+    blueprint: blueprint({
+      name: "fashion-store",
+      domain: "streetwear fashion store",
+      projectType: "marketplace",
+      style: "vibrant-modern",
+      density: "comfortable",
+      pages: [page("/", "Fashion store home with new collections"), page("/shop", "Shop all sneakers and apparel")],
+    }),
+  },
+  {
     name: "dashboard",
     blueprint: blueprint({
       name: "dashboard",

@@ -1,6 +1,6 @@
 import type { Runtime } from "@repo/agent-core";
 import type { ThemeOption } from "@repo/contracts";
-import { GLOBALS_CSS_PATH, THEME_CSS_PATH, themeCss, withThemeImports } from "./theme-css";
+import { THEME_STYLESHEETS, themeCss, withThemeImports, type ThemeStylesheet } from "./theme-css";
 
 async function readOrEmpty(runtime: Runtime, path: string): Promise<string | null> {
   try {
@@ -11,19 +11,28 @@ async function readOrEmpty(runtime: Runtime, path: string): Promise<string | nul
   }
 }
 
+async function findStylesheet(runtime: Runtime): Promise<{ target: ThemeStylesheet; globals: string } | null> {
+  const contents = await Promise.all(THEME_STYLESHEETS.map((target) => readOrEmpty(runtime, target.globalsPath)));
+  const index = contents.findIndex((content) => content !== null);
+  const target = THEME_STYLESHEETS[index];
+  const globals = contents[index];
+  return target && typeof globals === "string" ? { target, globals } : null;
+}
+
 export async function applyTheme(runtime: Runtime, theme: ThemeOption): Promise<string[]> {
-  const globals = await readOrEmpty(runtime, GLOBALS_CSS_PATH);
-  if (globals === null) return [];
+  const found = await findStylesheet(runtime);
+  if (!found) return [];
+  const { target, globals } = found;
   const nextThemeCss = themeCss(theme);
   const nextGlobals = withThemeImports(globals, theme);
   const written: string[] = [];
-  if ((await readOrEmpty(runtime, THEME_CSS_PATH)) !== nextThemeCss) {
-    await runtime.writeFile(THEME_CSS_PATH, nextThemeCss);
-    written.push(THEME_CSS_PATH);
+  if ((await readOrEmpty(runtime, target.themePath)) !== nextThemeCss) {
+    await runtime.writeFile(target.themePath, nextThemeCss);
+    written.push(target.themePath);
   }
   if (nextGlobals !== globals) {
-    await runtime.writeFile(GLOBALS_CSS_PATH, nextGlobals);
-    written.push(GLOBALS_CSS_PATH);
+    await runtime.writeFile(target.globalsPath, nextGlobals);
+    written.push(target.globalsPath);
   }
   return written;
 }

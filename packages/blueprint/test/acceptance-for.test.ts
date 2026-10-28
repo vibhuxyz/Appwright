@@ -22,6 +22,7 @@ describe("acceptanceFor", () => {
 
 describe("buildTaskPrompt", () => {
   const task = {
+    projectId: "project-1",
     type: "ADMIN",
     title: "Admin",
     owns: ["src/admin/**"],

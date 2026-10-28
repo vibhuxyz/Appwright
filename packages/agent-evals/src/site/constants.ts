@@ -1,0 +1,12 @@
+export const SITE_MODEL = "deepseek-flash";
+export const MAX_GENERATION_COST_USD = 0.5;
+export const MAX_TOTAL_COST_USD = 6;
+export const STUB_DATABASE_HOST = "stub.invalid";
+export const SITE_TEMPLATE = "nextjs-fullstack";
+export const TASK_MAX_ATTEMPTS = 1;
+export const SINGLE_PASS_MAX_ITERATIONS = 120;
+export const SINGLE_PASS_DEADLINE_MS = 12 * 60_000;
+export const TASK_RUN_DEADLINE_MS = 20 * 60_000;
+export const SMOKE_PROMPT = "Reply with the single word: ok";
+export const RESULTS_SUBDIR = "site-results";
+export const PROJECT_ID_PREFIX = "site";

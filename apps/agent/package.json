@@ -29,6 +29,7 @@
     "@repo/sandbox": "workspace:*",
     "@repo/selection": "workspace:*",
     "@repo/tools": "workspace:*",
+    "@repo/ui-system": "workspace:*",
     "@repo/verify": "workspace:*",
     "@repo/workspace": "workspace:*"
   }

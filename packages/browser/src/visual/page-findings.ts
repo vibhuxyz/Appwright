@@ -64,6 +64,12 @@ function layoutFindings(observation: PageObservation): Finding[] {
       makeFinding("unlabelled-control", where, `Controls with no accessible name: ${measurements.unlabelledControls.join("; ")}`),
     );
   }
+  if (measurements.clippedText.length > 0) {
+    findings.push(makeFinding("clipped-text", where, `Text is cut off: ${measurements.clippedText.join("; ")}`));
+  }
+  if (measurements.overlappingText.length > 0) {
+    findings.push(makeFinding("overlapping-text", where, `Text overlaps other text: ${measurements.overlappingText.join("; ")}`));
+  }
   const isRendered = navigation.status !== null && navigation.status < HTTP_ERROR_STATUS;
   if (isRendered && measurements.bodyTextLength < MIN_BODY_TEXT_CHARS) {
     findings.push(makeFinding("empty-page", where, "The page rendered with almost no visible text"));

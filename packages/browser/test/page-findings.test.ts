@@ -9,6 +9,8 @@ const HEALTHY: PageMeasurements = {
   overflowing: [],
   brokenImages: [],
   unlabelledControls: [],
+  clippedText: [],
+  overlappingText: [],
   links: [],
 };
 

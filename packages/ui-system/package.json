@@ -7,12 +7,15 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./sections": "./src/sections/index.ts"
+    "./sections": "./src/sections/index.ts",
+    "./server": "./src/server/index.ts"
   },
   "scripts": {
     "emit": "bun bin/emit.ts",
     "emit:check": "bun bin/emit.ts --check",
     "check-types": "tsc --noEmit",
+    "check-patterns": "tsc --noEmit -p patterns/tsconfig.json",
+    "vendor:effects": "bun bin/vendor-effects.ts",
     "build": "tsup src/index.ts --format esm --dts"
   },
   "dependencies": {
@@ -22,6 +25,7 @@
     "@types/bun": "latest",
     "@types/node": "^25.9.3",
     "tsup": "^8.3.5",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "zod": "^4.4.3"
   }
 }

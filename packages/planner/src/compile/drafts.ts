@@ -120,7 +120,7 @@ function pageReadsFor(route: string, baseReads: string[], blueprint: Blueprint):
 
 function shellDraft(blueprint: Blueprint): TaskDraft {
   const shell = shellFor(blueprint);
-  const named = shell.footerId ? `${shell.navigationId}, ${shell.footerId}` : shell.navigationId;
+  const named = [shell.announcementId, shell.navigationId, shell.footerId].filter((id) => id !== null).join(", ");
   return {
     key: "app-shell",
     type: "app-shell",

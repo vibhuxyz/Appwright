@@ -14,12 +14,19 @@ async function launchChromium(): Promise<Browser> {
   }
 }
 
-export async function launchPlaywrightSession(live?: LiveViewOptions): Promise<BrowserSession> {
+export interface SessionOptions {
+  readonly live?: LiveViewOptions;
+  readonly reducedMotion?: "reduce" | "no-preference";
+}
+
+export async function launchPlaywrightSession(options: SessionOptions = {}): Promise<BrowserSession> {
+  const { live, reducedMotion } = options;
   const browser = await launchChromium();
   return {
     async openPage(viewport) {
       const context = await browser.newContext({
         viewport: { width: viewport.width, height: viewport.height },
+        ...(reducedMotion ? { reducedMotion } : {}),
       });
       const page = await context.newPage();
       const wrapped = new PlaywrightPage(page);

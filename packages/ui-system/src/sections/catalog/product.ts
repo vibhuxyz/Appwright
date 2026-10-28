@@ -1,0 +1,38 @@
+import { acceptedPattern } from "../registry";
+
+export const PRODUCT_SECTIONS = [
+  acceptedPattern({
+    id: "hero.spotlight",
+    name: "Spotlight hero",
+    description: "Centred product headline with one rotating word and slow light beams in the primary colour.",
+    purpose: "hero",
+    directions: ["product"],
+    businesses: ["saas", "wallet", "other"],
+    styles: ["minimal-premium", "vibrant-modern", "dense-technical"],
+    densities: ["comfortable", "spacious"],
+    characteristics: ["text-led", "centered", "motion"],
+    layoutPattern: "spotlight",
+    contentFields: ["eyebrow", "headline start", "two to four rotating words", "description", "two actions"],
+    responsive: "Headline steps from 7xl to 4xl; actions wrap.",
+    interactions: ["Rotating word", "Light beams stop for reduced motion"],
+    width: "narrow",
+    componentName: "SpotlightHero",
+  }),
+  acceptedPattern({
+    id: "features.bento",
+    name: "Bento grid",
+    description: "Features in cards of unequal size: large, wide, tall and small.",
+    purpose: "features",
+    directions: ["product", "editorial"],
+    styles: ["minimal-premium", "vibrant-modern", "dense-technical"],
+    densities: ["comfortable", "compact", "spacious"],
+    characteristics: ["grid", "asymmetric", "cards"],
+    layoutPattern: "bento",
+    contentFields: ["eyebrow", "heading", "four to seven features with a size each"],
+    assets: [{ purpose: "screenshot", aspect: "16:9", required: false, guidance: "Real product screenshots for the large cards only." }],
+    responsive: "One column on phones; four columns with spans from md.",
+    interactions: ["Cards reveal in sequence"],
+    width: "content",
+    componentName: "BentoGrid",
+  }),
+];

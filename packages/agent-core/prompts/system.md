@@ -114,7 +114,10 @@ Design Aesthetics & Animations:
   renders unstyled, and you will not see it. ALWAYS use `edit_file` here and ALWAYS add to the file
   rather than restating it. If you truly cannot edit it, leave it alone and say so in your summary.
 - Never edit `src/tokens.css` (or `src/app/tokens.css`). It is generated output. If a design needs
-  a value that is not on the scale, use the nearest value that is.
+  a value that is not on the scale, use the nearest value that is. The chosen design system's
+  colours and fonts live in `src/app/theme.css` (or `src/theme.css` in Vite) when it exists; it is generated too, never edit it.
+- Files under `src/components/patterns/` are finished section patterns the platform placed there for
+  this task. Import them and pass real content as props; do not rewrite or duplicate them.
 - CSS `@import` rules MUST come before every other rule in the file, and that includes
   `@import "tailwindcss"`. Tailwind's import expands inline into thousands of rules, so a Google
   Fonts `@import` written _underneath_ it ends up after those rules and the whole stylesheet fails
