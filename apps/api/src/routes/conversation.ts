@@ -10,7 +10,7 @@ import { worktreeSessionIdOf } from "@repo/workspace";
 import { Router } from "express";
 import { requireAuthAllowingQueryToken } from "@repo/auth";
 import { setTraceContext } from "@repo/logger";
-import { IntakeQuestionsError, runIntakeRound } from "../intake";
+import { IntakeQuestionsError, persistChatTurn, runIntakeRound } from "../intake";
 import { log } from "../log";
 import { ownedBlueprintSessionId, ownedSessionProjectId } from "../ownership";
 import { attachSseClient, publishIntakeProgress, publishStatus } from "../stream/sse";
@@ -113,7 +113,7 @@ conversationRouter.post("/conversation/questions", async (req, res) => {
     log.info("intake questions model", { userId: req.userId, model: provider.model, provider: providerFor(provider.model) });
     const sessionId = parsed.data.sessionId;
     const projectId = sessionId ? await ownedSessionProjectId(sessionId, req.userId!) : null;
-    const { questions, action } = await runIntakeRound({
+    const { questions, action, reply } = await runIntakeRound({
       request: parsed.data,
       projectId,
       provider,
@@ -121,6 +121,9 @@ conversationRouter.post("/conversation/questions", async (req, res) => {
         if (sessionId && projectId) publishIntakeProgress(sessionId, progress);
       },
     });
+    if (action === "reply" && reply && sessionId) {
+      await persistChatTurn({ sessionId, prompt: parsed.data.prompt, reply });
+    }
     const body = PromptQuestionsResponse.safeParse({ questions, action });
     if (!body.success) {
       throw new IntakeQuestionsError(

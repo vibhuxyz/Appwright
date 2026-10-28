@@ -123,7 +123,7 @@ export const PromptQuestionsRequest = z.object({
 
 export const PromptQuestionsResponse = z.object({
   questions: z.array(PromptQuestionSchema).max(8),
-  action: z.enum(["plan", "send"]).default("send"),
+  action: z.enum(["plan", "send", "reply"]).default("send"),
 });
 
 export const EnhancePromptRequest = z.object({

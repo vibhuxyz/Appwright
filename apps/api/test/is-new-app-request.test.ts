@@ -77,3 +77,42 @@ describe("isNewAppRequest", () => {
     expect(planned).toBe(true);
   });
 });
+
+describe("isNewAppRequest conversational messages", () => {
+  it("does not plan a build for a non-build message when the classifier is down", async () => {
+    const planned = await isNewAppRequest("tell me a joke about cats", throwingProvider("503 unavailable"));
+    expect(planned).toBe(false);
+  });
+
+  it("does not plan a build when the model classifies the message as chat", async () => {
+    const chat = JSON.stringify({
+      intent: "chat", changeType: "unknown", risk: "low", route: "none",
+      component: "none", complexity: 0, ambiguity: 0, confidence: 0.95,
+    });
+    const planned = await isNewAppRequest("hy how are you", new FakeProvider([{ kind: "text", text: chat }]));
+    expect(planned).toBe(false);
+  });
+
+  it.each(["hy", "hy how are you", "hello how r u"])(
+    "falls back to keywords and does not plan a build for %p when the model is down",
+    async (message) => {
+      const planned = await isNewAppRequest(message, throwingProvider("503 unavailable"));
+      expect(planned).toBe(false);
+    },
+  );
+
+  it("does not plan a build when the classifier is unsure and finds no intent", async () => {
+    const unclear = JSON.stringify({
+      intent: "unknown",
+      changeType: "unknown",
+      risk: "low",
+      route: "none",
+      component: "none",
+      complexity: 0,
+      ambiguity: 10,
+      confidence: 0.2,
+    });
+    const planned = await isNewAppRequest("asdf qwer", new FakeProvider([{ kind: "text", text: unclear }]));
+    expect(planned).toBe(false);
+  });
+});

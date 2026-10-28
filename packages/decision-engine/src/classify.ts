@@ -12,8 +12,8 @@ const COMPONENT_OPTIONS = ComponentSchema.options
   .map((name) => `"${name}"`)
   .join("|");
 
-const PROMPT = `Classify the user's request below. Reply with ONLY a JSON object, no prose, matching:
-{"intent": "create"|"modify"|"debug"|"delete"|"test"|"unknown",
+const PROMPT = `Classify the user's request below. Use intent "chat" when the message is a greeting, small talk, a thank-you, or a question that needs no change to the project (for example "hi", "hy how are you", "what can you do?"). Use "create" only when the user asks for a new app or site to be built. Reply with ONLY a JSON object, no prose, matching:
+{"intent": "chat"|"create"|"modify"|"debug"|"delete"|"test"|"unknown",
  "changeType": "style"|"text"|"component"|"api"|"database"|"config"|"unknown",
  "risk": "low"|"medium"|"high",
  "route": "frontend"|"backend"|"database"|"devops"|"none" ("none" = a simple, self-contained text/style/prop tweak that needs no reasoning about a broader system, even if the file happens to live in a frontend or backend directory — otherwise the layer the change actually requires understanding),

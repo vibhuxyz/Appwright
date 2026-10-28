@@ -50,6 +50,11 @@ export function resolvePolicy(result: DecisionResult): ExecutionMode {
 const MIN_COMPLEXITY_FOR_PLAN = 6;
 const MIN_CONFIDENCE_FOR_INTENT = 0.5;
 
+export function isChatRequest(result: DecisionResult): boolean {
+  if (result.status !== "accepted") return false;
+  return result.decision.intent === "chat" && result.decision.confidence >= MIN_CONFIDENCE_FOR_INTENT;
+}
+
 export function isNewBuildRequest(result: DecisionResult): boolean {
   if (result.status !== "accepted") return false;
   return result.decision.intent === "create" && result.decision.confidence >= MIN_CONFIDENCE_FOR_INTENT;

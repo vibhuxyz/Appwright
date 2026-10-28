@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Appwright — Life of a Prompt</title>
+<style>
+:root{
+  --bg:#0b0c0e; --panel:#131519; --panel2:#1a1d22; --line:#262a31; --text:#e7e9ee; --mute:#8b93a1;
+  --lime:#e4ff3a; --green:#4ade80; --blue:#60a5fa; --pink:#f472b6; --amber:#fbbf24; --red:#f87171; --violet:#a78bfa;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;background:radial-gradient(900px 500px at 15% -10%,#e4ff3a14,transparent),radial-gradient(800px 500px at 100% 10%,#60a5fa12,transparent);pointer-events:none;z-index:0}
+main{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:0 20px 120px}
+a{color:var(--lime)}
+code,.mono{font-family:var(--mono)}
+code{background:var(--panel2);border:1px solid var(--line);padding:1px 6px;border-radius:6px;font-size:.86em;color:#d6f26b}
+h1,h2,h3{line-height:1.2;margin:0}
+section{padding-top:84px}
+.eyebrow{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--lime);margin-bottom:10px}
+h2{font-size:clamp(26px,4vw,38px);letter-spacing:-.02em;margin-bottom:10px}
+.lead{color:var(--mute);max-width:760px;margin:0 0 28px}
+nav{position:sticky;top:0;z-index:20;background:#0b0c0ecc;backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav .in{max-width:1180px;margin:0 auto;padding:10px 20px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+nav a{color:var(--mute);text-decoration:none;font:500 13px var(--sans);padding:6px 12px;border-radius:999px;white-space:nowrap;transition:.2s}
+nav a:hover,nav a.on{color:#0b0c0e;background:var(--lime)}
+.brand{font:700 14px var(--mono);color:var(--lime);padding:6px 12px 6px 0;white-space:nowrap}
+.hero{padding-top:70px}
+.hero h1{font-size:clamp(34px,6vw,68px);letter-spacing:-.035em;max-width:900px}
+.hero h1 em{font-style:normal;color:var(--lime)}
+.hero p{color:var(--mute);font-size:18px;max-width:720px;margin:18px 0 0}
+.typing{margin-top:34px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px;max-width:640px;display:flex;gap:12px;align-items:center;font:15px var(--mono)}
+.typing .caret{width:9px;height:19px;background:var(--lime);animation:blink 1s steps(1) infinite}
+.typing .send{margin-left:auto;background:var(--lime);color:#0b0c0e;border-radius:10px;padding:6px 12px;font:700 12px var(--sans);animation:pulse 2s infinite}
+@keyframes blink{50%{opacity:0}}
+@keyframes pulse{50%{box-shadow:0 0 0 8px #e4ff3a22}}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:34px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.stat b{display:block;font:700 26px var(--mono);color:var(--lime)}
+.stat span{color:var(--mute);font-size:13px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px}
+/* architecture */
+.arch{padding:14px;overflow:hidden}
+.arch svg{width:100%;height:auto;display:block}
+.edge{stroke:#2c313a;stroke-width:1.5;stroke-dasharray:4 5}
+.edge.hot{stroke:var(--lime);animation:dash 1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-18}}
+.node rect{fill:var(--panel2);stroke:var(--line);stroke-width:1.5;transition:.25s}
+.node text{fill:var(--text);font:600 15px var(--sans)}
+.node .sub{fill:var(--mute);font:11.5px var(--mono);font-weight:400}
+.node.on rect{stroke:var(--lime);fill:#1d2310;filter:drop-shadow(0 0 14px #e4ff3a55)}
+.packet{fill:var(--lime);filter:drop-shadow(0 0 8px var(--lime))}
+.packet-label{fill:#0b0c0e;font:700 10px var(--mono)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0}
+button{font:600 13px var(--sans);color:var(--text);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer;transition:.15s}
+button:hover{border-color:var(--lime);color:var(--lime)}
+button.primary{background:var(--lime);color:#0b0c0e;border-color:var(--lime)}
+button.primary:hover{color:#0b0c0e;filter:brightness(1.08)}
+button:focus-visible,nav a:focus-visible,.step:focus-visible{outline:2px solid var(--lime);outline-offset:2px}
+.progress{flex:1;min-width:140px;height:6px;background:var(--panel2);border-radius:999px;overflow:hidden}
+.progress i{display:block;height:100%;width:0;background:var(--lime);transition:width .4s}
+.walk{display:grid;grid-template-columns:330px 1fr;gap:18px;align-items:start}
+.rail{max-height:680px;overflow:auto;padding:8px;position:sticky;top:64px;scrollbar-width:thin}
+.phase-h{font:600 11px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);padding:12px 10px 4px}
+.step{display:flex;gap:10px;padding:9px 10px;border-radius:12px;cursor:pointer;border:1px solid transparent;transition:.15s}
+.step:hover{background:var(--panel2)}
+.step.on{background:#1d2310;border-color:#e4ff3a66}
+.step .n{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:700 12px var(--mono);background:var(--panel2);color:var(--mute)}
+.step.on .n{background:var(--lime);color:#0b0c0e}
+.step.done .n{background:#1f3a29;color:var(--green)}
+.step .t{font-size:13.5px;line-height:1.35}
+.detail{padding:24px;min-height:420px}
+.detail h3{font-size:24px;letter-spacing:-.01em;margin:6px 0 4px}
+.tag{display:inline-block;font:600 11px var(--mono);padding:3px 9px;border-radius:999px;border:1px solid var(--line);color:var(--mute);margin-right:6px}
+.tag.p-web{color:var(--blue);border-color:#60a5fa55}.tag.p-api{color:var(--green);border-color:#4ade8055}
+.tag.p-agent{color:var(--pink);border-color:#f472b655}.tag.p-build{color:var(--amber);border-color:#fbbf2455}.tag.p-done{color:var(--violet);border-color:#a78bfa55}
+.detail ul{padding-left:18px;margin:14px 0}
+.detail li{margin:7px 0}
+.files{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.files code{color:var(--blue)}
+pre{margin:14px 0 0;background:#08090b;border:1px solid var(--line);border-radius:12px;padding:14px;overflow:auto;font:12.5px/1.6 var(--mono);color:#c9d1d9}
+.fade{animation:fade .45s ease both}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:13px;color:var(--mute);margin-top:10px}
+.kv b{color:var(--text);font-weight:600}
+/* process cards */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.proc{padding:18px;transition:.2s}
+.proc:hover{transform:translateY(-4px);border-color:var(--lime)}
+.proc h3{font-size:16px;margin:8px 0 6px}
+.proc p{color:var(--mute);font-size:13.5px;margin:0}
+.proc .ico{font-size:24px}
+/* flowcharts */
+.flow{display:flex;flex-direction:column;align-items:center;gap:0;padding:26px 14px}
+.fn{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 16px;text-align:center;font-size:13.5px;max-width:340px;opacity:0;transform:translateY(12px);transition:.5s}
+.fn.show{opacity:1;transform:none}
+.fn.q{border-color:var(--amber);color:var(--amber);border-radius:999px}
+.fn.ok{border-color:var(--green)}.fn.end{border-color:var(--lime);background:#1d2310}
+.fn small{display:block;color:var(--mute);font:11.5px var(--mono);margin-top:2px}
+.arrow{width:2px;height:22px;background:repeating-linear-gradient(var(--lime) 0 4px,transparent 4px 8px);animation:flowdown .8s linear infinite}
+@keyframes flowdown{to{background-position:0 8px}}
+.branches{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;width:100%}
+.branch{display:flex;flex-direction:column;align-items:center;flex:1;min-width:210px;max-width:300px}
+.lbl{font:700 11px var(--mono);color:var(--mute);margin:2px 0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+/* loop */
+.loop{padding:22px}
+.loopring{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.lp{padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);font-size:13px;transition:.25s;position:relative}
+.lp b{display:block;font-size:13.5px;margin-bottom:2px}
+.lp span{color:var(--mute);font-size:12px}
+.lp.on{border-color:var(--lime);background:#1d2310;transform:scale(1.04);box-shadow:0 0 22px #e4ff3a33}
+.meters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:18px 0}
+.meter{font:12px var(--mono);color:var(--mute)}
+.bar{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;margin-top:5px}
+.bar i{display:block;height:100%;width:0;background:var(--green);transition:width .5s,background .3s}
+.exits{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.exit{font:600 12px var(--mono);padding:5px 11px;border-radius:99px;border:1px solid var(--line);color:var(--mute);transition:.3s}
+.exit.on{color:#0b0c0e;background:var(--lime);border-color:var(--lime)}
+.exit.bad.on{background:var(--red);border-color:var(--red)}
+.toolrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.tl{font:12px var(--mono);padding:4px 10px;border-radius:8px;background:var(--panel2);border:1px solid var(--line)}
+.tl.par{color:var(--blue)}.tl.seq{color:var(--amber)}
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+tr:hover td{background:#ffffff05}
+.tblwrap{overflow:auto}
+/* timeline */
+.tline{position:relative;padding:24px 24px 24px 44px}
+.tline::before{content:"";position:absolute;left:23px;top:30px;bottom:30px;width:2px;background:var(--line)}
+.ev{position:relative;margin:0 0 20px;opacity:0;transform:translateX(-10px);transition:.5s}
+.ev.show{opacity:1;transform:none}
+.ev::before{content:"";position:absolute;left:-26px;top:6px;width:12px;height:12px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px var(--panel)}
+.ev.bad::before{background:var(--red)}.ev.warn::before{background:var(--amber)}
+.ev time{font:12px var(--mono);color:var(--mute)}
+.ev p{margin:2px 0 0;font-size:14px}
+/* simulator */
+.sim{padding:22px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);cursor:pointer;font:13px var(--mono)}
+.chip.on{background:var(--lime);color:#0b0c0e;border-color:var(--lime)}
+.path{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0;align-items:center}
+.pn{padding:6px 12px;border-radius:10px;font:12px var(--mono);background:var(--panel2);border:1px solid var(--line);opacity:0;transform:scale(.8);animation:pop .4s forwards}
+.pn.skip{opacity:.35;text-decoration:line-through;animation:none;transform:none}
+.pn.hit{border-color:var(--lime);color:var(--lime)}
+@keyframes pop{to{opacity:1;transform:none}}
+.verdict{padding:14px 16px;border-left:3px solid var(--lime);background:var(--panel2);border-radius:0 12px 12px 0;color:var(--text);font-size:14px}
+.note{padding:14px 16px;border:1px solid #fbbf2455;background:#fbbf240d;border-radius:12px;color:#f6d98a;font-size:14px;margin-top:14px}
+.tree{font:12.5px/1.75 var(--mono);color:var(--mute);padding:18px;overflow:auto;white-space:pre}
+.tree b{color:var(--lime);font-weight:600}.tree i{color:var(--blue);font-style:normal}
+footer{margin-top:90px;color:var(--mute);font-size:13px;border-top:1px solid var(--line);padding-top:20px}
+@media(max-width:900px){.walk{grid-template-columns:1fr}.rail{position:static;max-height:260px}.two{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.fn,.ev{opacity:1;transform:none}.pn{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+<nav><div class="in">
+  <span class="brand">appwright/lifecycle</span>
+  <a href="#map">System map</a><a href="#walk">Step by step</a><a href="#decisions">Decisions</a>
+  <a href="#loop">Agent loop</a><a href="#stream">Realtime</a><a href="#guards">Limits</a>
+  <a href="#sim">Try it</a><a href="#logs">Your logs</a><a href="#files">File map</a>
+</div></nav>
+
+<main>
+<header class="hero">
+  <div class="eyebrow">Read from the code, not the old docs</div>
+  <h1>What happens when you press <em>Enter</em> in Appwright.</h1>
+  <p>One prompt crosses five processes, two data stores, a sandboxed cloud box and an LLM loop before a verified commit lands on <code>main</code>. This page follows it hop by hop, with the real file names.</p>
+  <div class="typing" aria-hidden="true"><span id="typed"></span><span class="caret"></span><span class="send">Enter ↵</span></div>
+  <div class="stats">
+    <div class="stat"><b>5</b><span>processes: web, api, agent, Postgres, Redis</span></div>
+    <div class="stat"><b>2</b><span>classifier calls per prompt (api, then worker)</span></div>
+    <div class="stat"><b>6</b><span>tools the agent can call</span></div>
+    <div class="stat"><b>6</b><span>exit reasons for the agent loop</span></div>
+    <div class="stat"><b>45m</b><span>hard wall-clock cap per sandbox</span></div>
+  </div>
+</header>
+
+<section id="map">
+  <div class="eyebrow">01 · System map</div>
+  <h2>Who talks to whom</h2>
+  <p class="lead">The API never runs the agent. It writes a <code>Job</code> row and returns <code>202</code>. A separate worker claims the job, boots a sandbox and runs the loop. Everything the worker does is pushed back to your browser through Redis pub/sub and the API's SSE stream.</p>
+  <div class="card arch">
+    <svg id="arch" viewBox="0 0 1000 430" role="img" aria-label="Architecture diagram"></svg>
+  </div>
+  <div class="grid" style="margin-top:16px">
+    <div class="card proc"><div class="ico">🖥️</div><h3>apps/web</h3><p>React + Vite. Intake dock, chat, tabs for Code, Preview, Plan and Diff. Zustand <code>agentStore</code> fed by one EventSource.</p></div>
+    <div class="card proc"><div class="ico">🚪</div><h3>apps/api</h3><p>Express on :3001. Auth, rate limits, intake classifier, enqueue, SSE fan-out. Contains no agent code path.</p></div>
+    <div class="card proc"><div class="ico">⚙️</div><h3>apps/agent</h3><p>Poller claims jobs (max 3 at once). <code>executeAgentJob</code> owns sandbox, loop, verify, commit and merge.</p></div>
+    <div class="card proc"><div class="ico">📦</div><h3>@repo/sandbox</h3><p>E2B box (or local) with a supervisor. Egress is allow-listed to npm, GitHub and PyPI. Tools reach it only through <code>Runtime</code>.</p></div>
+    <div class="card proc"><div class="ico">🧠</div><h3>agent-core</h3><p>The loop, providers, prompts, project memory, pricing. Pure: no fs, no HTTP.</p></div>
+    <div class="card proc"><div class="ico">🗺️</div><h3>blueprint + planner</h3><p>Turns a big "build me X" into intent, architecture, pages, a task DAG and then runs it with retries and budgets.</p></div>
+  </div>
+</section>
+
+<section id="walk">
+  <div class="eyebrow">02 · Step by step</div>
+  <h2>Follow one prompt, hop by hop</h2>
+  <p class="lead">Pick a step, or press play. The glowing packet shows which processes talk in that step. Steps 4a and 11a/11b are branches, covered in the next section.</p>
+  <div class="controls">
+    <button id="prev">← Prev</button><button id="play" class="primary">▶ Play all</button><button id="next">Next →</button>
+    <div class="progress"><i id="prog"></i></div><span class="mono" id="count" style="color:var(--mute);font-size:12px"></span>
+  </div>
+  <div class="walk">
+    <div class="card rail" id="rail" role="list"></div>
+    <div class="card detail" id="detail" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="decisions">
+  <div class="eyebrow">03 · The two forks</div>
+  <h2>Where the path splits</h2>
+  <p class="lead">Two gates decide how much machinery a prompt gets. Both fail closed: if the classifier times out or returns junk, the system falls back to something safe rather than guessing a plan.</p>
+  <div class="two">
+    <div class="card flow" data-flow>
+      <div class="eyebrow" style="margin-bottom:12px">Gate 1 · API intake</div>
+      <div class="fn">POST /conversation/questions<small>runIntakeRound()</small></div><div class="arrow"></div>
+      <div class="fn q">project already has a built app<br>or prompt is a repair prompt?</div><div class="arrow"></div>
+      <div class="branches">
+        <div class="branch"><span class="lbl">YES</span><div class="fn ok">action = "send"<small>skip questions, start now</small></div></div>
+        <div class="branch"><span class="lbl">NO</span><div class="fn">classify() with 10s timeout<small>intent == create ?</small></div><div class="arrow"></div>
+          <div class="branches"><div class="branch"><span class="lbl">create</span><div class="fn end">action = "plan"<small>questions → theme → plan review</small></div></div>
+          <div class="branch"><span class="lbl">chat / other</span><div class="fn ok">action = "send"</div></div></div>
+        </div>
+      </div>
+      <div class="fn" style="margin-top:14px;border-color:var(--amber)">Classifier timeout or invalid JSON<small>fallback: keywords (build, create, app, website…) minus greeting words</small></div>
+    </div>
+    <div class="card flow" data-flow>
+      <div class="eyebrow" style="margin-bottom:12px">Gate 2 · Worker, inside the sandbox job</div>
+      <div class="fn">classify(current turn)<small>again, in apps/agent</small></div><div class="arrow"></div>
+      <div class="fn q">theme chosen<br>OR (create AND complexity ≥ 6 AND confidence ≥ 0.5)?</div><div class="arrow"></div>
+      <div class="branches">
+        <div class="branch"><span class="lbl">NO</span><div class="fn ok">Single agent loop<small>runAgentLoop with tools</small></div></div>
+        <div class="branch"><span class="lbl">YES</span><div class="fn">runBlueprintPath<small>approved plan, or buildBlueprint()</small></div><div class="arrow"></div>
+          <div class="q fn">single-page site?</div><div class="arrow"></div>
+          <div class="branches"><div class="branch"><span class="lbl">yes</span><div class="fn ok">brief → one loop</div></div>
+          <div class="branch"><span class="lbl">no</span><div class="fn end">Task DAG<small>parallel tasks, 3 attempts each</small></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="loop">
+  <div class="eyebrow">04 · The agent loop</div>
+  <h2>runAgentLoop, the heart of it</h2>
+  <p class="lead">A <code>while(true)</code> in <code>packages/agent-core/src/loop.ts</code>. Each lap: check the budget, stream the model, run any tool calls (reads in parallel, writes one at a time), feed results back. It ends only when the model answers with no tool calls, or a limit trips.</p>
+  <div class="card loop">
+    <div class="loopring" id="lring">
+      <div class="lp"><b>1 · Budget gate</b><span>aborted? deadline? iterations? tokens? cost?</span></div>
+      <div class="lp"><b>2 · Stream model</b><span>collectTurn → text_delta frames; 3 retries, fallback providers</span></div>
+      <div class="lp"><b>3 · Bill usage</b><span>cost in USD, credits decremented in one transaction</span></div>
+      <div class="lp"><b>4 · Tool calls?</b><span>none → completed. length stop → fail the calls</span></div>
+      <div class="lp"><b>5 · Run reads ∥</b><span>list_files, read_file, grep via Promise.all</span></div>
+      <div class="lp"><b>6 · Run writes ›</b><span>write_file, edit_file, bash, in order, abort checked between</span></div>
+      <div class="lp"><b>7 · Push results</b><span>toolResponse messages, then back to 1</span></div>
+    </div>
+    <div class="toolrow">
+      <span class="tl par">list_files ∥</span><span class="tl par">read_file ∥</span><span class="tl par">grep ∥</span>
+      <span class="tl seq">write_file ›</span><span class="tl seq">edit_file ›</span><span class="tl seq">bash ›</span>
+      <span class="tl">+ interactive tools (questions, integrations) wrapped by guardTools</span>
+    </div>
+    <div class="meters">
+      <div class="meter">iterations <span id="mi">0</span> / 250<div class="bar"><i id="bi"></i></div></div>
+      <div class="meter">cost $<span id="mc">0.00</span> / $5.00<div class="bar"><i id="bc"></i></div></div>
+      <div class="meter">deadline <span id="mt">0</span>m / 30m<div class="bar"><i id="bt"></i></div></div>
+    </div>
+    <div class="controls" style="margin:0"><button id="loopgo" class="primary">▶ Simulate a run</button><button id="loopstop">■ Press Stop</button></div>
+    <div class="exits" id="exits">
+      <span class="exit" data-x="completed">completed</span><span class="exit bad" data-x="cancelled">cancelled</span>
+      <span class="exit bad" data-x="timeout">timeout</span><span class="exit bad" data-x="maxIterations">maxIterations</span>
+      <span class="exit bad" data-x="budgetExceeded">budgetExceeded</span><span class="exit bad" data-x="fatalError">fatalError</span>
+    </div>
+  </div>
+  <div class="two" style="margin-top:16px">
+    <div class="card" style="padding:18px"><h3 style="font-size:16px">RunGuard wraps every tool</h3>
+      <ul style="color:var(--mute);font-size:13.5px"><li>Identical read calls return a cached result with a note</li><li>Refuses to overwrite a file the agent never read</li><li>Refuses imports of packages missing from <code>package.json</code> or the allow-list</li></ul></div>
+    <div class="card" style="padding:18px"><h3 style="font-size:16px">Verify, then retry</h3>
+      <ul style="color:var(--mute);font-size:13.5px"><li>After <code>completed</code>: tsc, lint, build on the worktree</li><li>On failure the errors are appended as a user message and the loop runs again, max 2 retries</li><li>Same error twice means "stuck", give up with <code>fatalError</code></li></ul></div>
+  </div>
+</section>
+
+<section id="stream">
+  <div class="eyebrow">05 · Realtime back to the browser</div>
+  <h2>Two channels, one truth</h2>
+  <p class="lead">Durable state goes to Postgres as numbered <code>Message</code> rows. Ephemeral state (typing deltas, status, usage) goes only through Redis pub/sub. The API subscribes to <code>session:&lt;id&gt;</code> and rewrites each frame as an SSE event. If your tab reconnects, it asks for <code>afterSeq=N</code> and replays what it missed.</p>
+  <div class="card tblwrap"><table>
+    <thead><tr><th>SSE event</th><th>Published by</th><th>Persisted?</th><th>What the UI does</th></tr></thead>
+    <tbody>
+      <tr><td><code>message</code></td><td>worker <code>persist()</code>, API enqueue</td><td>Yes, <code>seq</code></td><td>Appends a chat row: user text, tool call, tool result, assistant text</td></tr>
+      <tr><td><code>delta</code></td><td>emit adapter on <code>text_delta</code></td><td>No</td><td>Streams assistant tokens live</td></tr>
+      <tr><td><code>status</code></td><td><code>publishStatus</code></td><td>Session.status</td><td>Run bar text: "Analyzing request…", "Running edit_file…", "Building: Auth, Cart"</td></tr>
+      <tr><td><code>usage</code></td><td>emit adapter on <code>usage</code></td><td>Session + User rows</td><td>Header meter: <code>$0.0000</code> and credits left</td></tr>
+      <tr><td><code>intake_progress</code></td><td>API during <code>/questions</code></td><td>No</td><td>Progress rows while the classifier and question writer run</td></tr>
+      <tr><td><code>assetRequest</code></td><td>blueprint path</td><td>AssetRequest</td><td>Image picker dock; the run waits for choices</td></tr>
+      <tr><td><code>agent_question</code></td><td>interactive tool</td><td>Yes</td><td>Question card mid-run</td></tr>
+      <tr><td><code>integration_configuration_required</code></td><td>integration prep</td><td>Yes</td><td>Environment / secrets card</td></tr>
+      <tr><td><code>approval</code>, <code>verification</code></td><td>approval gate, verify step</td><td>Partly</td><td>Approve button; typecheck / lint results bar</td></tr>
+    </tbody></table></div>
+  <div class="note"><b>Stop button:</b> <code>POST /conversation/:id/stop</code> sets a Redis cancel flag and flips the session to IDLE. The worker polls that flag every 1s and calls <code>AbortController.abort()</code>, and the loop returns <code>cancelled</code> at its next checkpoint, between tool calls.</div>
+</section>
+
+<section id="guards">
+  <div class="eyebrow">06 · Limits and safety</div>
+  <h2>Every stage has a cap</h2>
+  <div class="card tblwrap"><table>
+    <thead><tr><th>Where</th><th>Limit</th><th>If exceeded</th></tr></thead>
+    <tbody>
+      <tr><td>API, both routes</td><td>Per-user rate limit</td><td><code>429 TOO_MANY_REQUESTS</code></td></tr>
+      <tr><td>API, both routes</td><td>credits &gt; 0</td><td><code>402 OUT_OF_CREDITS</code> on /questions; worker posts a notice</td></tr>
+      <tr><td>POST /conversation</td><td>Runs per project, sandboxes per user, one writer per worktree</td><td><code>429</code> / <code>409 WORKTREE_BUSY</code></td></tr>
+      <tr><td>Classifier</td><td>10s <code>CLASSIFY_TIMEOUT_MS</code></td><td>Falls back to keyword heuristic</td></tr>
+      <tr><td>Question writer</td><td><code>QUESTIONS_TIMEOUT_MS</code></td><td><code>503 GENERATION_TIMEOUT</code></td></tr>
+      <tr><td>Job lease</td><td>30s, renewed every 5s</td><td>Reaped and requeued; workspace restored from checkpoint</td></tr>
+      <tr><td>Blueprint build</td><td>180s</td><td><code>BuildBlueprintError TIMEOUT</code></td></tr>
+      <tr><td>Agent loop</td><td>250 iterations · 2M tokens · $5 · 30 min</td><td>Stop notice + partial work committed</td></tr>
+      <tr><td>Task in DAG</td><td>60 iterations · $2 · 10 min · 3 attempts</td><td>Task failed, dependents blocked</td></tr>
+      <tr><td>Sandbox</td><td>45 min wall clock, network allow-list</td><td>Box killed, loop aborted</td></tr>
+      <tr><td>Verify</td><td>2 retries, stuck detection</td><td><code>fatalError</code>, no merge</td></tr>
+      <tr><td>Browser repair</td><td>Once per turn</td><td>Reports only what the recheck measured</td></tr>
+    </tbody></table></div>
+</section>
+
+<section id="sim">
+  <div class="eyebrow">07 · Try it</div>
+  <h2>Route a prompt through the system</h2>
+  <p class="lead">Pick a prompt and see which steps it actually touches. Toggle the timeout to see the fallback path.</p>
+  <div class="card sim">
+    <div class="chips" id="chips"></div>
+    <label style="display:flex;gap:8px;align-items:center;margin-top:14px;color:var(--mute);font-size:13.5px"><input type="checkbox" id="tmo"> API classifier times out (as in your log)</label>
+    <div class="path" id="path"></div>
+    <div class="verdict" id="verdict"></div>
+  </div>
+</section>
+
+<section id="logs">
+  <div class="eyebrow">08 · Your two screenshots, explained</div>
+  <h2>Why "hy how are" sat on "Analyzing request…"</h2>
+  <p class="lead">Reading the api log against the code gives this timeline for that one message.</p>
+  <div class="card tline" id="tline">
+    <div class="ev"><time>17:33:32.6 · api</time><p><code>intake questions model gemini-3.7-flash</code>. <code>/conversation/questions</code> starts and calls <code>isNewAppRequest → classify()</code>.</p></div>
+    <div class="ev bad"><time>17:33:42.7 · api · error</time><p><code>classify call failed: The operation timed out.</code> That is the 10s <code>CLASSIFY_TIMEOUT_MS</code>. Result is <code>provider_error</code>, so the code uses the keyword fallback.</p></div>
+    <div class="ev warn"><time>17:33:42.7 · api</time><p>Fallback: "hy how are" is made of greeting words (<code>is-conversational-message.ts</code>) and has no build verb, so it is <b>not</b> a new app. Action = <code>send</code>. The route answered <code>200</code> after <b>10 103 ms</b>, which is the whole timeout.</p></div>
+    <div class="ev"><time>17:33:43.1 · api</time><p><code>POST /conversation → 202</code> in 356 ms. Messages saved, worktree created, Job row inserted.</p></div>
+    <div class="ev warn"><time>after · agent</time><p>The worker claims the job, boots a sandbox, builds the system prompt and calls <code>classify()</code> <b>a second time</b>. There is no chat shortcut in <code>executeAgentJob</code>, so even a greeting goes through <code>runAgentLoop</code> and then verify.</p></div>
+    <div class="ev"><time>UI</time><p>The second line "Editing files, verifying TypeScript" is the fallback label in <code>RunningStatusRow.tsx</code> when the status text is not a "Running &lt;tool&gt;" message. It is not a real progress report.</p></div>
+  </div>
+  <div class="note"><b>What I would look at next (not changed):</b> the classifier is waiting 10s on <code>gemini-3.7-flash</code>, so check provider latency or raise the timeout. A cheap local chat check before the LLM call, using <code>isConversationalMessage</code>, would skip both classify calls and could skip the sandbox for greetings. Your working tree already has uncommitted edits in <code>is-conversational-message.ts</code> and <code>classify.ts</code> heading that way.</div>
+</section>
+
+<section id="files">
+  <div class="eyebrow">09 · File map</div>
+  <h2>Where to read next</h2>
+  <div class="card tree"><b>apps/web/src/features/agent/</b>
+  <i>intake/use-intake.ts</i>        gate state machine: checking → asking → choosing-theme → reviewing-plan → sent
+  <i>intake/intake-round.ts</i>      calls <b>POST /conversation/questions</b>
+  <i>hooks/useSendMessage.ts</i>     calls <b>POST /conversation</b>, sets "Analyzing request…"
+  <i>hooks/useConversationStream.ts</i>  history fetch + EventSource into agentStore
+  <i>../../realtime/connectionManager.ts</i>  the only place that touches EventSource
+
+<b>apps/api/src/</b>
+  <i>routes/conversation.ts</i>      both POST routes, stop, SSE mount
+  <i>intake/run-intake-round.ts</i>  fork 1 · <i>intake/is-new-app-request.ts</i> classifier + fallback
+  <i>workflow/enqueue-conversation.ts</i>  persist turns, create worktree, enqueueJob
+  <i>stream/sse.ts</i>               publish* helpers + client fan-out + 200-frame replay buffer
+
+<b>apps/agent/src/</b>
+  <i>poller/poller.ts</i>            1s tick, lease reaping, claimNextJob, max 3 concurrent
+  <i>worker/job-worker.ts</i>        executeAgentJob: the whole run, start to finish
+  <i>worker/run-blueprint-path.ts</i> fork 2 · plan, images, DAG
+  <i>worker/emit-adapter.ts</i>      AgentEvent → Message row / SSE / credits
+  <i>worker/host-mirror-runtime.ts</i> mirrors sandbox writes to the host worktree
+
+<b>packages/</b>
+  <i>agent-core/src/loop.ts</i>      runAgentLoop · <i>decision-engine/</i> classify + policy
+  <i>tools/</i>                      fs, grep, bash, RunGuard, commitTurn / revertTurn
+  <i>sandbox/</i>                    E2B + local providers, supervisor, warm pool
+  <i>blueprint/ planner/</i>         plan building · <i>verify/</i> tsc, lint, build runner
+  <i>db/lib/job-store.ts</i>         Postgres queue: FOR UPDATE SKIP LOCKED</div>
+</section>
+
+<footer>Generated from a read of the repository on 2026-10-28. <code>docs/ARCHITECTURE.md</code> still describes an earlier shape of the repo (it says the orchestrator is empty), so this page follows the code. Timings quoted come from the constants in the source, not from measurements.</footer>
+</main>
+
+<script>
+"use strict";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+/* hero typing */
+(() => {
+  const text = "build me a food delivery app with login and a cart", el = $("#typed");
+  if (REDUCED) { el.textContent = text; return; }
+  let i = 0; const tick = () => { el.textContent = text.slice(0, ++i); if (i < text.length) setTimeout(tick, 55); else setTimeout(() => { i = 0; setTimeout(tick, 900); }, 2600); };
+  tick();
+})();
+
+/* nav highlight */
+(() => {
+  const links = $$("nav a[href^='#']");
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(l => l.classList.toggle("on", l.getAttribute("href") === "#" + e.target.id)); }), { rootMargin: "-40% 0px -55% 0px" });
+  $$("section[id]").forEach(s => io.observe(s));
+})();
+
+/* ---------- architecture svg ---------- */
+const NODES = {
+  web:     { x: 20,  y: 30,  w: 170, h: 84, t: "Browser", s: "apps/web · React" },
+  api:     { x: 290, y: 30,  w: 170, h: 84, t: "API", s: "Express :3001" },
+  agent:   { x: 560, y: 30,  w: 170, h: 84, t: "Agent worker", s: "apps/agent · poller" },
+  sandbox: { x: 830, y: 30,  w: 150, h: 84, t: "Sandbox", s: "E2B · supervisor" },
+  pg:      { x: 290, y: 200, w: 170, h: 84, t: "Postgres", s: "Message · Job · Session" },
+  redis:   { x: 560, y: 200, w: 170, h: 84, t: "Redis", s: "pub/sub · cancel flag" },
+  llm:     { x: 830, y: 200, w: 150, h: 84, t: "LLM providers", s: "Gemini · OpenAI-compat" },
+  git:     { x: 560, y: 340, w: 170, h: 70, t: "Git worktrees", s: "host disk · per session" }
+};
+const EDGES = [["web","api"],["api","pg"],["api","redis"],["api","llm"],["agent","pg"],["agent","redis"],["agent","sandbox"],["agent","llm"],["agent","git"],["sandbox","git"]];
+const NS = "http://www.w3.org/2000/svg";
+const svg = $("#arch");
+const el = (n, a = {}, p = svg) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+const center = k => ({ x: NODES[k].x + NODES[k].w / 2, y: NODES[k].y + NODES[k].h / 2 });
+const edgeEls = new Map(), nodeEls = new Map();
+EDGES.forEach(([a, b]) => { const A = center(a), B = center(b); edgeEls.set(a + b, el("line", { class: "edge", x1: A.x, y1: A.y, x2: B.x, y2: B.y })); });
+for (const k in NODES) {
+  const n = NODES[k], g = el("g", { class: "node" }); nodeEls.set(k, g);
+  el("rect", { x: n.x, y: n.y, width: n.w, height: n.h, rx: 14 }, g);
+  el("text", { x: n.x + 16, y: n.y + 34 }, g).textContent = n.t;
+  el("text", { x: n.x + 16, y: n.y + 56, class: "sub" }, g).textContent = n.s;
+}
+const packet = el("g", { opacity: 0 });
+el("circle", { class: "packet", r: 15 }, packet);
+const plabel = el("text", { class: "packet-label", "text-anchor": "middle", y: 3.5 }, packet);
+const edgeFor = (a, b) => edgeEls.get(a + b) || edgeEls.get(b + a);
+function animateHop(a, b, label) {
+  const A = center(a), B = center(b), e = edgeFor(a, b);
+  e && e.classList.add("hot"); nodeEls.get(a).classList.add("on"); nodeEls.get(b).classList.add("on");
+  plabel.textContent = label || ""; packet.setAttribute("opacity", 1);
+  if (REDUCED) { packet.setAttribute("transform", `translate(${B.x} ${B.y})`); return Promise.resolve(); }
+  return new Promise(res => {
+    const t0 = performance.now(), dur = 900;
+    const frame = now => {
+      const t = Math.min(1, (now - t0) / dur), k = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      packet.setAttribute("transform", `translate(${A.x + (B.x - A.x) * k} ${A.y + (B.y - A.y) * k})`);
+      t < 1 ? requestAnimationFrame(frame) : res();
+    };
+    requestAnimationFrame(frame);
+  });
+}
+function clearArch() { edgeEls.forEach(e => e.classList.remove("hot")); nodeEls.forEach(n => n.classList.remove("on")); packet.setAttribute("opacity", 0); }
+const lit = new Set();
+async function playHops(hops, token) {
+  clearArch();
+  for (const [a, b, label] of hops) { if (token !== runToken) return; await animateHop(a, b, label); await sleep(REDUCED ? 0 : 120); }
+  if (token === runToken) packet.setAttribute("opacity", 0);
+}
+
+/* ---------- steps ---------- */
+const P = { web: "Browser", api: "API", agent: "Worker", build: "Build", done: "Finish" };
+const STEPS = [
+ { id: "1", ph: "web", title: "You press Enter", hops: [["web","api","ask"]],
+   files: ["features/agent/intake/use-intake.ts", "intake/intake-round.ts", "hooks/useSendMessage.ts"],
+   bullets: ["<code>useIntake.ask()</code> opens an <b>intake gate</b> in <code>checking</code> state and clears old progress rows.", "The composer is held so a second prompt cannot start while the gate is open.", "It calls <code>agentApi.questionsFor(prompt, sessionId, answers, attachments)</code>. Nothing is sent to the agent yet.", "If this is a follow-up in a project that already has an app, the API will answer in one round trip with no questions."],
+   code: "POST /conversation/questions\n{ prompt: \"hy how are\", sessionId, answers?, attachments? }", time: "instant" },
+ { id: "2", ph: "api", title: "API admits the request", hops: [["api","redis","rate"],["api","pg","credits"]],
+   files: ["apps/api/src/routes/conversation.ts"],
+   bullets: ["Zod-parses the body (<code>PromptQuestionsRequest</code>). Missing prompt gives <code>400</code>.", "<code>conversationRateLimitOk(userId)</code> against Redis, else <code>429</code>.", "Reads <code>credits</code> and <code>plan</code>; zero credits gives <code>402 OUT_OF_CREDITS</code>.", "Chooses the planner model for the user's plan: <code>plannerModel(plan)</code>."],
+   code: "log.info('intake questions model', { model: 'gemini-3.7-flash', provider: 'gemini' })", time: "~10 ms" },
+ { id: "3", ph: "api", title: "Intake round: is this a new app?", hops: [["api","pg","has app?"],["api","llm","classify"],["llm","api","JSON"]],
+   files: ["intake/run-intake-round.ts", "intake/is-new-app-request.ts", "decision-engine/src/classify.ts"],
+   bullets: ["<code>projectHasBuiltApp()</code> checks the DB. A project with an app, or a repair prompt, is a <b>change</b>: action <code>send</code>, no LLM needed.", "Otherwise <code>classify()</code> asks the model for JSON: intent, risk, route, complexity 0–10, ambiguity, confidence. 10 s timeout.", "Output is validated with Zod. Confidence below 0.5 is <code>low_confidence</code>; bad JSON is <code>invalid</code>.", "On <code>provider_error</code> or <code>invalid</code> the code falls back to a keyword check, so a dead provider cannot block the product.", "Progress frames (<code>checkingProject</code>, <code>decidingPlan</code>…) stream to the UI over SSE as it goes."],
+   code: "intakeAction({ prompt, isFollowUp, isNewApp })\n  → isFollowUp || isRepair ? 'send' : isNewApp ? 'plan' : 'send'", time: "up to 10 s" },
+ { id: "4a", ph: "api", title: "Plan branch: questions, theme, plan review", hops: [["api","llm","write questions"],["api","web","questions"]],
+   files: ["intake/generate-questions.ts", "features/agent/questions/", "features/plan/"],
+   bullets: ["Only for <code>action = plan</code>. The model writes a few business questions, merged with fixed creative-choice questions (design and images: choose or auto-decide).", "The browser shows them in the intake dock. Skipped answers get defaults via <code>withDefaults()</code>.", "Then a theme pick and a plan review (<code>approvePlan</code> / <code>revisePlan</code>) can happen before anything is built.", "A \"send\" action skips this whole step and goes straight to 5."],
+   code: "PromptQuestionsResponse = { questions: IntakeQuestion[], action: 'plan' | 'send' }", time: "human speed" },
+ { id: "5", ph: "api", title: "POST /conversation, the real send", hops: [["web","api","prompt"],["api","redis","limits"],["api","pg","capacity"]],
+   files: ["routes/conversation.ts", "workflow/run-limit.ts", "workflow/rate-limit.ts"],
+   bullets: ["<code>SendMessageRequest.parse</code> then ownership check: the session must belong to your project.", "A plan id, if present, must belong to this session.", "Capacity gates: runs per project, sandboxes per user, and <code>isWorktreeBusy</code> (<code>409</code> if another run is writing the same worktree)."],
+   code: "POST /conversation { sessionId, prompt, answers?, questions?, theme?, blueprintId?, selection? }", time: "~50 ms" },
+ { id: "6", ph: "api", title: "Persist the turn and enqueue the job", hops: [["api","pg","Message rows"],["api","git","worktree"],["api","pg","Job"],["api","web","202"]],
+   files: ["workflow/enqueue-conversation.ts", "workspace/manager.ts", "packages/db/lib/job-store.ts"],
+   bullets: ["Inserts your <code>Message</code> (role user) with the next <code>seq</code>, plus one row per answered question and the theme / plan-approved turn.", "Each row is also published as an SSE <code>message</code> frame, so your bubble appears instantly.", "<code>createSessionWorktree</code> makes a git worktree for this session on the host.", "<code>enqueueJob({ sessionId, projectId })</code> inserts a Job and the route returns <code>202 { jobId }</code>. The API's part is over."],
+   code: "await prisma.message.create({ data: { sessionId, seq, role:'user', content } })\nreturn enqueueJob({ sessionId, projectId })   // → 202", time: "~350 ms (your log)" },
+ { id: "7", ph: "agent", title: "Worker claims the job", hops: [["agent","pg","claim"],["pg","agent","Job"]],
+   files: ["apps/agent/src/poller/poller.ts", "packages/db/lib/job-store.ts"],
+   bullets: ["Every 1 s the poller reaps expired leases, then if fewer than 3 jobs run it calls <code>claimNextJob</code>.", "The claim is <code>SELECT … FOR UPDATE SKIP LOCKED</code>, so two workers never take the same job.", "A 30 s lease is renewed every 5 s. If the worker dies, the job is reaped and retried with <code>retryCount &gt; 0</code>, which triggers workspace restore.", "Job goes <code>RUNNING</code>; on exit it becomes <code>DONE</code> or <code>FAILED</code> according to the stop reason."],
+   code: "const job = await claimNextJob(workerId, leaseDurationMs)\nvoid runClaimedJob(job)", time: "≤ 1 s wait" },
+ { id: "8", ph: "agent", title: "Boot the sandbox", hops: [["agent","pg","credits"],["agent","redis","RUNNING"],["agent","sandbox","create"],["agent","web","status"]],
+   files: ["worker/job-worker.ts", "packages/sandbox/src/providers/e2b-provider.ts"],
+   bullets: ["Re-checks credits. Sets <code>Session.status = RUNNING</code> and publishes <b>\"Analyzing request…\"</b>. This is the text you see on screen.", "Creates an E2B box (warm pool when available), uploads the supervisor, waits up to 30 s for health. Egress allow-list: npm, GitHub, PyPI only.", "Starts a lease heartbeat (5 s) and a cancel-flag poll (1 s). The box dies at 45 min regardless.", "Sandbox start failures are reported to the chat, not swallowed."],
+   code: "sandboxProvider.create({ projectId, workspaceDir, maxWallClockMs: 45*60_000, onWallClockExceeded: () => controller.abort() })", time: "seconds" },
+ { id: "9", ph: "agent", title: "Prepare the workspace and the prompt", hops: [["agent","sandbox","env"],["agent","pg","memory"],["agent","git","mirror"]],
+   files: ["worker/host-mirror-runtime.ts", "agent-core/src/prompt.ts", "agent-core/src/project-memory/"],
+   bullets: ["Wraps the sandbox in <code>HostMirrorRuntime</code>: every write is also mirrored to the host worktree so the Code tab and preview see it.", "Injects project env vars, applies a chosen theme, restores a checkpoint if this is a retry.", "Loads <b>project memory</b> rows and builds the system prompt; adds prior chat as messages (<code>historyMessages</code>).", "Selection edits (clicked elements) are folded into the turn text first."],
+   code: "const systemPrompt = await buildSystemPrompt(runtime, { memorySection })\nconst messages = [systemMessage, ...historyMessages(rows)]", time: "~1 s" },
+ { id: "10", ph: "agent", title: "Second classify, then pick the path", hops: [["agent","llm","classify"],["llm","agent","Decision"]],
+   files: ["worker/should-run-blueprint.ts", "decision-engine/src/policy.ts"],
+   bullets: ["The worker classifies the turn again. A chosen theme, or a confident <code>create</code> with complexity ≥ 6, means <b>plan in detail</b>.", "Anything else (chat, small change, debug) goes straight to a single agent loop.", "<code>resolvePolicy</code> also exists (direct / tool / agent / review / blocked) but the job worker uses only the blueprint gate today."],
+   code: "planInDetail = theme ? true : needsDetailedPlan(decisionResult)", time: "up to 10 s" },
+ { id: "11a", ph: "build", title: "Blueprint path: plan, images, task DAG", hops: [["agent","llm","buildBlueprint"],["agent","pg","persist plan"],["agent","web","assetRequest"],["agent","sandbox","tasks"]],
+   files: ["worker/run-blueprint-path.ts", "blueprint/src/build-blueprint.ts", "apps/orchestrator/src/executor/"],
+   bullets: ["Uses the approved plan or builds one: intent → architecture → pages → content, validated against a package allow-list.", "Optional multimodal analysis of attachments. Plan is persisted and shown as <code>Plan: 1. … 2. …</code>.", "Section-image request is sent to the UI and the run waits for your choice (or auto-decides).", "Single-page sites become a written brief and fall through to the single loop. Bigger apps run a <b>task DAG</b>: tasks run in parallel when independent, each up to 3 attempts with its own budget, and dependents are blocked if upstream fails."],
+   code: "status: \"Building: Auth, Cart\"   // from onTaskStatus\n✅ Auth    ❌ Payments   // persisted per task", time: "minutes" },
+ { id: "11b", ph: "build", title: "Single path: the agent loop", hops: [["agent","llm","stream"],["llm","agent","tool calls"],["agent","sandbox","tools"],["sandbox","git","mirror"]],
+   files: ["agent-core/src/loop.ts", "tools/src/", "worker/emit-adapter.ts"],
+   bullets: ["<code>runAgentLoop</code> streams the model and executes tools through <code>Runtime</code> inside the sandbox. See section 04 for the loop.", "<code>emit-adapter</code> maps each <code>AgentEvent</code> to a Message row, an SSE frame, or a credits update. Browser cannot tell which process produced it.", "Every <code>usage</code> event decrements credits in the same DB transaction as the session cost."],
+   code: "stopReason = await runAgentLoop({ messages, tools: guard.tools, provider, runtime, emit, budget, signal, sessionId })", time: "seconds to ~30 min" },
+ { id: "12", ph: "build", title: "Verify: typecheck, lint, build", hops: [["agent","git","worktree"],["agent","web","verification"]],
+   files: ["worker/verify-step.ts", "packages/verify/src/runner.ts"],
+   bullets: ["Runs only after <code>completed</code>. Flushes the mirror, then runs <code>tsc --noEmit</code>, lint and build on the worktree.", "On errors the output is added as a user message and the loop runs again, at most twice. Same error twice means stuck: give up.", "A passed run sets <code>verificationPassed</code>; a failed one ends as <code>fatalError</code> and nothing merges."],
+   code: "MAX_VERIFY_ATTEMPTS = 2", time: "10–60 s" },
+ { id: "13", ph: "build", title: "Browser check and one repair", hops: [["agent","sandbox","run app"],["agent","llm","review"],["agent","web","findings"]],
+   files: ["worker/browser-check-step.ts", "worker/browser-repair/"],
+   bullets: ["If enabled and verification passed: opens the app in a headless browser, collects console / layout findings and takes screenshots.", "New pages get an AI visual review, labelled as judgement and kept separate from measured findings.", "At most one repair turn per run, then a re-check. It never claims a pass the recheck did not measure."],
+   code: "runBrowserRepair({ check, issues, changedPaths, recheck, runRepairTurn })", time: "optional" },
+ { id: "14", ph: "done", title: "Commit the turn, checkpoint, merge to main", hops: [["agent","git","commit"],["agent","git","merge"],["agent","web","✅ merged"]],
+   files: ["tools/src/turn-commit/commit-turn.ts", "worker/auto-merge-session.ts", "worker/checkpoint.ts"],
+   bullets: ["<code>commitTurn</code> stages everything except <code>.env*</code> and commits <code>agent: &lt;first line of prompt&gt;</code>. This is what lets <b>Revert</b> undo exactly one turn.", "A checkpoint is saved so a crashed job can restore.", "If verification passed the session branch auto-merges to <code>main</code>; a conflict is reported with a pointer to the Diff tab.", "Stop reasons other than completed produce a plain-language notice (out of credits, timeout, cancelled…)."],
+   code: "✅ Verified (typecheck + lint passed) and merged to main.", time: "~2 s" },
+ { id: "15", ph: "done", title: "Clean up and go idle", hops: [["agent","pg","IDLE"],["agent","redis","publish"],["agent","sandbox","destroy"],["redis","api","frame"],["api","web","SSE"]],
+   files: ["worker/job-worker.ts (finally)", "poller/job-outcome.ts"],
+   bullets: ["Clears both intervals, publishes final status (<code>IDLE</code> or <code>ERROR</code>), destroys the sandbox, adds the seconds used to <code>sandboxSeconds</code>, deletes the cancel flag.", "Poller marks the Job done/failed from the stop reason and frees a concurrency slot.", "The browser's EventSource receives the last frames; the run bar disappears and the composer unlocks."],
+   code: "publishStatus(sessionId, 'IDLE', undefined, 'completed')\nawait sandboxProvider.destroy(sandbox.id)", time: "< 1 s" }
+];
+
+const rail = $("#rail"), detail = $("#detail"), prog = $("#prog"), count = $("#count");
+let cur = 0, runToken = 0, playing = false;
+let lastPh = "";
+STEPS.forEach((s, i) => {
+  if (s.ph !== lastPh) { lastPh = s.ph; const h = document.createElement("div"); h.className = "phase-h"; h.textContent = P[s.ph]; rail.appendChild(h); }
+  const d = document.createElement("div"); d.className = "step"; d.tabIndex = 0; d.setAttribute("role", "listitem");
+  d.innerHTML = `<div class="n">${s.id}</div><div class="t">${s.title}</div>`;
+  d.onclick = () => { stop(); go(i); }; d.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); d.click(); } };
+  rail.appendChild(d); s.node = d;
+});
+function renderDetail(s) {
+  detail.classList.remove("fade"); void detail.offsetWidth; detail.classList.add("fade");
+  detail.innerHTML = `<span class="tag p-${s.ph}">${P[s.ph]}</span><span class="tag">step ${s.id}</span><span class="tag">⏱ ${s.time}</span>
+    <h3>${s.title}</h3>
+    <div class="files">${s.files.map(f => `<code>${f}</code>`).join("")}</div>
+    <ul>${s.bullets.map(b => `<li>${b}</li>`).join("")}</ul>
+    <pre></pre>`;
+  detail.querySelector("pre").textContent = s.code;
+}
+function go(i) {
+  cur = Math.max(0, Math.min(STEPS.length - 1, i));
+  STEPS.forEach((s, k) => { s.node.classList.toggle("on", k === cur); s.node.classList.toggle("done", k < cur); });
+  STEPS[cur].node.scrollIntoView({ block: "nearest", behavior: REDUCED ? "auto" : "smooth" });
+  renderDetail(STEPS[cur]);
+  prog.style.width = ((cur + 1) / STEPS.length * 100) + "%"; count.textContent = `${cur + 1} / ${STEPS.length}`;
+  const token = ++runToken; playHops(STEPS[cur].hops, token);
+  return token;
+}
+function stop() { playing = false; $("#play").textContent = "▶ Play all"; }
+async function playAll() {
+  if (playing) { stop(); return; }
+  playing = true; $("#play").textContent = "❚❚ Pause";
+  if (cur >= STEPS.length - 1) cur = -1;
+  while (playing && cur < STEPS.length - 1) {
+    const token = go(cur + 1);
+    await sleep(REDUCED ? 1500 : 900 * STEPS[cur].hops.length + 1800);
+    if (token !== runToken) break;
+  }
+  stop();
+}
+$("#prev").onclick = () => { stop(); go(cur - 1); };
+$("#next").onclick = () => { stop(); go(cur + 1); };
+$("#play").onclick = playAll;
+addEventListener("keydown", e => { if (!e.target.closest("button,input")) { if (e.key === "ArrowRight") { stop(); go(cur + 1); } if (e.key === "ArrowLeft") { stop(); go(cur - 1); } } });
+go(0);
+
+/* ---------- flowcharts reveal ---------- */
+$$("[data-flow]").forEach(box => {
+  const items = $$(".fn", box);
+  const io = new IntersectionObserver(async es => {
+    if (!es[0].isIntersecting) return; io.disconnect();
+    for (const n of items) { n.classList.add("show"); await sleep(REDUCED ? 0 : 260); }
+  }, { threshold: .25 });
+  io.observe(box);
+});
+
+/* ---------- agent loop simulation ---------- */
+const lps = $$(".lp"), exits = $$(".exit");
+let loopTok = 0, stopRequested = false;
+const setMeters = (it, cost, mins) => {
+  $("#mi").textContent = it; $("#mc").textContent = cost.toFixed(2); $("#mt").textContent = mins;
+  const set = (id, v) => { const b = $(id); b.style.width = Math.min(100, v * 100) + "%"; b.style.background = v > .8 ? "var(--red)" : v > .5 ? "var(--amber)" : "var(--green)"; };
+  set("#bi", it / 250); set("#bc", cost / 5); set("#bt", mins / 30);
+};
+function showExit(name) { exits.forEach(e => e.classList.toggle("on", e.dataset.x === name)); }
+$("#loopstop").onclick = () => { stopRequested = true; };
+$("#loopgo").onclick = async () => {
+  const tok = ++loopTok; stopRequested = false; showExit(""); setMeters(0, 0, 0);
+  const laps = 6; let it = 0, cost = 0;
+  for (let lap = 1; lap <= laps; lap++) {
+    const last = lap === laps;
+    const seq = last ? [0, 1, 2, 3] : [0, 1, 2, 3, 4, 5, 6];
+    for (const idx of seq) {
+      if (tok !== loopTok) return;
+      lps.forEach((l, k) => l.classList.toggle("on", k === idx));
+      if (idx === 0) { if (stopRequested) { lps.forEach(l => l.classList.remove("on")); showExit("cancelled"); return; } it++; }
+      if (idx === 2) cost += .18 + Math.random() * .1;
+      setMeters(it * 12, cost, Math.round(it * 2.2));
+      await sleep(REDUCED ? 80 : 420);
+    }
+  }
+  lps.forEach(l => l.classList.remove("on")); showExit("completed");
+};
+
+/* ---------- simulator ---------- */
+const PROMPTS = [
+  { name: "hy how are you", kind: "chat", hasApp: false },
+  { name: "build me a food delivery app", kind: "create", hasApp: false },
+  { name: "make the hero button blue", kind: "modify", hasApp: true },
+  { name: "build a landing page, project already has an app", kind: "create", hasApp: true }
+];
+const chips = $("#chips"); let pick = 0;
+PROMPTS.forEach((p, i) => { const c = document.createElement("div"); c.className = "chip"; c.tabIndex = 0; c.textContent = p.name; c.onclick = () => { pick = i; runSim(); }; c.onkeydown = e => { if (e.key === "Enter") c.click(); }; chips.appendChild(c); });
+$("#tmo").onchange = () => runSim();
+function nodes(list) { const path = $("#path"); path.innerHTML = ""; list.forEach(([label, hit], i) => { const n = document.createElement("div"); n.className = "pn" + (hit === "skip" ? " skip" : hit ? " hit" : ""); n.textContent = label; if (hit !== "skip") n.style.animationDelay = (REDUCED ? 0 : i * 130) + "ms"; path.appendChild(n); }); }
+function runSim() {
+  $$(".chip", chips).forEach((c, i) => c.classList.toggle("on", i === pick));
+  const p = PROMPTS[pick], timeout = $("#tmo").checked;
+  const looksBuild = /\b(build|create|make|app|landing|page|website)\b/i.test(p.name) && p.kind !== "chat";
+  const change = p.hasApp;
+  const classifyOnApi = !change;
+  const apiSaysNew = classifyOnApi && (timeout ? looksBuild : p.kind === "create");
+  const plan = apiSaysNew;
+  const blueprint = p.kind === "create";
+  const list = [["web: ask", true], ["api: rate + credits", true], ["api: has app?", true],
+    ["api: classify (LLM)", classifyOnApi && !timeout ? true : classifyOnApi ? true : "skip"]];
+  if (classifyOnApi && timeout) list.push(["⏱ 10s timeout → keywords", true]);
+  list.push(plan ? ["questions → theme → plan review", true] : ["questions skipped", "skip"]);
+  list.push(["POST /conversation", true], ["enqueue Job", true], ["agent: claim", true], ["sandbox boot", true], ["worker: classify (LLM)", true]);
+  list.push(blueprint ? ["blueprint → plan → DAG / brief", true] : ["single agent loop", true]);
+  if (blueprint) list.push(["agent loop(s)", true]);
+  list.push(["verify tsc/lint", true], ["commit turn", true], ["merge → main", true]);
+  nodes(list);
+  let v;
+  if (p.kind === "chat") v = `A greeting still costs a sandbox boot and ${timeout ? "a 10 s wait on the API" : "two classifier calls"}. The model replies with plain text and no tool calls, so the loop ends <code>completed</code> after one lap, but verify still runs on the worktree.`;
+  else if (change) v = "Follow-up changes skip the API classifier and the questions entirely (<code>isFollowUp</code>). The worker still classifies; low complexity means one agent loop with edit_file calls, then verify and commit.";
+  else if (p.kind === "create" && !plan) v = "The API classifier timed out and the keyword fallback judged this as not a new app, so the questions step is skipped. The worker still gets a chance to run the blueprint path.";
+  else v = "A new app gets the full treatment: questions, theme, plan review, a blueprint, a task DAG with per-task budgets, verify, an optional browser check, and a merge to main.";
+  if (timeout && classifyOnApi && p.kind === "create" && plan) v += " The keyword fallback happened to agree with the model here.";
+  $("#verdict").innerHTML = v;
+}
+runSim();
+
+/* ---------- timeline reveal ---------- */
+(() => {
+  const evs = $$(".ev"), io = new IntersectionObserver(async es => {
+    if (!es[0].isIntersecting) return; io.disconnect();
+    for (const e of evs) { e.classList.add("show"); await sleep(REDUCED ? 0 : 380); }
+  }, { threshold: .15 });
+  io.observe($("#tline"));
+})();
+</script>
+</body>
+</html>

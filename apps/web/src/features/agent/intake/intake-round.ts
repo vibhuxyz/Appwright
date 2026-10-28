@@ -79,6 +79,11 @@ export function fetchRound(
         });
         return;
       }
+      if (round.action === "reply") {
+        controls.activePromptRef.current = null;
+        controls.setGate((current) => (current && isCurrent(current) ? { ...current, status: "sent", error: null } : current));
+        return;
+      }
       if (round.action === "plan") {
         beginPlanning({ prompt, afterSeq, answers, asked }, controls);
         return;

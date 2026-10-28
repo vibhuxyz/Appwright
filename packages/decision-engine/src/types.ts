@@ -4,6 +4,7 @@ import { z } from "zod";
 // Fixed fields, not an extensible question registry — a registry earns its
 // keep once a second classifier needs one (docs/versions/V1_2_DECISION_ENGINE.md).
 export const IntentSchema = z.enum([
+  "chat",
   "create",
   "modify",
   "debug",
