@@ -26,6 +26,7 @@ import { publishChannel, sessionChannel, type SseAssetRequestFrame } from "@repo
 import { formatSpecificationSummary } from "./format-spec-summary";
 import { createEmitAdapter } from "./emit-adapter";
 import { prepareBuildEnvironment } from "./integrations";
+import { createTaskInteractiveTools } from "./interactive-tools";
 import { publishStatus } from "./persist";
 import type { PersistFields } from "./persist";
 import { waitForSectionImages } from "./section-images";
@@ -138,6 +139,7 @@ async function runPlannedTasks(options: RunBlueprintPathOptions, approved: Appro
       userRemainingCents: creditsToCents(credits),
       runtime,
       conversationEmit,
+      extraTools: createTaskInteractiveTools({ projectId, sessionId, worktreeSessionId, signal, persist }),
       onTaskStatus: (taskId, status) => {
         const title = titleById.get(taskId) ?? taskId;
         if (status === "running") {

@@ -63,14 +63,18 @@ async function waitForAnswers(ctx: InteractiveToolContext, questions: AgentQuest
   return formatDefaults(`The user closed the questions without answering. ${DEFAULTS_HEADING}`, questions);
 }
 
-async function askUser(ctx: InteractiveToolContext, rawArgs: unknown): Promise<string> {
+export async function askUser(
+  ctx: InteractiveToolContext,
+  rawArgs: unknown,
+  limitMs: number = AGENT_WAIT_LIMITS.askUserMs,
+): Promise<string> {
   const parsed = AskUserArgsSchema.safeParse(rawArgs);
   if (!parsed.success) return `Error: invalid ask_user arguments: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`;
   if (asksForSecret(parsed.data.questions)) {
     return "Error: never ask for keys, secrets or passwords with ask_user. Call request_integration for provider credentials instead.";
   }
   const waitMs = computeWaitBudgetMs({
-    limitMs: AGENT_WAIT_LIMITS.askUserMs,
+    limitMs,
     deadlineAt: ctx.deadlineAt,
     now: Date.now(),
     safetyMarginMs: AGENT_WAIT_LIMITS.safetyMarginMs,

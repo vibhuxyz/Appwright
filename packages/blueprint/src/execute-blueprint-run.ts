@@ -3,7 +3,7 @@ import { workspaceRoot } from "@repo/contracts/files";
 import { prisma } from "@repo/db";
 import { createLogger } from "@repo/logger";
 import { verifyWorkspace } from "@repo/verify";
-import type { AgentEventSink, Runtime } from "@repo/agent-core";
+import type { AgentEventSink, Runtime, Tool } from "@repo/agent-core";
 import {
   createPostgresPorts,
   createPrismaRunStore,
@@ -37,6 +37,7 @@ export interface ExecuteBlueprintRunOptions {
   runtime: Runtime;
   onTaskStatus?: (taskId: string, status: string) => void;
   conversationEmit?: AgentEventSink;
+  extraTools?: readonly Tool[];
 }
 
 function withTaskStatusNotifications(
@@ -83,7 +84,7 @@ export async function executeBlueprintRun(
     runSpentCents: run.spentCents,
   });
 
-  const generator = createRunTaskGenerator({ sessionId, model, plan, runtime, conversationEmit });
+  const generator = createRunTaskGenerator({ sessionId, model, plan, runtime, conversationEmit, extraTools: options.extraTools });
   const workspaceDir = workspaceRoot(projectId, worktreeSessionId);
   const verifier = createWorkspaceVerifier(workspaceDir, verifyWorkspace);
   const ports = createPostgresPorts({ runId, store, generator, verifier, now: () => Date.now() });

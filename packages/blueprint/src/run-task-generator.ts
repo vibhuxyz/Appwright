@@ -6,6 +6,7 @@ import {
   runAgentLoop,
   type AgentEventSink,
   type Runtime,
+  type Tool,
 } from "@repo/agent-core";
 import { AGENT_LOOP_LIMITS, type PlanId, type TaskType } from "@repo/contracts";
 import { createLogger } from "@repo/logger";
@@ -51,6 +52,7 @@ export interface RunTaskGeneratorOptions {
   conversationEmit?: AgentEventSink;
   loadDetail?: (taskId: string) => Promise<TaskDetail>;
   providers?: readonly Provider[];
+  extraTools?: readonly Tool[];
 }
 
 async function withPatterns(task: TaskDetail, runtime: Runtime): Promise<string[]> {
@@ -101,7 +103,7 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
 
       let lastError = "";
       const [primary, ...fallback] = options.providers ?? providerChain(model, plan);
-      const guard = guardTools(ALL_TOOLS);
+      const guard = guardTools([...ALL_TOOLS, ...(options.extraTools ?? [])]);
       const stopReason = await runAgentLoop({
         messages: [
           {
