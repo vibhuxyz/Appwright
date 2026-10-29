@@ -32,12 +32,23 @@ The run stopped early after two generations failed in a row, so 7 of 12 combinat
 
 The earlier `gemini-3.1-flash-lite` run (`baseline-flash-lite-2026-10-29`) failed TypeScript in both generations it ran (A-fashion and B-fashion) before stopping. That model is not used for site evals.
 
-## What the harness does not measure yet
+## Planning time, before and after Phase 6a
 
-These numbers are not available:
-- **Verify rounds per run:** the harness makes one attempt and has no verify-and-repair loop.
-- **Planning p75:** `buildBlueprint` time is not recorded separately from the generation.
+- **Command:** `bun run eval:site --plan-bench --confirm-spend`, run 2026-10-29.
+- **Setup:** `buildBlueprint` with no cached fixtures, 4 briefs × 2 repeats, run one after another, on `gemini-3-flash-preview`.
+- **"Before":** a worktree with commits `c61e58b`, `26350fa` and `ae8a2c7` reverted.
 
-Phases 5 and 6b need both numbers, so the harness has to record them first.
+| Code | p50 | p75 | max | Failures | Cost |
+|---|---|---|---|---|---|
+| Before (intent, then content) | 12982 ms | 15216 ms | 19161 ms | 0 / 8 | $0.016 |
+| After (intent and content in parallel) | 10466 ms | 11438 ms | 12206 ms | 0 / 8 | $0.016 |
 
-The harness total cap (`MAX_TOTAL_COST_USD`) adds up `summary.totalCostUsd` from every earlier run folder. Each of those totals already includes the runs before it, so earlier spend is counted more than once.
+`BUILD_BLUEPRINT_TIMEOUT_MS` is still 180 s. A test requires at least 180 s for reasoning planners, and no reasoning planner has been measured yet.
+
+## Harness notes
+
+- Since `adbe31b`:
+  - `--plan-bench` measures planning time.
+  - `--repair` runs production retry limits and records repair rounds per generation.
+  - The total spend cap counts only the current run.
+- Before `adbe31b`, the total cap added up the totals of every earlier run folder, so earlier spend was counted more than once. That is why `baseline-3flash-2026-10-29` shows $5.77 while its own generations cost $0.65.
