@@ -23,8 +23,6 @@ import { designWithTheme } from "./approved-plan";
 import { createIntentClassifier } from "./classify-intent-llm";
 import { generateBlueprintContent } from "./generate-content-llm";
 
-// Two sequential planner calls (intent, then the full plan). deepseek-v4-pro
-// was still running when 30s aborted the request.
 export const BUILD_BLUEPRINT_TIMEOUT_MS = 180_000;
 
 export class BuildBlueprintError extends Error {
@@ -73,6 +71,34 @@ function resolveDesignDirection(directionId: string | undefined) {
   return chosen ?? directions.find((d) => d.isDefault) ?? directions[0];
 }
 
+async function planIntentAndContent(
+  prompt: string,
+  options: BuildBlueprintOptions & { signal: AbortSignal },
+) {
+  const { provider, specification, onProgress, signal } = options;
+  const contentAbort = new AbortController();
+  const [intentSettled, contentSettled] = await Promise.allSettled([
+    classifyIntent(createIntentClassifier(provider), prompt, signal).then((result) => {
+      if (result.ok) onProgress?.({ stage: "intent", detail: describeIntent(result.value) });
+      else contentAbort.abort();
+      return result;
+    }),
+    generateBlueprintContent({
+      prompt,
+      provider,
+      specification,
+      signal: AbortSignal.any([signal, contentAbort.signal]),
+      onPages: reportPages(onProgress),
+    }),
+  ]);
+  if (intentSettled.status === "rejected") throw intentSettled.reason;
+  if (!intentSettled.value.ok) {
+    throw new BuildBlueprintError("INTENT_FAILED", intentSettled.value.issues.map((issue) => issue.message).join("; "));
+  }
+  if (contentSettled.status === "rejected") throw contentSettled.reason;
+  return { intent: intentSettled.value.value, content: contentSettled.value };
+}
+
 export async function buildBlueprint(
   prompt: string,
   options: BuildBlueprintOptions = {},
@@ -80,15 +106,6 @@ export async function buildBlueprint(
   const { provider, directionId, theme, specification, answers, onProgress } = options;
   const signal = options.signal ?? AbortSignal.timeout(BUILD_BLUEPRINT_TIMEOUT_MS);
   try {
-    onProgress?.({ stage: "intent", detail: "Understanding what you want to build" });
-    const intentResult = await classifyIntent(createIntentClassifier(provider), prompt, signal);
-    if (!intentResult.ok) {
-      throw new BuildBlueprintError(
-        "INTENT_FAILED",
-        intentResult.issues.map((issue) => issue.message).join("; "),
-      );
-    }
-
     const needs = detectNeeds(prompt);
     const architecture = decideArchitecture(needs);
     const packageIssues = validateArchitectureDecisions(architecture.decisions, ALLOWED_PACKAGES);
@@ -99,14 +116,14 @@ export async function buildBlueprint(
       );
     }
 
-    onProgress?.({ stage: "intent", detail: describeIntent(intentResult.value) });
-    const content = await generateBlueprintContent({ prompt, signal, provider, specification, onPages: reportPages(onProgress) });
+    onProgress?.({ stage: "intent", detail: "Understanding what you want to build" });
+    const { intent, content } = await planIntentAndContent(prompt, { ...options, signal });
     onProgress?.({ stage: "checking", detail: `Checking ${content.pages.length} pages and splitting the build into tasks` });
     const direction = resolveDesignDirection(directionId);
 
     const draft = BlueprintSchema.safeParse({
       blueprintVersion: 1,
-      intent: intentResult.value,
+      intent,
       stack: architecture.stack,
       entities: content.entities,
       pages: content.pages,
