@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Msg, StopNotice } from "../schemas/agentSchemas";
+import { nextRunSteps } from "./run-steps";
 
 export type IntakeTool = "request" | "questions" | "planner";
 
@@ -14,6 +15,7 @@ interface AgentState {
   delta: string;
   running: boolean;
   statusDetail: string;
+  runSteps: readonly string[];
   stopNotice: StopNotice | null;
   lastSeq: number;
   intakeSteps: readonly IntakeStep[];
@@ -43,6 +45,7 @@ export const useAgentStore = create<AgentState>((set) => ({
   delta: "",
   running: false,
   statusDetail: "",
+  runSteps: [],
   stopNotice: null,
   lastSeq: -1,
   intakeSteps: [],
@@ -52,6 +55,7 @@ export const useAgentStore = create<AgentState>((set) => ({
       messages,
       running,
       statusDetail,
+      runSteps: running ? nextRunSteps([], statusDetail) : [],
       delta: "",
       stopNotice: null,
       lastSeq: messages.at(-1)?.seq ?? -1,
@@ -68,7 +72,12 @@ export const useAgentStore = create<AgentState>((set) => ({
       };
     }),
 
-  setRunning: (running, statusDetail = "") => set({ running, statusDetail }),
+  setRunning: (running, statusDetail = "") =>
+    set((state) => ({
+      running,
+      statusDetail,
+      runSteps: running ? nextRunSteps(state.runSteps, statusDetail) : [],
+    })),
   setDelta: (delta) =>
     set((state) => ({
       delta: typeof delta === "function" ? delta(state.delta) : delta,

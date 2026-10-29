@@ -10,7 +10,7 @@ export function useSendMessage(sessionId: string | undefined) {
     mutationFn: (message: OutgoingMessage) => {
       if (!sessionId) throw new Error("No active session");
       agentStore.getState().setStopNotice(null);
-      agentStore.getState().setRunning(true, "Analyzing request & planning…");
+      agentStore.getState().setRunning(true, "Sending your request…");
       return agentApi.sendMessage(sessionId, message);
     },
     onError: (err: Error) => {
