@@ -127,6 +127,7 @@ async function runPlannedTasks(options: RunBlueprintPathOptions, approved: Appro
   const titleById = new Map(approved.persisted.tasks.map((task) => [task.id, task.title]));
   const typeById = new Map(approved.persisted.tasks.map((task) => [task.id, task.type]));
   const reportedTasks = new Set<string>();
+  const delegatedTasks = new Set<string>();
   const labelByTitle = new Map<string, string>();
   const { emit: conversationEmit } = createEmitAdapter({ sessionId, userId, persist });
 
@@ -145,7 +146,18 @@ async function runPlannedTasks(options: RunBlueprintPathOptions, approved: Appro
       onTaskStatus: (taskId, status) => {
         const title = titleById.get(taskId) ?? taskId;
         const label = codingProfileFor(typeById.get(taskId) ?? "").label;
-        if (status === "running") labelByTitle.set(title, label);
+        if (status === "running") {
+          labelByTitle.set(title, label);
+          if (!delegatedTasks.has(taskId)) {
+            delegatedTasks.add(taskId);
+            void persist({
+              role: "assistant",
+              type: "text",
+              content: `Delegated to ${label}: ${title}`,
+              data: { delegation: label, transcriptOnly: true },
+            });
+          }
+        }
         if (status === "done" || status === "failed") labelByTitle.delete(title);
         if (status === "running" || status === "done" || status === "failed") {
           publishStatus(sessionId, "RUNNING", delegatedStatus(delegatedEntries(labelByTitle)));

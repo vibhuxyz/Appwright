@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Sparkles } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import type { VerificationResult } from "@repo/contracts";
@@ -12,15 +12,13 @@ import {
   RunningStatusRow,
   PlanDecisionBubble,
   ThemeChoiceCard,
-  ToolGroupRow,
+  AgentTurn,
   buildTranscriptItems,
-  summarizeToolGroup,
+  visibleTranscriptItems,
   type TranscriptItem,
 } from "../transcript";
 import { ApprovalCard } from "./ApprovalCard";
-import { ToolCallGroup } from "./ToolCallGroup";
 import { UserMessageItem } from "./UserMessageItem";
-import { VerificationStatusBar } from "./VerificationStatusBar";
 
 type Responses = ReadonlyMap<string | undefined, Msg>;
 
@@ -41,7 +39,15 @@ function verificationOf(msg: Msg | null): VerificationResult[] | null {
   return Array.isArray(verification) ? (verification as VerificationResult[]) : null;
 }
 
-function TranscriptRow({ item, responses, showMeta }: { item: TranscriptItem; responses: Responses; showMeta: boolean }) {
+interface TranscriptRowProps {
+  item: TranscriptItem;
+  responses: Responses;
+  showMeta: boolean;
+  projectId?: string;
+  onViewAgent: (agent: string) => void;
+}
+
+function TranscriptRow({ item, responses, showMeta, projectId, onViewAgent }: TranscriptRowProps) {
   switch (item.kind) {
     case "user":
       return <UserMessageItem msg={item.msg} />;
@@ -53,19 +59,18 @@ function TranscriptRow({ item, responses, showMeta }: { item: TranscriptItem; re
       return <ThemeChoiceCard theme={item.theme} />;
     case "question":
       return <AgentBlock text={null}><QuestionCard card={item.card} /></AgentBlock>;
-    case "agent": {
-      const verification = verificationOf(item.text);
+    case "agent":
       return (
-        <AgentBlock text={item.text?.content ?? null} meta={showMeta && item.text ? { createdAt: item.text.createdAt } : null}>
-          {item.calls.length > 0 && (
-            <ToolGroupRow summary={summarizeToolGroup(item.calls, responses)}>
-              <ToolCallGroup calls={item.calls} responsesByCallId={responses} />
-            </ToolGroupRow>
-          )}
-          {verification && <VerificationStatusBar results={verification} />}
-        </AgentBlock>
+        <AgentTurn
+          text={item.text}
+          calls={item.calls}
+          responses={responses}
+          showMeta={showMeta}
+          {...(projectId ? { projectId } : {})}
+          verification={verificationOf(item.text)}
+          onViewAgent={onViewAgent}
+        />
       );
-    }
     default: {
       const unhandled: never = item;
       return unhandled;
@@ -79,6 +84,7 @@ export function MessageList({
   running,
   statusDetail,
   sessionId,
+  projectId,
   onStop,
   footer,
 }: {
@@ -87,6 +93,7 @@ export function MessageList({
   running: boolean;
   statusDetail: string;
   sessionId?: string;
+  projectId?: string;
   onStop: () => void;
   footer?: ReactNode;
 }) {
@@ -114,12 +121,18 @@ export function MessageList({
   const responses: Responses = new Map(
     messages.filter((m) => m.type === "toolResponse").map((m) => [m.data?.toolCallId, m]),
   );
-  const items = buildTranscriptItems(messages);
+  const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  const items = visibleTranscriptItems(buildTranscriptItems(messages), agentFilter);
   const lastIndex = items.length - 1;
 
   return (
     <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-4 *:shrink-0">
       {items.length === 0 && !delta && !running && !footer && <EmptyState />}
+      {agentFilter ? (
+        <button type="button" onClick={() => setAgentFilter(null)} className="self-start text-[12px] text-foreground-secondary hover:text-foreground">
+          Showing {agentFilter} messages. Show the full transcript.
+        </button>
+      ) : null}
 
       {items.map((item, index) => (
         <TranscriptRow
@@ -127,12 +140,14 @@ export function MessageList({
           item={item}
           responses={responses}
           showMeta={item.kind === "agent" && item.isTurnEnd && !(running && index === lastIndex)}
+          {...(projectId ? { projectId } : {})}
+          onViewAgent={setAgentFilter}
         />
       ))}
 
       {delta && <AgentBlock text={delta} isStreaming />}
 
-      {running && <RunningStatusRow statusDetail={statusDetail} onStop={onStop} />}
+      {running && <RunningStatusRow statusDetail={statusDetail} onStop={onStop} onViewAgent={setAgentFilter} />}
 
       {footer}
       {sessionId &&

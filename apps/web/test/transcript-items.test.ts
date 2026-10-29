@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { THEME_FONT_NAMES } from "@repo/contracts";
 import type { Msg } from "../src/features/agent/schemas/agentSchemas";
-import { buildTranscriptItems, findLateQuestions, summarizeToolGroup } from "../src/features/agent/transcript";
+import { activityChips, buildTranscriptItems, delegationAgent, findLateQuestions, presentAgentText, summarizeToolGroup } from "../src/features/agent/transcript";
 import { parseMessageBlocks } from "../src/features/agent/transcript/message-text/parse-message-blocks";
 
 let nextSeq = 0;
@@ -75,6 +75,45 @@ describe("summarizeToolGroup", () => {
     const calls = [call("read_file", { path: "a" }, "r1"), call("read_file", { path: "b" }, "r2")];
     const summary = summarizeToolGroup(calls, new Map([["r1", { content: "Error: missing" }]]));
     expect(summary).toMatchObject({ label: "Viewing 2 paths", isRunning: true, hasFailure: true });
+  });
+});
+
+describe("activity chips", () => {
+  it("names a single viewed or created path and a shell command", () => {
+    const calls = [
+      call("read_file", { path: "app/test_reports/iteration_1.json" }, "r1"),
+      call("write_file", { path: "app/memory/PRD.md" }, "w1"),
+      call("bash", { argv: ["mkdir", "-p", "/app/memory"] }, "b1"),
+    ];
+    const chips = activityChips(calls, new Map(calls.map((item) => [item.data?.toolCallId, { content: "ok" }])));
+    expect(chips.map((chip) => ({ kind: chip.kind, label: chip.label, path: chip.path }))).toEqual([
+      { kind: "file", label: "Created", path: "/app/memory/PRD.md" },
+      { kind: "file", label: "Viewed", path: "/app/test_reports/iteration_1.json" },
+      { kind: "shell", label: "$ mkdir -p /app/memory", path: undefined },
+    ]);
+  });
+
+  it("collapses several edits into one chip", () => {
+    const calls = [call("write_file", { path: "a.ts" }, "w1"), call("edit_file", { path: "b.ts" }, "w2")];
+    const chips = activityChips(calls, new Map());
+    expect(chips[0]?.label).toBe("Created 1, Edited 1 files");
+  });
+});
+
+describe("presentAgentText", () => {
+  it("turns a delegation line and a handoff into chips and a summary card", () => {
+    expect(delegationAgent("Delegated to UI Agent: Home")).toBe("UI Agent");
+    const handoff = msg({
+      role: "assistant",
+      type: "text",
+      content: "Created /app/memory/PRD.md\n\nShop page complete",
+      data: { handoff: true, delegation: "Handoff Agent", summaryTitle: "Shop page complete", summaryBullets: ["Verified the shop."], summaryNote: "Prices were not supplied." },
+    });
+    expect(presentAgentText(handoff)).toMatchObject({
+      text: null,
+      delegation: "Handoff Agent",
+      handoff: { title: "Shop page complete", bullets: ["Verified the shop."], note: "Prices were not supplied.", createdPath: "/app/memory/PRD.md" },
+    });
   });
 });
 

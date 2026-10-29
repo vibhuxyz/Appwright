@@ -83,6 +83,7 @@ export function ChatPane({
         running={running}
         statusDetail={statusDetail}
         sessionId={sessionId}
+        projectId={projectId}
         onStop={stop}
         footer={
           intake.gate ? (

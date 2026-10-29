@@ -7,5 +7,6 @@ export { ThemeChoiceCard } from "./ThemeChoiceCard";
 export { QuestionCard, QuestionReplyBubble } from "./question-card";
 export { RunningStatusRow } from "./RunningStatusRow";
 export { cardFromSet } from "./question-card-model";
+export { AgentTurn, activityChips, delegationAgent, presentAgentText, visibleTranscriptItems } from "./chips";
 export { summarizeToolGroup, ToolGroupRow } from "./tool-group";
 export type { LateQuestions, QuestionCardModel, TranscriptItem } from "./types";

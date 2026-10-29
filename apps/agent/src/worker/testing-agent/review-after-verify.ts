@@ -92,7 +92,7 @@ export async function reviewAfterVerification(input: ReviewInput): Promise<Revie
     role: "assistant",
     type: "text",
     content: `Testing Agent: ${decision.status}.${notes.length > 0 ? ` ${notes}` : ""}`,
-    data: { transcriptOnly: true, testingAgent: true, status: decision.status },
+    data: { transcriptOnly: true, testingAgent: true, delegation: "Testing Agent", status: decision.status },
   });
   if (input.signal.aborted) return { passed: false, notes };
   if (decision.mustFix.length === 0) return { passed: true, notes };

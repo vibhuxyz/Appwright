@@ -40,6 +40,6 @@ export function handoffPrompt(input: {
     body.replaceAll(`</${CONTEXT_TAG}>`, `<\\/${CONTEXT_TAG}>`),
     `</${CONTEXT_TAG}>`,
     "",
-    'After the write, return only JSON: {"summary":"one or two sentences for the user"}',
+    'After the write, return only JSON: {"title":"short title","bullets":["what was built"],"note":"optional remaining detail"}',
   ].join("\n");
 }

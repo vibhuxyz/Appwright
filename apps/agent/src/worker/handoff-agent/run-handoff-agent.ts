@@ -91,10 +91,15 @@ export async function runHandoffAgent(input: HandoffInput): Promise<void> {
   }), memory.tool);
   publish(FINISHED_STATUS);
   if (input.signal.aborted) return;
+  const summary = text === undefined ? undefined : parseHandoffSummary(text);
   await input.persist({
     role: "assistant",
     type: "text",
-    content: handoffMessage(memory.wrote(), text === undefined ? undefined : parseHandoffSummary(text)),
-    data: { handoff: true },
+    content: handoffMessage(memory.wrote(), summary),
+    data: {
+      handoff: true,
+      delegation: "Handoff Agent",
+      ...(summary ? { summaryTitle: summary.title, summaryBullets: [...summary.bullets], ...(summary.note ? { summaryNote: summary.note } : {}) } : {}),
+    },
   });
 }

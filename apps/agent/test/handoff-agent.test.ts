@@ -23,8 +23,13 @@ describe("isHandoffPath", () => {
 });
 
 describe("parseHandoffSummary", () => {
-  it("reads a fenced summary and drops an empty one", () => {
-    expect(parseHandoffSummary('```json\n{"summary":"The shop page is ready."}\n```')).toBe("The shop page is ready.");
+  it("reads a title and bullets, and accepts a one-line summary", () => {
+    expect(parseHandoffSummary('```json\n{"title":"Shop page complete","bullets":["Verified the shop."],"note":"Prices were not supplied."}\n```')).toEqual({
+      title: "Shop page complete",
+      bullets: ["Verified the shop."],
+      note: "Prices were not supplied.",
+    });
+    expect(parseHandoffSummary('{"summary":"The shop page is ready."}')).toEqual({ title: "The shop page is ready.", bullets: [] });
     expect(parseHandoffSummary('{"summary":"   "}')).toBeUndefined();
   });
 });
@@ -60,7 +65,7 @@ describe("runHandoffAgent", () => {
       provider: new FakeProvider([
         { kind: "toolCall", toolCallId: "bad", toolName: "write_file", args: { path: "src/app/page.tsx", content: "nope" } },
         { kind: "toolCall", toolCallId: "good", toolName: "write_file", args: { path: "/app/memory/PRD.md", content: "# PRD\nBuilt the shop." } },
-        { kind: "text", text: '{"summary":"The shop page is verified and ready to continue."}' },
+        { kind: "text", text: '{"title":"Shop page complete","bullets":["The shop page is verified and ready to continue."]}' },
       ]),
       runtime,
       emit: async () => {},
@@ -75,6 +80,6 @@ describe("runHandoffAgent", () => {
     });
     expect(runtimeWrites).toEqual([{ path: "app/memory/PRD.md", content: "# PRD\nBuilt the shop.\n" }]);
     expect(published).toEqual(["Delegated to Handoff Agent", "Handoff Agent finished"]);
-    expect(persisted).toEqual([handoffMessage(true, "The shop page is verified and ready to continue.")]);
+    expect(persisted).toEqual([handoffMessage(true, { title: "Shop page complete", bullets: ["The shop page is verified and ready to continue."] })]);
   });
 });

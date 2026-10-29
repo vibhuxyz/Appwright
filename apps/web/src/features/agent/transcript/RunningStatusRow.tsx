@@ -2,6 +2,8 @@ import { Check, Loader2, Square } from "lucide-react";
 import { AGENT_WAIT_STATUS } from "@repo/contracts";
 import { useAgentStore } from "../store/agentStore";
 import { AgentBlock } from "./AgentBlock";
+import { DelegationChip } from "./chips/DelegationChip";
+import { delegationAgent } from "./chips/present";
 
 const IMAGE_WAIT_STATUS = "Waiting for section images…";
 const VISIBLE_DONE_STEPS = 6;
@@ -27,15 +29,17 @@ function DoneSteps({ steps }: { steps: readonly string[] }) {
   );
 }
 
-export function RunningStatusRow({ statusDetail, onStop }: { statusDetail: string; onStop: () => void }) {
+export function RunningStatusRow({ statusDetail, onStop, onViewAgent }: { statusDetail: string; onStop: () => void; onViewAgent?: (agent: string) => void }) {
   const runSteps = useAgentStore((state) => state.runSteps);
   const current = statusDetail || "Working on your app…";
   const doneSteps = runSteps.at(-1) === current ? runSteps.slice(0, -1) : runSteps;
   const hint = WAIT_HINTS.get(statusDetail);
+  const agent = delegationAgent(current);
   return (
     <AgentBlock text={null}>
       <div role="status" aria-live="polite" className="space-y-2">
         <DoneSteps steps={doneSteps} />
+        {agent && onViewAgent ? <DelegationChip agent={agent} onView={onViewAgent} /> : null}
         <div className="flex items-center gap-2.5 rounded-xl border border-border-soft bg-surface-2 px-3 py-2.5">
           <Loader2 aria-hidden="true" className="size-3.5 shrink-0 animate-spin text-lime" />
           <div className="flex min-w-0 flex-1 flex-col">
