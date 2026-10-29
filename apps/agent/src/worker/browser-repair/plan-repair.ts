@@ -47,6 +47,12 @@ export function planRepair(findings: readonly Finding[], issues: readonly Visual
 export interface RepairContext {
   readonly skill: string;
   readonly changedPaths: readonly string[];
+  readonly extraMustFix?: readonly string[];
+}
+
+function extraLines(items: readonly string[] | undefined): string[] {
+  if (!items || items.length === 0) return [];
+  return ["", "Testing review also requires:", ...items.slice(0, MAX_LISTED).map((item) => `- ${flat(item)}`)];
 }
 
 function findingLine(finding: Finding): string {
@@ -86,6 +92,7 @@ export function formatRepairPrompt(plan: RepairPlan, context: RepairContext): st
     "",
     "Change only the code that causes these findings. Do not restyle, reorder or delete other sections, and keep every data-section attribute.",
     `After you stop, the platform rechecks ${plan.recheck.routes.join(", ")} at ${plan.recheck.viewports.join(", ")}. Anything still failing is reported to the user as failing.`,
+    ...extraLines(context.extraMustFix),
     ...(context.skill ? ["", context.skill] : []),
   ].join("\n");
 }

@@ -11,6 +11,7 @@ export interface BrowserRepairParams {
   readonly check: BrowserCheckResult | undefined;
   readonly issues: readonly VisualIssue[];
   readonly changedPaths: readonly string[];
+  readonly extraMustFix?: readonly string[];
   readonly runRepairTurn: (prompt: string) => Promise<boolean>;
   readonly recheck: (scope: BrowserRecheck) => Promise<BrowserCheckResult | undefined>;
   readonly persist: (fields: PersistFields) => Promise<unknown>;
@@ -21,11 +22,15 @@ async function repairSkill(): Promise<string> {
 }
 
 export async function runBrowserRepair(params: BrowserRepairParams): Promise<BrowserRepairOutcome> {
-  const { check, issues, changedPaths, runRepairTurn, recheck, persist } = params;
+  const { check, issues, changedPaths, extraMustFix, runRepairTurn, recheck, persist } = params;
   if (!check || check.status !== "checked") return "not-needed";
   const plan = planRepair(check.report.findings, issues);
   if (!plan) return "not-needed";
-  const prompt = formatRepairPrompt(plan, { skill: await repairSkill(), changedPaths });
+  const prompt = formatRepairPrompt(plan, {
+    skill: await repairSkill(),
+    changedPaths,
+    ...(extraMustFix && extraMustFix.length > 0 ? { extraMustFix } : {}),
+  });
   await persist({ role: "user", type: "text", content: prompt, data: { verificationRetry: true, browserRepair: true } });
   if (!(await runRepairTurn(prompt))) {
     await persist({ role: "assistant", type: "text", content: "❌ The browser repair attempt did not pass typecheck and build, so the problems above remain." });

@@ -97,8 +97,9 @@ describe("formatArtDirection", () => {
     expect(formatArtDirection(design, "seed")).toEqual([]);
   });
 
-  test("reaches the task prompt", () => {
-    expect(buildTaskPrompt(task({ design }), undefined)).toContain('<design-system name="Street">');
+  test("reaches the task prompt only after a failed attempt", () => {
+    expect(buildTaskPrompt(task({ design }), undefined)).not.toContain('<design-system name="Street">');
+    expect(buildTaskPrompt(task({ design }), undefined, { includeDesign: true })).toContain('<design-system name="Street">');
   });
 });
 

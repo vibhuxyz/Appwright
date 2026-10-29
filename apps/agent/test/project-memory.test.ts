@@ -57,16 +57,16 @@ describe("project memory across chats", () => {
     await prisma.user.delete({ where: { id: userId } });
   });
 
-  it("a new chat sees the earlier chat's requests, plan, tasks, files and verification", async () => {
+  it("a new chat sees the earlier request, the approval and the last verification", async () => {
     const memory = formatProjectMemory(await loadProjectMemoryRows(projectId));
-    expect(memory).toContain('"Build a booking site for my yoga studio"');
-    expect(memory).toContain("- booking site for yoga studio (medium)");
-    expect(memory).toContain("The user approved this plan.");
-    expect(memory).toContain("- [DONE] Build schedule page — owns: src/app/schedule/page.tsx");
-    expect(memory).toContain("- src/app/schedule/page.tsx (1)");
-    expect(memory).toContain("- tsc: passed");
-    expect(memory).toContain("- [required] seo: Every page has a title");
+    expect(memory).toContain("Build a booking site for my yoga studio");
+    expect(memory).toContain("Plan approved");
+    expect(memory).toContain("tsc passed");
+    expect(memory).not.toContain("Build schedule page");
+    expect(memory).not.toContain("src/app/schedule/page.tsx");
+    expect(memory).not.toContain("Every page has a title");
     expect(memory).not.toContain("Verification failed");
+    expect(Buffer.byteLength(memory, "utf8")).toBeLessThanOrEqual(1_200);
   });
 
   it("never leaks another project's memory", async () => {

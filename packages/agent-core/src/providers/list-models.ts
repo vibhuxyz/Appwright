@@ -1,19 +1,9 @@
-import {
-  AVAILABLE_MODELS,
-  AvailableModelSchema,
-  inferModelCategory,
-  type AvailableModel,
-} from "@repo/contracts";
+import { AVAILABLE_MODELS, type AvailableModel } from "@repo/contracts";
 import { z } from "zod";
-import {
-  ENDPOINTS,
-  type ListAuth,
-  type ProviderId,
-  providerFor,
-} from "./openai";
+import { type ListedModel, buildModelList } from "./model-listing";
+import { ENDPOINTS, type ListAuth, type ProviderId } from "./openai";
 
 const LIST_TIMEOUT_MS = 4_000;
-const MAX_EXTRA_PER_PROVIDER = 8;
 
 const OpenAiListSchema = z.object({
   data: z.array(z.object({ id: z.string() })),
@@ -37,20 +27,6 @@ const AnthropicListSchema = z.object({
     }),
   ),
 });
-
-export interface ListedModel {
-  id: string;
-  name?: string;
-}
-
-const PROVIDER_LABEL: Record<ProviderId, string> = {
-  openai: "OpenAI",
-  groq: "Groq",
-  xai: "xAI",
-  gemini: "Google",
-  deepseek: "DeepSeek",
-  anthropic: "Anthropic",
-};
 
 export type FetchLike = (
   input: string | URL | Request,
@@ -101,21 +77,12 @@ function isChatModel(provider: ProviderId, id: string): boolean {
     return /^(gpt-|o[1-9]|chatgpt-)/.test(id);
   }
   if (provider === "gemini") {
-    return !/embedding|imagen|tts|aqa/.test(id);
+    return !/embedding|imagen|tts|aqa|image|veo|audio|live|robotics|computer-use|learnlm|gemma|transcribe|nano-banana|omni|customtools/.test(id);
   }
   if (provider === "anthropic") return id.startsWith("claude");
   if (provider === "xai") return id.startsWith("grok");
+  if (provider === "groq") return !/whisper|guard|tts|playai|orpheus|safeguard/.test(id);
   return true;
-}
-
-function titleFromId(id: string): string {
-  return id
-    .replace(/^models\//, "")
-    .replace(/[/]/g, " ")
-    .split(/[-_]/)
-    .filter((part) => part.length > 0)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 }
 
 function parseListed(provider: ProviderId, body: unknown): ListedModel[] {
@@ -167,55 +134,23 @@ async function fetchProviderModels(
   );
 }
 
-function extraRow(provider: ProviderId, listed: ListedModel): AvailableModel {
-  return AvailableModelSchema.parse({
-    id: listed.id,
-    name: listed.name && listed.name.length > 0 ? listed.name : titleFromId(listed.id),
-    provider: PROVIDER_LABEL[provider],
-    description: `Available from ${PROVIDER_LABEL[provider]}`,
-    category: inferModelCategory(listed.id),
-  });
-}
-
 export async function listAvailableModels(
   opts: ListAvailableModelsOpts = {},
 ): Promise<AvailableModel[]> {
   const env = opts.env ?? process.env;
   const fetchImpl = opts.fetch ?? fetch;
-  const catalog = [...AVAILABLE_MODELS];
-  const seen = new Set(catalog.map((model) => model.id));
-
   const providers = (
     Object.keys(ENDPOINTS) as ProviderId[]
   ).filter((provider) => hasKey(env, ENDPOINTS[provider].envKey));
 
-  const live = await Promise.all(
+  const listings = await Promise.all(
     providers.map(async (provider) => {
       try {
-        return {
-          provider,
-          models: await fetchProviderModels(provider, env, fetchImpl),
-        };
+        return { provider, models: await fetchProviderModels(provider, env, fetchImpl) };
       } catch {
         return { provider, models: [] as ListedModel[] };
       }
     }),
   );
-
-  const extras: AvailableModel[] = [];
-  for (const { provider, models } of live) {
-    let added = 0;
-    for (const model of models) {
-      if (seen.has(model.id)) continue;
-      // A live id that would route to a different host is a catalog lie —
-      // skip it rather than let the picker send it to the wrong API.
-      if (providerFor(model.id) !== provider) continue;
-      extras.push(extraRow(provider, model));
-      seen.add(model.id);
-      added += 1;
-      if (added >= MAX_EXTRA_PER_PROVIDER) break;
-    }
-  }
-
-  return [...catalog, ...extras];
+  return buildModelList(AVAILABLE_MODELS, listings);
 }

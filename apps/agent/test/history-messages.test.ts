@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import type { MessageRow } from "@repo/agent-core";
-import { historyMessages } from "../src/worker/history-messages";
+import { historyMessages } from "../src/worker/history";
 
 const AT = new Date("2026-10-27T00:00:00.000Z");
 const IMAGE = { name: "hero.png", mimeType: "image/png", type: "image" as const, sizeBytes: 4_900_000, dataUrl: `data:image/png;base64,${"A".repeat(1000)}`, status: "COMPLETED" as const };
@@ -46,6 +46,37 @@ describe("historyMessages", () => {
 
   it("leaves a single-turn session untouched", () => {
     expect(historyMessages(rows.slice(0, 3)).map((message) => message.type)).toEqual(["text", "toolCall", "toolResponse"]);
+  });
+});
+
+describe("historyMessages drops what the next turn does not need", () => {
+  it("keeps the last two turns and leaves older requests out of the message list", () => {
+    const sent = JSON.stringify(historyMessages([
+      row(0, { content: "Build a hiring site" }),
+      row(1, { role: "assistant", content: "Built the hiring site." }),
+      row(2, { content: "Add the dashboard" }),
+      row(3, { role: "assistant", content: "Added the dashboard." }),
+      row(4, { content: "Make the hero bigger" }),
+    ]));
+    expect(sent).not.toContain("hiring site");
+    expect(sent).toContain("Add the dashboard");
+    expect(sent).toContain("Make the hero bigger");
+  });
+
+  it("drops thanks and older verification transcripts", () => {
+    const sent = JSON.stringify(historyMessages([
+      row(0, { content: "Build the home page" }),
+      row(1, { role: "assistant", content: "Built the home page." }),
+      row(2, { content: "thanks" }),
+      row(3, { role: "assistant", content: "Glad it helped." }),
+      row(4, { content: "Verification failed, retrying:\nerror TS2304" , data: { verificationRetry: true } }),
+      row(5, { content: "Add a pricing page" }),
+    ]));
+    expect(sent).not.toContain("thanks");
+    expect(sent).not.toContain("Glad it helped");
+    expect(sent).not.toContain("TS2304");
+    expect(sent).toContain("Build the home page");
+    expect(sent).toContain("Add a pricing page");
   });
 });
 

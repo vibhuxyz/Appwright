@@ -3,26 +3,6 @@ import { z } from "zod";
 
 export const CheckpointDataSchema = z.object({ checkpoint: TurnCheckpointSchema });
 
-export const IntentSchema = z.object({
-  type: z.string(),
-  domain: z.string(),
-  complexity: z.string(),
-});
-
-export const PagesSchema = z.array(z.object({ route: z.string(), purpose: z.string() }));
-
-export const FeaturesSchema = z.array(z.string());
-
-export const RequirementsSchema = z.array(
-  z.object({
-    area: z.string(),
-    level: z.string(),
-    acceptance: z.array(z.string()).default([]),
-  }),
-);
-
-export const OwnsSchema = z.array(z.string());
-
 export const QuestionItemsSchema = z.array(
   z.object({
     label: z.string(),

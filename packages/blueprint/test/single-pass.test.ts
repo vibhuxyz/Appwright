@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { AssetSlotSchema, BlueprintSchema, type Blueprint } from "@repo/contracts";
 import { buildSinglePassBrief, isSinglePassBlueprint } from "../src";
+import { fitBriefLines } from "../src/single-pass";
 
 function blueprint(overrides: Partial<Record<keyof Blueprint, unknown>> = {}): Blueprint {
   return BlueprintSchema.parse({
@@ -78,6 +79,20 @@ describe("buildSinglePassBrief", () => {
     const pages = ["/", "/a", "/b", "/c"].map((route) => ({ route, purpose: "x".repeat(2_000), components }));
     const slots = Array.from({ length: 40 }, (_, index) => ({ ...HERO_SLOT, id: `slot-${index}`, altText: "y".repeat(160) }));
     const { text } = buildSinglePassBrief({ blueprint: blueprint({ pages }), slots, projectId: PROJECT_ID, delivery: NO_DELIVERY });
-    expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(24_000 + 200);
+    expect(Buffer.byteLength(text, "utf8")).toBeLessThanOrEqual(24_000);
+  });
+});
+
+describe("fitBriefLines", () => {
+  it("drops lower-priority prose before the page list", () => {
+    const lines = [
+      { priority: 3, text: "Page /: Home" },
+      { priority: 0, text: "x".repeat(80) },
+      { priority: 1, text: "Images: hero" },
+    ];
+    const fitted = fitBriefLines(lines, 40);
+    expect(fitted.kept).toContain("Page /: Home");
+    expect(fitted.kept.join("\n")).not.toContain("x".repeat(80));
+    expect(fitted.cutLines).toBeGreaterThan(0);
   });
 });

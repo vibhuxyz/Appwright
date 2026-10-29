@@ -72,12 +72,14 @@ describe("formatProjectMemory", () => {
     expect(formatProjectMemory(emptyRows())).toBe("");
   });
 
-  test("labels confirmed, open, assumed and planned items separately", () => {
+  test("keeps decisions, blockers and a short summary, and drops the plan text", () => {
     const memory = formatProjectMemory(emptyRows({
       userRows: [
         { content: "Build a booking site\nfor my yoga studio", data: {}, createdAt: AT },
+        { content: "Use Razorpay for booking payments", data: {}, createdAt: AT },
         { content: "Verification failed, retrying: tsc", data: { verificationRetry: true }, createdAt: AT },
         { content: "old retry row with no data", data: null, createdAt: AT },
+        { content: "Approve plan", data: { blueprintId: "bp1" }, createdAt: AT },
       ],
       questions: [
         { status: "PENDING", questions: [question] },
@@ -86,20 +88,20 @@ describe("formatProjectMemory", () => {
       pendingIntegrations: [{ provider: "razorpay", reason: "Take booking payments" }],
       blueprint,
     }));
-    expect(memory).toContain('## Confirmed by the user (newest first)\n- "Build a booking site for my yoga studio" (2026-10-25)');
+    expect(memory).toContain("The user asked: Build a booking site for my yoga studio.");
+    expect(memory).toContain("- Use Razorpay for booking payments (2026-10-25)");
+    expect(memory).toContain("- Plan approved (2026-10-25)");
     expect(memory).not.toContain("Verification failed");
     expect(memory).not.toContain("old retry row");
     expect(memory).toContain("- Payment: What do customers pay for?");
     expect(memory).toContain("- Connect razorpay: Take booking payments");
-    expect(memory).toContain("## Assumed defaults (the user did not answer)\n- Payment → Advance");
-    expect(memory).toContain("- booking site for yoga studio (medium)");
-    expect(memory).toContain("Not approved by the user yet; treat it as a proposal.");
-    expect(memory).toContain("- [DONE] Build schedule page — owns: src/app/schedule/page.tsx");
-    expect(memory).toContain("- [required] seo: Every page has a title");
+    expect(memory).not.toContain("Assumed defaults");
+    expect(memory).not.toContain("Build schedule page");
+    expect(memory).not.toContain("Every page has a title");
     expect(memory).not.toContain("Hidden");
   });
 
-  test("shows the newest verification result and the files built in earlier chats", () => {
+  test("keeps one verification line and drops file traces", () => {
     const memory = formatProjectMemory(emptyRows({
       assistantRows: [
         { data: { stopReason: "completed" }, createdAt: AT },
@@ -107,12 +109,12 @@ describe("formatProjectMemory", () => {
       ],
       toolCallRows: [toolCall("write_file", "src/Card.tsx"), toolCall("read_file", "src/main.tsx")],
     }));
-    expect(memory).toContain("- tsc: passed (2026-10-25)\n- build: failed (2 errors) (2026-10-25)");
-    expect(memory).toContain("- src/Card.tsx (1)");
-    expect(memory).toContain("## Files read earlier and never changed");
+    expect(memory).toContain("Last verified no commit (2026-10-25): tsc passed, build failed.");
+    expect(memory).not.toContain("src/Card.tsx");
+    expect(memory).not.toContain("src/main.tsx");
   });
 
-  test("names the newest turn commit next to the verification result", () => {
+  test("names the newest turn commit on the verification line", () => {
     const sha = "a".repeat(8) + "b".repeat(32);
     const memory = formatProjectMemory(emptyRows({
       assistantRows: [
@@ -121,21 +123,27 @@ describe("formatProjectMemory", () => {
         { data: { verification: [{ ok: true, check: "tsc", errors: [] }] }, createdAt: AT },
       ],
     }));
-    expect(memory).toContain("- Last turn commit: aaaaaaaa (2026-10-25)\n- tsc: passed (2026-10-25)");
+    expect(memory).toContain("Last verified commit aaaaaaaa (2026-10-25): tsc passed.");
     expect(memory).not.toContain("cccccccc");
   });
 
   test("caps each section and reports the hidden count", () => {
-    const toolCallRows = Array.from({ length: SECTION_LIMITS.changedFiles + 3 }, (_, i) =>
-      toolCall("write_file", `src/f${String(i).padStart(3, "0")}.ts`));
-    expect(formatProjectMemory(emptyRows({ toolCallRows }))).toContain("(+3 more)");
+    const userRows = Array.from({ length: SECTION_LIMITS.confirmed + 3 }, (_, index) => ({
+      content: `Use auth option ${index}`,
+      data: {},
+      createdAt: AT,
+    }));
+    expect(formatProjectMemory(emptyRows({ userRows }))).toContain("(+3 more)");
   });
 
   test("keeps the byte budget, drops lowest priority first and says so", () => {
-    const longText = "é".repeat(400);
+    const longText = `auth ${"é".repeat(400)}`;
     const userRows = Array.from({ length: 60 }, () => ({ content: longText, data: {}, createdAt: AT }));
-    const toolCallRows = Array.from({ length: 60 }, (_, i) => toolCall("read_file", `src/${"é".repeat(150)}${i}.ts`));
-    const memory = formatProjectMemory(emptyRows({ userRows, toolCallRows }));
+    const questions = Array.from({ length: 12 }, () => ({
+      status: "PENDING",
+      questions: [{ label: "Payment", text: "é".repeat(400), options: ["A"], defaultOptionIndex: 0 }],
+    }));
+    const memory = formatProjectMemory(emptyRows({ userRows, questions }));
     expect(Buffer.byteLength(memory, "utf8")).toBeLessThanOrEqual(MAX_PROJECT_MEMORY_BYTES);
     expect(memory).toContain("## Confirmed by the user");
     expect(memory).toMatch(/\(memory trimmed: \d+ lower-priority lines left out\)/);
@@ -172,10 +180,9 @@ describe("reverted turns", () => {
     }));
     expect(memory).toContain('## Reverted by the user (this work was undone; do not redo it unless the user asks again)\n- "Add a student dashboard"');
     expect(memory).not.toContain("Contact — WhatsApp");
-    expect(memory).toContain('## Confirmed by the user (newest first)\n- "Make the hero bigger"');
-    expect(memory).toContain("- src/app/page.tsx (1)");
+    expect(memory).toContain("The user asked: Make the hero bigger.");
     expect(memory).not.toContain("dashboard/page.tsx");
-    expect(memory).not.toContain("## Last verification");
+    expect(memory).not.toContain("tsc");
   });
 
   test("a revert in another chat does not hide this chat's rows with the same seq", () => {
@@ -183,7 +190,7 @@ describe("reverted turns", () => {
       revertedTurns: [{ sessionId: "other-chat", fromSeq: 0, toSeq: 100 }],
       userRows: [{ seq: 5, content: "Keep this", data: {}, createdAt: AT }],
     }));
-    expect(memory).toContain('"Keep this"');
+    expect(memory).toContain("The user asked: Keep this.");
     expect(memory).not.toContain("## Reverted by the user");
   });
 });

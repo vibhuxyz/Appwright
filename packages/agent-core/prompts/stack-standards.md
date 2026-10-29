@@ -8,7 +8,7 @@ Stack — fixed, do not substitute:
 - Server data on the client: TanStack Query (`useQuery`, `useMutation`). One query-key factory per feature, a `staleTime` on every query, invalidate only the keys a mutation changes. Server Components read the models directly instead.
 - Client state: Zustand for global UI state only (sidebar, theme, or a cart when the product sells goods). Select the smallest slice, use `useShallow` for several fields. Never copy server data into a store.
 - Forms: `react-hook-form` with `zodResolver`.
-- Dependencies: Add packages only when a concrete requirement needs them. Do not install packages in the scaffold or before they are needed. Before installing a package, check whether the existing stack (Next.js App Router, Server Actions, native React state, Zod) already covers the functionality. Never install stripe unless there is an active payment workflow; never install next-auth or bcryptjs unless the project has user authentication; never install zustand unless complex global client state is needed. Install only packages that are already in `package.json` or on the allowlist: next-auth, bcryptjs, mongoose, zod, zustand, @tanstack/react-query, react-hook-form, @hookform/resolvers, stripe, lucide-react, clsx, tailwind-merge. Write small helpers yourself instead of adding anything else. After implementation, audit dependencies for unused additions.
+- Dependencies: use what is in `package.json` first; Server Actions, React state and Zod cover most needs. Add a package only when a concrete requirement needs it, and only from this allowlist: next-auth, bcryptjs, mongoose, zod, zustand, @tanstack/react-query, react-hook-form, @hookform/resolvers, stripe, lucide-react, clsx, tailwind-merge. Add stripe only for an active payment workflow, next-auth and bcryptjs only when the project has user authentication, zustand only for complex global client state. Remove any addition you end up not using.
 
 Design system and UI components (already in `src/components/ui/`, import them, never rebuild them):
 - Theme: colours and fonts come from the theme tokens in `src/app/theme.css`. Use `bg-background`, `text-foreground`, `bg-primary`, `text-primary-foreground`, `bg-secondary`, `bg-accent`, `bg-muted`, `text-muted-foreground`, `border-border`, `bg-card`, `rounded-lg`, and `font-heading` for display text. Never write hex or `rgb()` colours or font names in components, and never edit `theme.css`.
@@ -24,7 +24,7 @@ TypeScript:
 
 React:
 - Components render, hooks hold logic. Keep components under 150 lines and files under 250 lines, one job per file, kebab-case file names (PascalCase for component files).
-- Server Components by default. `"use client"` goes only on the smallest interactive leaf, as the first line.
+- Server Components by default. Make only the smallest interactive leaf a client component.
 - Derive values during render. Do not sync derived data with `useEffect` + `setState`. Every effect cleans up.
 - Optimize on purpose: `memo` on list-row components, `useMemo` for sorting/filtering/grouping lists, `useCallback` only for functions passed to memoized children or used in effect dependencies. Do not create new objects, arrays or inline functions as props of memoized children. No memoization anywhere else.
 - Lists use stable ids as keys, never the array index. Long lists over about 100 rows are virtualized.
@@ -36,7 +36,7 @@ API and data:
 - Route handlers parse the body with Zod, return `{ "error": { "code", "message", "details" } }` on failure, and use 400, 401, 403, 404, 409, 422 correctly.
 - Validate ids with `isValidObjectId` before querying. Return only the fields the client needs.
 - Secrets live in `src/env.ts` (Zod-validated) and `.env.local`. Nothing secret in `NEXT_PUBLIC_*`.
-- Seed data uses only facts the task provides. Do not invent prices, reviews, client names, or a sample brand. Never use "Item 1" or lorem ipsum.
+- Seed data uses only facts the task provides. Do not invent prices, reviews, client names, or a sample brand. When the task gives no facts, show an empty state or a neutral labelled placeholder ("Product name"), never "Item 1" or lorem ipsum.
 
 Working efficiently on large builds:
 - Plan the files first, then write each complete file with one `write_file` call. Do not re-read files you just wrote or files that did not change.

@@ -2424,7 +2424,9 @@ results. Its state matches what the model can see. It does three things:
 
 The list of files already changed or read was first built per session. On the same day it was
 folded into the project memory ([D80](#decision-80-project-memory-is-assembled-from-postgres-across-every-chat-never-a-file-in-the-app--active-2026-10-27-target-agent-loop)),
-so there is one memory, not two. Each run logs `run guard stats` (cache hits, overwrites refused,
+so there is one memory, not two. [D86](#decision-86-agent-context-keeps-the-last-two-turns-a-12-kb-memory-and-a-minimal-task-prompt--active-2026-10-29-amends-d80-d82-and-d84-partly-answers-o8)
+stops rendering that ledger. The three guards above are unchanged. `buildWorkLedger` remains
+only for its unit test. Each run logs `run guard stats` (cache hits, overwrites refused,
 import refusals, checks skipped), so the effect is measured, not assumed.
 
 **Why:** an audit of a long build found the agent re-reading the same files, rebuilding existing
@@ -2446,7 +2448,7 @@ nested `package.json`. Then resolve the nearest `package.json` per file.
 
 ---
 
-## Decision 80: Project memory is assembled from Postgres across every chat, never a file in the app ✅ ACTIVE _(2026-10-27, target: agent loop)_
+## Decision 80: Project memory is assembled from Postgres across every chat, never a file in the app ✅ ACTIVE _(2026-10-27, target: agent loop; section list and cap amended by D86)_
 
 **Decision:** at the start of every agent run, the worker loads one project's memory from rows
 Appwright already stores, across **all chats** of that project (`loadProjectMemoryRows` in
@@ -2466,9 +2468,13 @@ Appwright already stores, across **all chats** of that project (`loadProjectMemo
 | planned | Acceptance criteria | Blueprint requirements |
 | planned | Pages, features | Blueprint |
 
-The cap is 12 KB. Lower-priority lines are dropped first, and the block says how many were cut.
-The system's own "Verification failed, retrying" row is now marked `verificationRetry`, so it is
-never shown as something the user said.
+The cap was 12 KB. Lower-priority lines were dropped first, and the block said how many were cut.
+[D86](#decision-86-agent-context-keeps-the-last-two-turns-a-12-kb-memory-and-a-minimal-task-prompt--active-2026-10-29-amends-d80-d82-and-d84-partly-answers-o8)
+replaces that shape: the cap is 1,200 bytes, and the rendered sections are a short rolling
+summary, one verification line, confirmed decisions, open blockers, and reverted prompts.
+The plan text, assumed defaults, and file ledger are no longer rendered. The system's own
+"Verification failed, retrying" row is marked `verificationRetry`, so it is never shown as
+something the user said.
 
 **Why:** a user asked for an Emergent-style `/app/memory/PRD.md` plus a `TASKS.md` handoff. Checked
 first: **no such file or mechanism exists in Appwright.** Every agent input (history, blueprint)
@@ -2526,7 +2532,7 @@ into `packages/assets` so the worker can run it itself, which is a file move tha
 
 ---
 
-## Decision 82: Earlier turns are sent as text only, and cached input is billed at the cache price ✅ ACTIVE _(2026-10-27, target: agent loop, billing; amends D40 replay)_
+## Decision 82: Earlier turns are sent as text only, and cached input is billed at the cache price ✅ ACTIVE _(2026-10-27, target: agent loop, billing; amends D40 replay; history window amended by D86)_
 
 **Decision:**
 - **Earlier turns go to the model as text only.** Each run sends the current turn whole: the
@@ -2535,6 +2541,9 @@ into `packages/assets` so the worker can run it itself, which is a file move tha
   `historyMessages` in the worker). Old tool calls and results are dropped; project memory (D80)
   already lists the files and tasks they produced. Old reasoning is dropped; DeepSeek says it
   ignores it. An old attachment becomes a one-line note naming it.
+  [D86](#decision-86-agent-context-keeps-the-last-two-turns-a-12-kb-memory-and-a-minimal-task-prompt--active-2026-10-29-amends-d80-d82-and-d84-partly-answers-o8)
+  keeps this compaction, and also drops every turn older than the last two from the message
+  list. Those turns survive only as the rolling summary inside project memory.
 - **Cache hits are billed at the cache price.** `costUsd` now takes the cached input tokens the
   provider reports (DeepSeek `prompt_cache_hit_tokens`, OpenAI-style
   `prompt_tokens_details.cached_tokens`). It prices them at the model's `cachedIn` rate.
@@ -2567,8 +2576,9 @@ real $0.006/M. So the $5 cap, and the credits charged, overstated the real bill.
 - Cache-hit counts were never stored, so the real saving on past sessions can't be computed.
   The usage event now carries them, but no column stores them yet. Adding one is a migration.
 
-**Revisit when:** a continued run visibly loses track of the paused run's work. Then also keep
-the last earlier turn whole, within a byte budget.
+**Revisit when:** a continued run visibly loses track of the paused run's work. D86 took the
+first half of that step: the previous turn stays as text, and everything older becomes the
+rolling summary. A byte budget on that one previous turn is still open.
 
 ---
 
@@ -2655,6 +2665,10 @@ Pure tests cover the memory and history filters.
 4. **Design skills load only when needed** (`packages/ui-system/skills/*.md`, 12 KB cap,
    4 KB per skill). Art direction loads for UI tasks, layout for pages, motion when a pattern
    moves, assets when images are listed, and quality review on a repair.
+   [D86](#decision-86-agent-context-keeps-the-last-two-turns-a-12-kb-memory-and-a-minimal-task-prompt--active-2026-10-29-amends-d80-d82-and-d84-partly-answers-o8)
+   amends the task prompt: art direction, visual-reference colours, and these skills are
+   included only after a non-verification failure. The section brief still goes out on the
+   first attempt.
 5. **Browser verification follows risk.** `classifyChange`: no source change skips it; logic-only
    checks desktop; a UI change checks mobile and desktop; a new page checks all three sizes with
    full-page screenshots. New warnings: clipped text and overlapping text.
@@ -2785,6 +2799,81 @@ Vision scores are reported apart from pass or fail.
 
 ---
 
+## Decision 86: Agent context keeps the last two turns, a 1.2 KB memory, and a minimal task prompt ✅ ACTIVE _(2026-10-29, amends D80, D82, and D84; partly answers O8)_
+
+**Decision:** before anything is added to a model call, it has to change a decision the model
+would make. The same fact is not sent twice, and a long text is summarized or named instead of
+pasted. Nothing here adds a model call. The summary is pure code over saved rows.
+
+1. **History is the last two turns.** `historyMessages`
+   (`apps/agent/src/worker/history/`) drops reverted rows, transcript-only rows, and
+   verification transcripts (`verificationRetry`, or text that starts with "Verification
+   failed" or "Running verification checks"). It then keeps the current turn in full, including
+   its tool calls, and one previous turn as text only (D82's `compactEarlierTurns`). Turns
+   older than those two are not in the message list. A pure chat turn ("thanks", "ok", "looks
+   good") is dropped unless it is the current turn, so the model can still answer it.
+2. **Older turns become a rolling summary inside project memory.** `summarizeMemory` walks the
+   saved user rows in time order, skips intake, question replies, transcript-only rows,
+   verification, pure chat, and code snippets, and writes two to four sentences ("The user
+   asked: …", plus one assistant outcome when that reply is at least 24 characters and is not
+   an undo marker). The paragraph is the `## Earlier` section. It is not copied into the
+   message list as well.
+3. **Project memory is 1,200 bytes** (`MAX_PROJECT_MEMORY_BYTES`). Each item is at most 120
+   characters. The block, highest priority first, is: the earlier summary, one line
+   `Last verified commit <8-char sha> (date): <checks>.`, up to four confirmed decisions, up
+   to four open blockers, and up to two reverted prompts under the exact D83 heading. A
+   confirmed line is a question reply, a `blueprintId` row rendered as `Plan approved (date)`,
+   or a user sentence that names a stack choice (auth, payments, database, deploy, and the
+   same kind of word). Code fences and texts longer than 12 lines are dropped. The plan body,
+   assumed defaults, and the file ledger are not rendered. Tail lines are cut first, and the
+   block says how many were left out. `</project-memory>` inside untrusted text is escaped.
+4. **A task prompt is the task, not the handbook.** `buildTaskPrompt` carries the title, type,
+   owns, reads, acceptance (including the existing page and scaffold lines), the section brief
+   for that page, short image hints, and the integration-gateway lines for tasks that call the
+   gateway. Stack standards and the project-tree listing are not in the task prompt. Art
+   direction, visual-reference colours, and design skills are added only when
+   `includeDesign` is set. The generator sets that only after a previous error that is not a
+   verification failure. Verification failures still use `buildRetryPrompt` (4,000 characters).
+   Any other previous error is flattened to 1,500 characters.
+5. **The stable rules come first.** `buildSystemPrompt` order is `system.md`, stack standards,
+   the UI primitive section, `system-reference.md`, the file tree (top 50), then project
+   memory. Direct and single-pass runs send all of those. A task run sends two user messages:
+   the system prompt with the file tree off, the reference section only when `includeDesign`
+   is set, and the UI list only for `page`, `component`, `app-shell`, and `layout`; then the
+   task or retry prompt. Task runs still do not receive project memory or chat history. There
+   is no provider cache-breakpoint field. The order is what automatic prefix caching can reuse.
+6. **Tool results cannot grow for the rest of the run.** `truncate` hard-caps every tool
+   result at 12,288 bytes and marks the cut. After a successful `write_file` or `edit_file`,
+   earlier `read_file` results for that path become `[read <path> — N lines]`. Grep results
+   stay. A failed edit does not replace the read.
+7. **The single-pass brief stays at 24,000 bytes and drops prose first.** Page lines, rules,
+   and the opening stay ahead of acceptance, which stays ahead of the shell and image lines,
+   which stay ahead of `formatSectionBrief` prose. `fitBriefLines` drops the lowest priority,
+   and on a tie the later line, and reports how many lines were cut.
+
+**Why:** the second classifier call was already gone. The remaining waste was history, task
+prose, and tool results resent on every iteration. A shorter context also leaves the model
+less to attend to besides the current task.
+
+**What we gave up:**
+- A session longer than two turns no longer replays the older user and assistant text. The
+  summary can drop a detail that was not a stack decision.
+- Project memory no longer carries the plan, the file ledger, or assumed defaults. The task
+  prompt or the single-pass brief has to carry the slice that matters.
+- The first attempt at a UI task does not see design-skill markdown or the long art-direction
+  prose. The section brief, including signature effects, is still there.
+- After a file is edited, the model sees a placeholder instead of the read it did earlier, and
+  must read the file again if it needs the new text.
+- Direct and single-pass runs still send the file tree and the reference section. The UI list
+  is the whole registry for UI task types, not only the primitives named in the current
+  composition.
+
+**Revisit when:** a measured session shows the direct or single-pass input is still mostly the
+file tree or the UI list, or a continued run loses a decision the summary clipped. An explicit
+cache breakpoint waits until a provider API accepts one and the saving is measured.
+
+---
+
 ## Open — not yet decided
 
 These block work when they're reached. Each needs an entry above before the relevant slice starts.
@@ -2797,7 +2886,7 @@ These block work when they're reached. Each needs an entry above before the rele
 | O4     | **Approval timeout** — expire, or park indefinitely?                                                                                                                                                                                                                                                                               | V2 Slice 3                       | Affects the session state machine.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | O5     | **User-supplied secrets, at preview time only** — the user's own Stripe / SendGrid keys, needed inside the sandbox _before_ a Vercel project exists to write them through to.                                                                                                                                                      | V4/V5                            | **Shrunk 2026-08-16 by [D41](#decision-41-deployment-targets-the-users-own-accounts-and-the-connect-moment-is-at-deploy--active-target-v6-slice-4).** For _deployed_ apps the answer is write-through: push the key into the user's Vercel env and keep no copy, so there is no vault, no rotation, and no encryption-at-rest problem. What remains is the sandbox, which has no destination to write through to. Three candidates, in order of preference: **preview only ever uses test keys** (cleanest — live keys go straight to Vercel at deploy) · hold in memory for the sandbox's lifetime, never persist · [V3 Slice 6](./versions/V3_CLOUD_SANDBOX.md)'s proxy pattern, real credential outside, scoped token in. **Distinct from the generated app's own secrets** (`DATABASE_URL`, `AUTH_SECRET`), answered by [D15](#decision-15-the-generated-apps-database--one-per-project--active-target-v4).                                                                                                                                            |
 | ~~O6~~ | ~~**Blueprint mutability**~~                                                                                                                                                                                                                                                                                                       | —                                | ✅ **Closed 2026-08-13** by [D34](#decision-34-architecture-change-requests--the-frozen-stack-is-unfrozen-only-by-the-planner--active-target-v4-closes-o6) — an agent proposes, the planner amends, `blueprintVersion` bumps, only affected tasks recompute.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| O8     | **Context budget and drop order** — [D33](#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4) assembles context deterministically with no ability to compress. What is the per-task token cap, and what gets dropped first when `reads` is wide?                                | V4 (context builder)             | Raised by D33. Without an answer, "assemble everything relevant" becomes dollars per task.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| O8     | **Context budget and drop order** — [D33](#decision-33-machine-state-lives-in-postgres-and-context-is-assembled-not-generated--active-target-v4) assembles context deterministically with no ability to compress. What is the per-task token cap, and what gets dropped first when `reads` is wide?                                | V4 (context builder)             | Raised by D33. [D86](#decision-86-agent-context-keeps-the-last-two-turns-a-12-kb-memory-and-a-minimal-task-prompt--active-2026-10-29-amends-d80-d82-and-d84-partly-answers-o8) answers the agent prompt: last two turns, a 1,200-byte memory, a minimal task prompt, a 12,288-byte tool-result cap, and a priority drop on the 24,000-byte single-pass brief. Still open: a token cap when a task's `reads` list is wide.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ~~O9~~ | ~~**Ownership breadth**~~                                                                                                                                                                                                                                                                                                          | —                                | ✅ **Closed 2026-08-13** by [D37](#decision-37-ownership-is-normalised-and-covers-more-than-files--active-target-v4-closes-o9) — canonicalise before accepting the graph; breadth above a threshold is a validator warning.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | O10    | **`RunEvent` retention** — event volume grows far faster than message volume. How long are events kept, and is the timeline rebuilt from them or from a roll-up?                                                                                                                                                                   | V4 (when the timeline UI exists) | Raised by [D40](#decision-40-runevent-is-the-durable-execution-log--message-is-the-conversation--active-target-v1-grows-per-version). Cheap to decide before there are millions of rows.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | O11    | **A generic `Artifact` table** — screenshots, test reports, build outputs, migration records. Deferred at V4 in favour of one `TaskAttempt.commitSha` column.                                                                                                                                                                      | V5                               | Raised by [D35](#decision-35-plan-and-execution-are-separate-tables--run-task-taskattempt--active-target-v4). Decide when V5's screenshots and test reports arrive with real query patterns — not before.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |

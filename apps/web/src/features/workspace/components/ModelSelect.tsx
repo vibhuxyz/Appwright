@@ -10,13 +10,13 @@ import {
 } from "@repo/contracts";
 import {
   useAvailableModels,
-  FALLBACK_MODELS,
 } from "@/features/agent/hooks/useAvailableModels";
 import type { AvailableModel, ModelCategory } from "@/features/agent/schemas/agentSchemas";
 import { useAuthStore } from "@/stores/authStore";
 import { cn } from "@/shared/lib/cn";
 
 const EFFORT_LEVELS = ["Low", "Medium", "High"] as const;
+const NO_MODELS: readonly AvailableModel[] = [];
 
 function ModelOptionRow({
   item,
@@ -82,7 +82,7 @@ export function ModelSelect({
   const [tab, setTab] = useState<ModelCategory>("efficient");
   const [effortIndex, setEffortIndex] = useState(1);
 
-  const { data: models = FALLBACK_MODELS, isError, isPending } = useAvailableModels();
+  const { data: models = NO_MODELS, isError, isPending } = useAvailableModels();
 
   const effort = EFFORT_LEVELS[effortIndex];
   const activeModel =

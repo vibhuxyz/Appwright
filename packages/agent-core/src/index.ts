@@ -51,10 +51,15 @@ export { planTasks, formatPlanForAgent } from "./planner";
 export { verifyTypeScript, type VerifyResult } from "./verify";
 export {
   compactEarlierTurns,
+  isPureChat,
   isTranscriptOnlyRow,
+  isVerificationTranscript,
+  looksLikeSnippet,
   serializeRow,
+  summarizeTurns,
   toCoreMessage,
   type MessageRow,
+  type SummaryTurn,
 } from "./transcript";
 export { resolveStopNotice, type StopNotice } from "./notices";
 export {

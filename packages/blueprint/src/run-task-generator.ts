@@ -1,18 +1,21 @@
 import {
   OpenAiProvider,
   bestModelsForPlan,
-  type Provider,
-  loadStackStandards,
+  buildSystemPrompt,
   runAgentLoop,
   type AgentEventSink,
+  type Budget,
+  type Message,
+  type Provider,
   type Runtime,
+  type StopReason,
   type Tool,
 } from "@repo/agent-core";
 import { AGENT_LOOP_LIMITS, type PlanId, type TaskType } from "@repo/contracts";
 import { createLogger } from "@repo/logger";
 import { ALL_TOOLS, guardTools } from "@repo/tools";
 import type { FencedAttemptInput, GeneratedAttempt, TaskGenerator } from "orchestrator";
-import { loadDesignSkills } from "./art-direction";
+import { isUiTaskType, loadDesignSkills } from "./art-direction";
 import { buildTaskPrompt } from "./build-task-prompt";
 import { buildRetryPrompt, isVerificationFailure } from "./retry-prompt";
 import { generateAdminCrudAttempt } from "./generate-admin-crud-attempt";
@@ -43,6 +46,7 @@ const DETERMINISTIC_GENERATORS: Partial<
 const log = createLogger("blueprint");
 const CENTS_PER_USD = 100;
 const WRITE_TOOL_NAMES = new Set(["write_file", "edit_file"]);
+const EMPTY_SKILLS = { text: "", included: [] as string[], cut: [] as string[] };
 
 export interface RunTaskGeneratorOptions {
   sessionId: string;
@@ -72,6 +76,66 @@ function pathFromToolArgs(args: Record<string, unknown>): string | undefined {
   return typeof args.path === "string" ? args.path : undefined;
 }
 
+function taskBudget(nowMs: number): Budget {
+  return {
+    maxIterations: AGENT_LOOP_LIMITS.maxTaskIterations,
+    maxTokens: AGENT_LOOP_LIMITS.maxTokens,
+    maxCostUsd: AGENT_LOOP_LIMITS.maxTaskCostUsd,
+    deadline: nowMs + AGENT_LOOP_LIMITS.taskDeadlineMs,
+  };
+}
+
+interface AttemptTotals {
+  costUsd: number;
+  writtenPaths: string[];
+  lastError: string;
+}
+
+function trackAttempt(conversationEmit: AgentEventSink | undefined): { emit: AgentEventSink; totals: AttemptTotals } {
+  const totals: AttemptTotals = { costUsd: 0, writtenPaths: [], lastError: "" };
+  const emit: AgentEventSink = (event) => {
+    if (event.type === "usage") totals.costUsd += event.costUsd;
+    if (event.type === "error") totals.lastError = event.message;
+    if (event.type === "tool_call_start" && WRITE_TOOL_NAMES.has(event.toolName)) {
+      const path = pathFromToolArgs(event.args);
+      if (path) totals.writtenPaths.push(path);
+    }
+    return conversationEmit?.(event);
+  };
+  return { emit, totals };
+}
+
+function finishAttempt(stopReason: StopReason, totals: AttemptTotals): GeneratedAttempt {
+  const costCents = Math.round(totals.costUsd * CENTS_PER_USD);
+  if (stopReason === "completed") return { kind: "completed", costCents, writtenPaths: totals.writtenPaths };
+  if (stopReason === "budgetExceeded") return { kind: "budgetExceeded", costCents };
+  return { kind: "failed", costCents, error: totals.lastError || `Agent stopped: ${stopReason}` };
+}
+
+async function taskMessages(task: TaskDetail, runtime: Runtime, previousError: string | undefined): Promise<Message[]> {
+  const includeDesign = previousError !== undefined && !isVerificationFailure(previousError);
+  const [, skills] = await Promise.all([
+    withPatterns(task, runtime),
+    includeDesign ? loadDesignSkills(task, previousError) : Promise.resolve(EMPTY_SKILLS),
+  ]);
+  if (skills.included.length > 0) log.info("design skills", { task: task.title, included: skills.included, cut: skills.cut });
+  const systemPrompt = await buildSystemPrompt(runtime, {
+    includeFileTree: false,
+    includeReference: includeDesign,
+    includeUiPrimitives: isUiTaskType(task.type),
+  });
+  const taskPrompt = isVerificationFailure(previousError)
+    ? buildRetryPrompt(task, previousError)
+    : buildTaskPrompt(task, previousError, {
+        includeDesign,
+        ...(skills.text ? { skills: skills.text } : {}),
+      });
+  return [
+    { role: "user", type: "text", content: systemPrompt },
+    { role: "user", type: "text", content: taskPrompt },
+  ];
+}
+
 export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGenerator {
   const { sessionId, model, plan, runtime, conversationEmit, loadDetail = loadTaskDetail } = options;
 
@@ -79,72 +143,24 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
     async generate(input: FencedAttemptInput): Promise<GeneratedAttempt> {
       const task = await loadDetail(input.task.id);
       const deterministicGenerator = DETERMINISTIC_GENERATORS[taskTypeFromPrisma(task.type)];
-      if (deterministicGenerator) {
-        return deterministicGenerator(task, runtime);
-      }
+      if (deterministicGenerator) return deterministicGenerator(task, runtime);
 
-      const [standards, projectTree, skills] = await Promise.all([
-        loadStackStandards(),
-        withPatterns(task, runtime),
-        loadDesignSkills(task, input.previousError),
-      ]);
-      if (skills.included.length > 0) log.info("design skills", { task: task.title, included: skills.included, cut: skills.cut });
-      const writtenPaths: string[] = [];
-      let costUsd = 0;
-
-      const emit: AgentEventSink = (event) => {
-        if (event.type === "usage") costUsd += event.costUsd;
-        if (event.type === "tool_call_start" && WRITE_TOOL_NAMES.has(event.toolName)) {
-          const path = pathFromToolArgs(event.args);
-          if (path) writtenPaths.push(path);
-        }
-        return conversationEmit?.(event);
-      };
-
-      let lastError = "";
+      const { emit, totals } = trackAttempt(conversationEmit);
       const [primary, ...fallback] = options.providers ?? providerChain(model, plan);
       const guard = guardTools([...ALL_TOOLS, ...(options.extraTools ?? [])]);
       const stopReason = await runAgentLoop({
-        messages: [
-          {
-            role: "user",
-            type: "text",
-            content: isVerificationFailure(input.previousError)
-              ? buildRetryPrompt(task, input.previousError)
-              : buildTaskPrompt(task, input.previousError, { standards, projectTree, skills: skills.text }),
-          },
-        ],
+        messages: await taskMessages(task, runtime, input.previousError),
         tools: guard.tools,
         provider: primary ?? new OpenAiProvider({ model }),
         fallbackProviders: fallback,
         runtime,
-        emit: (event) => {
-          if (event.type === "error") lastError = event.message;
-          return emit(event);
-        },
-        budget: {
-          maxIterations: AGENT_LOOP_LIMITS.maxTaskIterations,
-          maxTokens: AGENT_LOOP_LIMITS.maxTokens,
-          maxCostUsd: AGENT_LOOP_LIMITS.maxTaskCostUsd,
-          deadline: Date.now() + AGENT_LOOP_LIMITS.taskDeadlineMs,
-        },
+        emit,
+        budget: taskBudget(Date.now()),
         signal: input.signal,
         sessionId,
       });
       log.info("run guard stats", { sessionId, taskId: input.task.id, ...guard.stats() });
-
-      const costCents = Math.round(costUsd * CENTS_PER_USD);
-      if (stopReason === "completed") {
-        return { kind: "completed", costCents, writtenPaths };
-      }
-      if (stopReason === "budgetExceeded") {
-        return { kind: "budgetExceeded", costCents };
-      }
-      return {
-        kind: "failed",
-        costCents,
-        error: lastError || `Agent stopped: ${stopReason}`,
-      };
+      return finishAttempt(stopReason, totals);
     },
   };
 }

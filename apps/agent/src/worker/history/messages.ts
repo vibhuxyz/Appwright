@@ -1,12 +1,14 @@
 import {
   compactEarlierTurns,
   isTranscriptOnlyRow,
+  isVerificationTranscript,
   toCoreMessage,
   type Message as CoreMessage,
   type MessageRow,
 } from "@repo/agent-core";
 import { isInRevertedTurn, revertedTurnOf, type SessionTurnRange } from "@repo/contracts";
-import { currentTurnRows } from "./current-turn-text";
+import { groupTurns } from "./group-turns";
+import { selectRecentTurns } from "./select-turns";
 
 function revertedRanges(rows: readonly MessageRow[]): SessionTurnRange[] {
   return rows.flatMap((row) => {
@@ -17,10 +19,12 @@ function revertedRanges(rows: readonly MessageRow[]): SessionTurnRange[] {
 
 export function historyMessages(rows: readonly MessageRow[]): CoreMessage[] {
   const reverted = revertedRanges(rows);
-  const live = rows.filter((row) => !isInRevertedTurn(row, reverted));
-  const currentStartSeq = currentTurnRows(live)[0]?.seq ?? Number.NEGATIVE_INFINITY;
-  const visible = live.filter((row) => !isTranscriptOnlyRow(row));
-  const earlier = visible.filter((row) => row.seq < currentStartSeq).map(toCoreMessage);
-  const current = visible.filter((row) => row.seq >= currentStartSeq).map(toCoreMessage);
-  return [...compactEarlierTurns(earlier), ...current];
+  const visible = rows.filter(
+    (row) => !isInRevertedTurn(row, reverted) && !isTranscriptOnlyRow(row) && !isVerificationTranscript(row.data, row.content),
+  );
+  const kept = selectRecentTurns(groupTurns(visible));
+  const current = kept[kept.length - 1];
+  if (!current) return [];
+  const earlier = kept.slice(0, -1).flatMap((turn) => compactEarlierTurns(turn.rows.map(toCoreMessage)));
+  return [...earlier, ...current.rows.map(toCoreMessage)];
 }

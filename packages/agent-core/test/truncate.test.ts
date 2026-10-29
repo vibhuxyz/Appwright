@@ -20,5 +20,6 @@ describe("truncate", () => {
 
     expect(result.startsWith("HEAD")).toBe(true);
     expect(result.endsWith("TAIL")).toBe(true);
+    expect(Buffer.byteLength(result, "utf8")).toBeLessThanOrEqual(200);
   });
 });

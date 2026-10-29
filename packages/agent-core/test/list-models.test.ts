@@ -10,13 +10,27 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe("listAvailableModels", () => {
-  it("returns the curated catalog when no provider keys are set", async () => {
+  it("returns nothing when no provider keys are set", async () => {
     const models = await listAvailableModels({ env: {}, fetch: async () => jsonResponse({}) });
-    expect(models.map((m) => m.id)).toEqual(AVAILABLE_MODELS.map((m) => m.id));
-    expect(models.some((m) => m.provider === "Google")).toBe(true);
-    expect(models.some((m) => m.provider === "OpenAI")).toBe(true);
-    expect(models.some((m) => m.provider === "DeepSeek")).toBe(true);
-    expect(models.some((m) => m.provider === "Anthropic")).toBe(true);
+    expect(models).toEqual([]);
+  });
+
+  it("lists only what the provider returns and adds catalog copy when the id matches", async () => {
+    const models = await listAvailableModels({
+      env: { GEMINI_API_KEY: "gem-test" },
+      fetch: async () =>
+        jsonResponse({
+          models: [
+            { name: "models/gemini-3.7-flash", supportedGenerationMethods: ["generateContent"] },
+            { name: "models/gemini-9-pro", displayName: "Gemini 9 Pro", supportedGenerationMethods: ["generateContent"] },
+            { name: "models/gemini-9-pro-image", supportedGenerationMethods: ["generateContent"] },
+            { name: "models/gemini-embedding-001", supportedGenerationMethods: ["embedContent"] },
+          ],
+        }),
+    });
+    expect(models.map((m) => m.id).sort()).toEqual(["gemini-3.7-flash", "gemini-9-pro"]);
+    expect(models.find((m) => m.id === "gemini-3.7-flash")?.badge).toBe("Recommended");
+    expect(models.find((m) => m.id === "gemini-9-pro")?.name).toBe("Gemini 9 Pro");
   });
 
   it("does not call a provider that has no API key", async () => {
@@ -65,6 +79,7 @@ describe("listAvailableModels", () => {
     expect(ids).toContain("gpt-4o-mini");
     expect(ids).toContain("gpt-4.1");
     expect(ids).toContain("claude-opus-4-6");
+    expect(ids).not.toContain("gemini-3.7-flash");
     expect(ids.filter((id) => id === "gpt-4o-mini")).toHaveLength(1);
     expect(ids).not.toContain("whisper-1");
     expect(ids).not.toContain("text-embedding-3-large");
@@ -75,13 +90,22 @@ describe("listAvailableModels", () => {
     expect(models.find((m) => m.id === "gpt-4.1")?.category).toBe("standard");
   });
 
-  it("keeps the catalog when a provider list call fails", async () => {
+  it("falls back to that provider's catalog entries when its list call fails", async () => {
     const models = await listAvailableModels({
       env: { GEMINI_API_KEY: "gem-test" },
       fetch: async () => {
         throw new Error("network down");
       },
     });
-    expect(models.map((m) => m.id)).toEqual(AVAILABLE_MODELS.map((m) => m.id));
+    const expected = AVAILABLE_MODELS.filter((m) => m.provider === "Google").map((m) => m.id);
+    expect(models.map((m) => m.id).sort()).toEqual([...expected].sort());
+  });
+
+  it("returns models in a stable order", async () => {
+    const env = { OPENAI_API_KEY: "sk-test" };
+    const fetch = async () => jsonResponse({ data: [{ id: "gpt-4.1" }, { id: "gpt-4o-mini" }, { id: "gpt-5.4" }] });
+    const first = await listAvailableModels({ env, fetch });
+    const second = await listAvailableModels({ env, fetch });
+    expect(first.map((m) => m.id)).toEqual(second.map((m) => m.id));
   });
 });

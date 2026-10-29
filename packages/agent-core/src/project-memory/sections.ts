@@ -1,29 +1,44 @@
 import type { ProjectMemoryRows } from "@repo/contracts";
-import { MAX_PATH_CHARS, SHORT_SHA_LENGTH, VERIFICATION_RETRY_MARKER } from "./constants";
-import {
-  CheckpointDataSchema,
-  FeaturesSchema,
-  IntentSchema,
-  OwnsSchema,
-  PagesSchema,
-  QuestionItemsSchema,
-  RequirementsSchema,
-  VerificationSchema,
-  parseOr,
-} from "./schemas";
+import { isPureChat, isVerificationTranscript, looksLikeSnippet } from "../transcript";
+import { SHORT_SHA_LENGTH } from "./constants";
+import { CheckpointDataSchema, QuestionItemsSchema, VerificationSchema, parseOr } from "./schemas";
 import { flatten, isoDate } from "./text";
-import type { WorkLedger } from "./work-ledger";
 
-type Blueprint = NonNullable<ProjectMemoryRows["blueprint"]>;
+const DECISION_PATTERN =
+  /\b(auth|login|sign[- ]?in|sign[- ]?up|payment|razorpay|stripe|database|mongo(?:db)?|postgres|stack|next\.?js|appwrite|pricing|subscription|admin|upload|email|oauth|deploy|theme|gateway)\b/i;
 
-function isUserStatement(data: unknown): boolean {
-  return typeof data === "object" && data !== null && !(VERIFICATION_RETRY_MARKER in data);
+type UserRow = ProjectMemoryRows["userRows"][number];
+
+function isRecord(data: unknown): data is Record<string, unknown> {
+  return typeof data === "object" && data !== null;
 }
 
-export function confirmedItems(userRows: ProjectMemoryRows["userRows"]): string[] {
+function skipsPrompt(row: UserRow): boolean {
+  if (!isRecord(row.data)) return true;
+  if ("intake" in row.data || "transcriptOnly" in row.data) return true;
+  return isVerificationTranscript(row.data, row.content) || isPureChat(row.content) || looksLikeSnippet(row.content);
+}
+
+export function quotedItems(userRows: readonly UserRow[]): string[] {
   return userRows
-    .filter((row) => isUserStatement(row.data))
+    .filter((row) => !skipsPrompt(row) && !(isRecord(row.data) && "questionReply" in row.data))
     .map((row) => `"${flatten(row.content)}" (${isoDate(row.createdAt)})`);
+}
+
+function decisionLine(row: UserRow): string | undefined {
+  if (skipsPrompt(row) && !(isRecord(row.data) && "questionReply" in row.data)) return undefined;
+  if (isPureChat(row.content) || isVerificationTranscript(row.data, row.content) || looksLikeSnippet(row.content)) return undefined;
+  if (isRecord(row.data) && "blueprintId" in row.data) return `Plan approved (${isoDate(row.createdAt)})`;
+  const chose = isRecord(row.data) && "questionReply" in row.data;
+  if (!chose && !DECISION_PATTERN.test(row.content)) return undefined;
+  return `${flatten(row.content)} (${isoDate(row.createdAt)})`;
+}
+
+export function decisionItems(userRows: readonly UserRow[]): string[] {
+  return userRows.flatMap((row) => {
+    const line = decisionLine(row);
+    return line ? [line] : [];
+  });
 }
 
 export function openItems(rows: Pick<ProjectMemoryRows, "questions" | "pendingIntegrations">): string[] {
@@ -37,69 +52,31 @@ export function openItems(rows: Pick<ProjectMemoryRows, "questions" | "pendingIn
   return [...questions, ...integrations];
 }
 
-export function assumedItems(questions: ProjectMemoryRows["questions"]): string[] {
-  return questions
-    .filter((row) => row.status !== "PENDING")
-    .flatMap((row) => parseOr(QuestionItemsSchema, row.questions, []))
-    .map((item) => `${flatten(item.label)} → ${flatten(item.options[item.defaultOptionIndex] ?? "no default")}`);
+function checksFor(row: ProjectMemoryRows["assistantRows"][number]): string[] {
+  const parsed = VerificationSchema.safeParse(row.data);
+  if (!parsed.success) return [];
+  return parsed.data.verification.map((result) => `${flatten(result.check)} ${result.ok ? "passed" : "failed"}`);
 }
 
-export function goalItems(blueprint: Blueprint): string[] {
-  const intent = IntentSchema.safeParse(blueprint.intent);
-  const approval = blueprint.isApproved
-    ? "The user approved this plan."
-    : "Not approved by the user yet; treat it as a proposal.";
-  if (!intent.success) return [approval];
-  const { type, domain, complexity } = intent.data;
-  return [`${flatten(type)} for ${flatten(domain)} (${flatten(complexity)})`, approval];
-}
-
-export function taskItems(blueprint: Blueprint): string[] {
-  return blueprint.tasks.map((task) => {
-    const owns = parseOr(OwnsSchema, task.owns, []).map((path) => flatten(path, MAX_PATH_CHARS));
-    return `[${task.status}] ${flatten(task.title)}${owns.length > 0 ? ` — owns: ${owns.join(", ")}` : ""}`;
-  });
-}
-
-export function lastCommitItems(assistantRows: ProjectMemoryRows["assistantRows"]): string[] {
+export function statusItems(assistantRows: ProjectMemoryRows["assistantRows"]): string[] {
+  let commit = "";
+  let when = "";
+  let checks: string[] = [];
   for (const row of assistantRows) {
-    const parsed = CheckpointDataSchema.safeParse(row.data);
-    if (parsed.success) return [`Last turn commit: ${parsed.data.checkpoint.sha.slice(0, SHORT_SHA_LENGTH)} (${isoDate(row.createdAt)})`];
+    if (!commit) {
+      const parsed = CheckpointDataSchema.safeParse(row.data);
+      if (parsed.success) {
+        commit = parsed.data.checkpoint.sha.slice(0, SHORT_SHA_LENGTH);
+        when = isoDate(row.createdAt);
+      }
+    }
+    if (checks.length === 0) {
+      checks = checksFor(row);
+      if (checks.length > 0 && !when) when = isoDate(row.createdAt);
+    }
   }
-  return [];
-}
-
-export function verificationItems(assistantRows: ProjectMemoryRows["assistantRows"]): string[] {
-  for (const row of assistantRows) {
-    const parsed = VerificationSchema.safeParse(row.data);
-    if (!parsed.success) continue;
-    return parsed.data.verification.map((result) =>
-      `${flatten(result.check)}: ${result.ok ? "passed" : `failed (${result.errors.length} errors)`} (${isoDate(row.createdAt)})`,
-    );
-  }
-  return [];
-}
-
-export function changedFileItems(ledger: WorkLedger): string[] {
-  return ledger.changed.map(([path, count]) => `${flatten(path, MAX_PATH_CHARS)} (${count})`);
-}
-
-export function readFileItems(ledger: WorkLedger): string[] {
-  return ledger.readOnly.map((path) => flatten(path, MAX_PATH_CHARS));
-}
-
-export function acceptanceItems(blueprint: Blueprint): string[] {
-  return parseOr(RequirementsSchema, blueprint.requirements, [])
-    .filter((requirement) => requirement.level !== "not-applicable")
-    .flatMap((requirement) =>
-      requirement.acceptance.map((item) => `[${flatten(requirement.level)}] ${flatten(requirement.area)}: ${flatten(item)}`),
-    );
-}
-
-export function pageItems(blueprint: Blueprint): string[] {
-  return parseOr(PagesSchema, blueprint.pages, []).map((page) => `${flatten(page.route)} — ${flatten(page.purpose)}`);
-}
-
-export function featureItems(blueprint: Blueprint): string[] {
-  return parseOr(FeaturesSchema, blueprint.features, []).map((feature) => flatten(feature));
+  if (!commit && checks.length === 0) return [];
+  const checkText = checks.length > 0 ? checks.join(", ") : "no checks recorded";
+  const commitText = commit ? `commit ${commit}` : "no commit";
+  return [`Last verified ${commitText}${when ? ` (${when})` : ""}: ${checkText}.`];
 }

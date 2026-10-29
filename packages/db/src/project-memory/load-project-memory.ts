@@ -57,7 +57,7 @@ export async function loadProjectMemoryRows(projectId: string): Promise<ProjectM
       where: { ...inProject, role: "assistant", type: "text" },
       orderBy: NEWEST_FIRST,
       take: PROJECT_MEMORY_LIMITS.maxRecentAssistantRows,
-      select: { sessionId: true, seq: true, data: true, createdAt: true },
+      select: { sessionId: true, seq: true, content: true, data: true, createdAt: true },
     }),
   ]);
   return {

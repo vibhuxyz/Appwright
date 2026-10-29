@@ -100,9 +100,9 @@ describe("revert the last agent turn", () => {
   it("project memory shows the reverted request as reverted, not as built", async () => {
     const memory = formatProjectMemory(await loadProjectMemoryRows(projectId));
     expect(memory).toContain('## Reverted by the user (this work was undone; do not redo it unless the user asks again)\n- "Add a student dashboard"');
-    expect(memory).toContain('"Build the home page"');
+    expect(memory).toContain("Build the home page");
+    expect(memory).not.toContain("The user asked: Add a student dashboard");
     const confirmed = memory.split("## Confirmed by the user")[1]?.split("\n## ")[0] ?? "";
-    expect(confirmed).toContain('"Build the home page"');
     expect(confirmed).not.toContain("Add a student dashboard");
   });
 

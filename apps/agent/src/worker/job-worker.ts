@@ -19,7 +19,7 @@ import {
 } from "@repo/cache";
 import { loadMissingAssetsNotice } from "@repo/assets";
 import { applyTheme, chosenThemeFromRows } from "@repo/blueprint";
-import { AGENT_LOOP_LIMITS, loopSpendLimits, type Attachment } from "@repo/contracts";
+import { AGENT_LOOP_LIMITS, loopSpendLimits, type Attachment, type VerificationResult } from "@repo/contracts";
 import { loadProjectMemoryRows, prisma, type Job } from "@repo/db";
 import { classify, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
@@ -31,14 +31,11 @@ import { answersFromRows } from "./answers-from-rows";
 import { withSelectionApplied } from "./apply-selection";
 import { approvedBlueprintIdFromRows } from "./approved-blueprint-id";
 import { autoMergeSession } from "./auto-merge-session";
-import { isBrowserCheckEnabled, runBrowserCheckStep } from "./browser-check-step";
-import { createRepairTurn, reviewNewPages, runBrowserRepair } from "./browser-repair";
-import { worktreeChangeScope } from "./browser-scope";
 import { checkpointSession } from "./checkpoint";
 import { currentTurnRows, currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
 import { hintMessageForTurn } from "./error-hints";
-import { historyMessages } from "./history-messages";
+import { historyMessages } from "./history";
 import { HostMirrorRuntime } from "./host-mirror-runtime";
 import { isAutoImageChoice } from "./image-choice";
 import { injectProjectRuntimeEnv } from "./inject-project-env";
@@ -50,6 +47,7 @@ import { runBlueprintPath } from "./run-blueprint-path";
 import { shouldRunBlueprintPath } from "./should-run-blueprint";
 import { freshStoredAnalysis } from "./stored-analysis";
 import type { AgentJobResult } from "./types";
+import { reviewAfterVerification } from "./testing-agent";
 import { runVerifyStep } from "./verify-step";
 
 const log = createLogger("agent-job");
@@ -176,6 +174,7 @@ export async function executeAgentJob(
 
     let verificationPassed = false;
     let verifyGaveUp = false;
+    let verifyResults: VerificationResult[] = [];
 
     const turnRows = currentTurnRows(priorRows);
     const approvedBlueprintId = approvedBlueprintIdFromRows(turnRows);
@@ -226,6 +225,7 @@ export async function executeAgentJob(
 
         if (verify.passed) {
           verificationPassed = true;
+          verifyResults = verify.results;
           const missingAssets = await loadMissingAssetsNotice(session.id);
           if (missingAssets) {
             await persist({ role: "assistant", type: "text", content: missingAssets });
@@ -289,6 +289,7 @@ export async function executeAgentJob(
 
         if (verify.passed) {
           verificationPassed = true;
+          verifyResults = verify.results;
           break;
         }
 
@@ -320,27 +321,21 @@ export async function executeAgentJob(
       }
     }
 
-    if (verificationPassed && isBrowserCheckEnabled()) {
-      const browser = { projectId: job.projectId, sessionId: session.id, worktreeDir, persist };
-      const check = await runBrowserCheckStep(browser);
-      const repair = await runBrowserRepair({
-        check,
-        issues: await reviewNewPages({ check, ...browser }),
-        changedPaths: (await worktreeChangeScope(worktreeDir))?.changedPaths ?? [],
+    if (verificationPassed) {
+      await reviewAfterVerification({
+        projectId: job.projectId,
+        sessionId: session.id,
+        userId,
+        worktreeDir,
+        verifyResults,
+        sessionModel,
+        ...(provider ? { provider } : {}),
+        runtime,
+        emit,
+        signal: controller.signal,
         persist,
-        recheck: (scope) => runBrowserCheckStep({ ...browser, recheck: scope }),
-        runRepairTurn: createRepairTurn({
-          messages,
-          provider: provider ?? new OpenAiProvider({ model: sessionModel }),
-          runtime,
-          emit,
-          signal: controller.signal,
-          sessionId: session.id,
-          userId,
-          worktreeDir,
-        }),
+        messages,
       });
-      log.info("browser repair", { sessionId: session.id, repair });
     }
 
     if (stopReason !== "completed" && !verifyGaveUp) {

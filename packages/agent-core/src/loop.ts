@@ -1,6 +1,5 @@
 import { z } from "zod";
-import { collectTurn, type CollectedTurn, type PendingToolCall } from "./collect-turn";
-import { classifyProviderFailure, isRetryableProviderFailure } from "./providers/provider-errors";
+import { collectTurnWithRetry, runToolCalls } from "./agent-loop";
 import { costUsd } from "./providers/pricing";
 import type { Provider, ToolSpec } from "./providers/types";
 import type { Runtime } from "./runtime";
@@ -35,17 +34,6 @@ export interface RunAgentLoopParams {
   providerRetryDelayMs?: number;
 }
 
-function hasReasoningInMeta(toolCalls: readonly PendingToolCall[]): boolean {
-  const meta = toolCalls[0]?.providerMeta;
-  return (
-    typeof meta === "object" &&
-    meta !== null &&
-    "reasoningContent" in meta &&
-    typeof (meta as Record<string, unknown>).reasoningContent === "string" &&
-    ((meta as Record<string, unknown>).reasoningContent as string).length > 0
-  );
-}
-
 function toToolSpecs(tools: Tool[]): ToolSpec[] {
   return tools.map((t) => ({
     name: t.name,
@@ -54,59 +42,7 @@ function toToolSpecs(tools: Tool[]): ToolSpec[] {
   }));
 }
 
-// runAgentLoop — THE loop. Pure function of its params: no printing, no HTTP,
-// no node:fs. Returns a StopReason, never void (D26).
-const PROVIDER_ATTEMPTS = 3;
 const UNFINISHED_TOOL_RESULT = "Error: this tool call did not finish because the run stopped.";
-
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException("Aborted", "AbortError"));
-      return;
-    }
-    const timer = setTimeout(() => {
-      signal.removeEventListener("abort", onAbort);
-      resolve();
-    }, ms);
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException("Aborted", "AbortError"));
-    };
-    signal.addEventListener("abort", onAbort, { once: true });
-  });
-}
-
-async function collectTurnWithRetry(
-  providers: Provider[],
-  messages: Message[],
-  toolSpecs: ToolSpec[],
-  signal: AbortSignal,
-  emit: AgentEventSink,
-  sessionId: string,
-  nextSeq: () => number,
-  retryDelayMs: number,
-): Promise<{ turn: CollectedTurn; billedModel: string }> {
-  let lastError: unknown = new Error("No model provider available");
-  for (const [providerIndex, active] of providers.entries()) {
-    for (let attempt = 0; attempt < PROVIDER_ATTEMPTS; attempt++) {
-      try {
-        const turn = await collectTurn(active, messages, toolSpecs, signal, emit, sessionId, nextSeq);
-        return { turn, billedModel: active.model };
-      } catch (error) {
-        lastError = error;
-        const message = error instanceof Error ? error.message : String(error);
-        const kind = classifyProviderFailure(message);
-        if (signal.aborted || !isRetryableProviderFailure(kind)) throw error;
-        const hasLaterProvider = providerIndex < providers.length - 1;
-        const hasLaterAttempt = attempt < PROVIDER_ATTEMPTS - 1;
-        if (!hasLaterAttempt && !hasLaterProvider) throw error;
-        if (hasLaterAttempt && retryDelayMs > 0) await sleep(retryDelayMs * 2 ** attempt, signal);
-      }
-    }
-  }
-  throw lastError;
-}
 
 export async function runAgentLoop(
   params: RunAgentLoopParams,
@@ -148,7 +84,6 @@ export async function runAgentLoop(
 
   try {
     while (true) {
-      // Six exits, cheapest and most urgent first.
       if (signal.aborted) return end("cancelled");
       if (Date.now() > budget.deadline) return end("timeout");
       if (iterations >= budget.maxIterations) return end("maxIterations");
@@ -190,9 +125,6 @@ export async function runAgentLoop(
       }
 
       if (stopReason.reason === "length") {
-        // A length stop means the arguments may be silently incomplete even
-        // when the JSON parses — fail every tool call in this message rather
-        // than executing on truncated input.
         messages.push({ role: "assistant", type: "text", content: text });
         for (const call of toolCalls) {
           await emit({
@@ -247,89 +179,19 @@ export async function runAgentLoop(
         });
       }
 
-      const sequential = toolCalls.filter((c) => {
-        const tool = toolsByName.get(c.toolName);
-        return !tool || tool.executionMode === "sequential";
+      const outcome = await runToolCalls({
+        calls: toolCalls,
+        toolsByName,
+        messages,
+        runtime,
+        signal,
+        sessionId,
+        emit,
+        nextSeq,
+        openCallIds,
+        ...(onApprovalRequired ? { onApprovalRequired } : {}),
       });
-      const parallel = toolCalls.filter((c) => !sequential.includes(c));
-
-      const runOne = async (call: PendingToolCall) => {
-        await emit({
-          type: "tool_call_start",
-          seq: nextSeq(),
-          sessionId,
-          toolCallId: call.toolCallId,
-          toolName: call.toolName,
-          args: call.args as Record<string, unknown>,
-          providerMeta: call.providerMeta,
-        });
-        openCallIds.add(call.toolCallId);
-
-        const tool = toolsByName.get(call.toolName);
-        let resultText = call.argsError ? `Error: ${call.argsError}` : "";
-        let failed = call.argsError !== undefined;
-
-        if (!failed && onApprovalRequired) {
-          const approval = await onApprovalRequired({
-            toolCallId: call.toolCallId,
-            toolName: call.toolName,
-            args: (call.args as Record<string, unknown>) ?? {},
-          });
-          if (!approval.approved) {
-            resultText = approval.reason ?? "User denied permission for this action";
-            failed = true;
-          }
-        }
-
-        if (!failed) {
-          if (!tool) {
-            resultText = `Error: unknown tool "${call.toolName}"`;
-            failed = true;
-          } else {
-            try {
-              resultText = await tool.execute(call.args, { runtime });
-            } catch (err) {
-              resultText = `Error: ${err instanceof Error ? err.message : String(err)}`;
-              failed = true;
-            }
-          }
-        }
-
-        if (failed) {
-          await emit({
-            type: "tool_error",
-            seq: nextSeq(),
-            sessionId,
-            toolCallId: call.toolCallId,
-            error: resultText,
-          });
-        } else {
-          await emit({
-            type: "tool_call_end",
-            seq: nextSeq(),
-            sessionId,
-            toolCallId: call.toolCallId,
-            result: resultText,
-          });
-        }
-
-        openCallIds.delete(call.toolCallId);
-        messages.push({
-          role: "tool",
-          type: "toolResponse",
-          toolCallId: call.toolCallId,
-          content: resultText,
-        });
-      };
-
-      // Parallel batch first (reads), then sequential calls one at a time
-      // (writes/bash), preserving the model's requested order within each
-      // group — never interleaved in a way that corrupts a shared file.
-      await Promise.all(parallel.map(runOne));
-      for (const call of sequential) {
-        if (signal.aborted) return end("cancelled");
-        await runOne(call);
-      }
+      if (outcome === "cancelled") return end("cancelled");
     }
   } catch (err) {
     if (signal.aborted) return end("cancelled");

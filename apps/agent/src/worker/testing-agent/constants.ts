@@ -1,0 +1,12 @@
+export const TESTING_MAX_ITERATIONS = 20;
+export const TESTING_DEADLINE_MS = 60_000;
+export const TESTING_MAX_COST_USD = 0.25;
+export const TESTING_MAX_TOKENS = 80_000;
+export const MAX_MUST_FIX = 8;
+export const MAX_FIX_CHARS = 180;
+export const MAX_NOTES_CHARS = 400;
+export const MAX_LISTED = 12;
+export const MAX_CHANGED_FILES = 20;
+export const MAX_PROMPT_BYTES = 8_000;
+export const DELEGATED_STATUS = "Delegated to Testing Agent";
+export const FINISHED_STATUS = "Testing Agent finished";

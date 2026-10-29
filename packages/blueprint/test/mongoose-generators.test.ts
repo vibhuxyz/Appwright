@@ -106,19 +106,11 @@ describe("generators emit Mongoose, never Prisma", () => {
 });
 
 describe("buildTaskPrompt standards", () => {
-  test("puts the standards before the task when provided", () => {
-    const prompt = buildTaskPrompt(taskWith({ title: "Seed", type: "seed" } as Partial<TaskDetail>), undefined, { standards: "STANDARDS BLOCK" });
-    expect(prompt.startsWith("STANDARDS BLOCK")).toBe(true);
+  test("names the task and its files without inlining the stack standards or the file tree", () => {
+    const prompt = buildTaskPrompt(taskWith({ title: "Seed", type: "seed" } as Partial<TaskDetail>), undefined);
     expect(prompt).toContain("Task: Seed");
-  });
-
-  test("lists the project tree without the ui primitives", () => {
-    const prompt = buildTaskPrompt(taskWith({ title: "Seed", type: "seed" } as Partial<TaskDetail>), undefined, {
-      projectTree: ["src/app/page.tsx", "src/components/ui/button.tsx"],
-    });
-    expect(prompt).toContain("- src/app/page.tsx");
-    expect(prompt).not.toContain("- src/components/ui/button.tsx");
-    expect(prompt).toContain("(+1 more, including the src/components/ui primitives)");
+    expect(prompt).not.toContain("Project files already on disk");
+    expect(prompt).not.toContain("PROJECT STACK AND STANDARDS");
   });
 
   test("adds the integration gateway only to tasks that call it", () => {

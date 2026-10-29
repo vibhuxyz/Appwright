@@ -20,10 +20,13 @@
 | No secret ever appears in an LLM prompt | D15 | env-injection at provision time | ⬜ needs a test that greps assembled prompts |
 | No code file is written that imports a package absent from `package.json` | D79 | `guardTools` (`tools/src/run-guard`) | ✅ `run-guard.test.ts` |
 | An existing file is never overwritten by `write_file` unless it was read in the same run | D79 | `guardTools` | ✅ `run-guard.test.ts` |
-| Project memory never exceeds `MAX_PROJECT_MEMORY_BYTES` and cannot close its own tag | D80, D33 | `formatProjectMemory` | ✅ `agent-core/test/project-memory.test.ts` |
+| Project memory never exceeds `MAX_PROJECT_MEMORY_BYTES` (1,200) and cannot close its own tag | D80, D86, D33 | `formatProjectMemory` | ✅ `agent-core/test/project-memory.test.ts` |
+| Replayed history is at most the last two turns; verification transcripts are omitted, and pure chat is omitted unless it is the current turn | D86, D82 | `historyMessages` | ✅ `apps/agent/test/history-messages.test.ts` |
+| A tool result in the loop never exceeds `MAX_TOOL_RESULT_BYTES` (12,288); after a successful edit, earlier reads of that file are a line-count placeholder | D86 | `truncate`, `replaceStaleReads` | ✅ `truncate.test.ts`, `replace-stale-reads.test.ts` |
+| A single-pass brief never exceeds `MAX_SINGLE_PASS_BRIEF_BYTES` (24,000); lower-priority prose is dropped first | D86 | `fitBriefLines` | ✅ `blueprint/test/single-pass.test.ts` |
 | A revert never deletes uncommitted work; it undoes exactly one saved turn or changes nothing | D83 | `revertTurn` preflight (dirty / not-on-branch / conflict) | ✅ `apps/api/test/revert-turn.test.ts` |
 | No `.env*` file except `.env.example` is ever committed by the platform | D83 | `commitTurn` pathspec | ✅ `apps/api/test/revert-turn.test.ts` |
-| Rows of a reverted turn never reach project memory or replayed history | D83 | `isInRevertedTurn` in `formatProjectMemory` and `historyMessages` | ✅ memory + history tests |
+| A reverted turn is not replayed in history and is not listed as confirmed work; memory quotes the request only under the reverted heading | D83, D86 | `isInRevertedTurn` in `formatProjectMemory` and `historyMessages` | ✅ memory + history + `apps/api/test/revert-turn.test.ts` |
 | A generated app receives only the pattern files its chosen sections need | D84 | `planPatternDelivery` | ✅ `ui-system/test/patterns.test.ts`, `blueprint/test/design-delivery.test.ts` |
 | Every catalog section with code renders its own `data-section` marker and guards motion with reduced motion | D84 | manifest + pattern source | ✅ `ui-system/test/patterns.test.ts` |
 | A browser repair runs at most once per turn and never reports a pass the recheck did not measure | D84 | `runBrowserRepair` | ✅ `apps/agent/test/browser-repair.test.ts` |

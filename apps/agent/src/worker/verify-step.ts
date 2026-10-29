@@ -1,3 +1,4 @@
+import type { VerificationResult } from "@repo/contracts";
 import {
   shouldRetryVerification,
   type VerifyOutcome,
@@ -18,7 +19,7 @@ export interface VerifyStepResult {
   outputText: string;
   shouldRetry: boolean;
   stuck: boolean;
-  results: unknown[];
+  results: VerificationResult[];
 }
 
 export async function runVerifyStep(

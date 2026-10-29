@@ -35,7 +35,19 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("src/components/ui/");
   });
 
-  test("appends the project memory only when there is one", async () => {
+  test("leaves the file tree out when a task run asks for the core only", async () => {
+    const prompt = await buildSystemPrompt(runtimeWith(["src/App.tsx", "src/components/ui/button.tsx"]), {
+      includeFileTree: false,
+      includeReference: false,
+      includeUiPrimitives: false,
+    });
+    expect(prompt).not.toContain("Project file tree");
+    expect(prompt).not.toContain("framer-motion");
+    expect(prompt).not.toContain("## UI system");
+    expect(prompt).toContain("Do not `read_file` or edit anything under `src/components/ui/`");
+  });
+
+  test("puts memory after the stable rules", async () => {
     const memorySection = "<project-memory>\n- src/App.tsx (1)\n</project-memory>";
     const withMemory = await buildSystemPrompt(runtimeWith(["src/App.tsx"]), { memorySection });
     const without = await buildSystemPrompt(runtimeWith(["src/App.tsx"]), { memorySection: "" });
