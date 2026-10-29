@@ -112,6 +112,19 @@ describe("formatProjectMemory", () => {
     expect(memory).toContain("## Files read earlier and never changed");
   });
 
+  test("names the newest turn commit next to the verification result", () => {
+    const sha = "a".repeat(8) + "b".repeat(32);
+    const memory = formatProjectMemory(emptyRows({
+      assistantRows: [
+        { data: { checkpoint: { sha, isTurnCommit: true } }, createdAt: AT },
+        { data: { checkpoint: { sha: "c".repeat(40), isTurnCommit: true } }, createdAt: AT },
+        { data: { verification: [{ ok: true, check: "tsc", errors: [] }] }, createdAt: AT },
+      ],
+    }));
+    expect(memory).toContain("- Last turn commit: aaaaaaaa (2026-10-25)\n- tsc: passed (2026-10-25)");
+    expect(memory).not.toContain("cccccccc");
+  });
+
   test("caps each section and reports the hidden count", () => {
     const toolCallRows = Array.from({ length: SECTION_LIMITS.changedFiles + 3 }, (_, i) =>
       toolCall("write_file", `src/f${String(i).padStart(3, "0")}.ts`));

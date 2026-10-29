@@ -10,7 +10,7 @@ export const SECTION_LIMITS = {
   assumed: 10,
   open: 10,
   tasks: 40,
-  verification: 4,
+  verification: 5,
   changedFiles: 40,
   acceptance: 20,
   pages: 15,
@@ -21,6 +21,7 @@ export const SECTION_LIMITS = {
 export const READ_TOOL = "read_file";
 export const CHANGE_TOOLS: ReadonlySet<string> = new Set(["write_file", "edit_file"]);
 
+export const SHORT_SHA_LENGTH = 8;
 export const VERIFICATION_RETRY_MARKER = "verificationRetry";
 
 export const MEMORY_PREAMBLE = [

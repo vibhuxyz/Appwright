@@ -1,4 +1,7 @@
+import { TurnCheckpointSchema } from "@repo/contracts";
 import { z } from "zod";
+
+export const CheckpointDataSchema = z.object({ checkpoint: TurnCheckpointSchema });
 
 export const IntentSchema = z.object({
   type: z.string(),

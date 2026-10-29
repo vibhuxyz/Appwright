@@ -1,6 +1,7 @@
 import type { ProjectMemoryRows } from "@repo/contracts";
-import { MAX_PATH_CHARS, VERIFICATION_RETRY_MARKER } from "./constants";
+import { MAX_PATH_CHARS, SHORT_SHA_LENGTH, VERIFICATION_RETRY_MARKER } from "./constants";
 import {
+  CheckpointDataSchema,
   FeaturesSchema,
   IntentSchema,
   OwnsSchema,
@@ -58,6 +59,14 @@ export function taskItems(blueprint: Blueprint): string[] {
     const owns = parseOr(OwnsSchema, task.owns, []).map((path) => flatten(path, MAX_PATH_CHARS));
     return `[${task.status}] ${flatten(task.title)}${owns.length > 0 ? ` — owns: ${owns.join(", ")}` : ""}`;
   });
+}
+
+export function lastCommitItems(assistantRows: ProjectMemoryRows["assistantRows"]): string[] {
+  for (const row of assistantRows) {
+    const parsed = CheckpointDataSchema.safeParse(row.data);
+    if (parsed.success) return [`Last turn commit: ${parsed.data.checkpoint.sha.slice(0, SHORT_SHA_LENGTH)} (${isoDate(row.createdAt)})`];
+  }
+  return [];
 }
 
 export function verificationItems(assistantRows: ProjectMemoryRows["assistantRows"]): string[] {
