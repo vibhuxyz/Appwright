@@ -13,6 +13,7 @@ import { ALL_TOOLS, guardTools } from "@repo/tools";
 import type { FencedAttemptInput, GeneratedAttempt, TaskGenerator } from "orchestrator";
 import { loadDesignSkills } from "./art-direction";
 import { buildTaskPrompt } from "./build-task-prompt";
+import { buildRetryPrompt, isVerificationFailure } from "./retry-prompt";
 import { generateAdminCrudAttempt } from "./generate-admin-crud-attempt";
 import { generateDataModelAttempt } from "./generate-data-model-attempt";
 import { generateDeployAttempt } from "./generate-deploy-attempt";
@@ -103,7 +104,13 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
       const guard = guardTools(ALL_TOOLS);
       const stopReason = await runAgentLoop({
         messages: [
-          { role: "user", type: "text", content: buildTaskPrompt(task, input.previousError, { standards, projectTree, skills: skills.text }) },
+          {
+            role: "user",
+            type: "text",
+            content: isVerificationFailure(input.previousError)
+              ? buildRetryPrompt(task, input.previousError)
+              : buildTaskPrompt(task, input.previousError, { standards, projectTree, skills: skills.text }),
+          },
         ],
         tools: guard.tools,
         provider: primary ?? new OpenAiProvider({ model }),

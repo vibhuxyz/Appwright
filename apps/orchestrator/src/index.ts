@@ -49,6 +49,7 @@ export {
   runPersistedRun,
   DEFAULT_MAX_ATTEMPTS_PER_TASK,
   DEFAULT_MAX_CONCURRENT_TASKS,
+  VERIFICATION_FAILED_PREFIX,
   type FencedAttemptInput,
   type GeneratedAttempt,
   type PersistedRunOptions,

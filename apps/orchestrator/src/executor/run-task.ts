@@ -1,3 +1,4 @@
+import { VERIFICATION_FAILED_PREFIX } from "./constants";
 import type {
   AttemptOutcome,
   AttemptRecord,
@@ -42,7 +43,7 @@ async function verifyOutcome(
   return {
     kind: "failed",
     costCents: outcome.costCents,
-    error: `Verification failed: ${verdict.error}`,
+    error: `${VERIFICATION_FAILED_PREFIX}${verdict.error}`,
   };
 }
 
