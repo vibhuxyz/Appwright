@@ -18,9 +18,11 @@ export {
   PromptAnalysisSchema,
   SuggestedPathSchema,
   hashPrompt,
+  hasPlanFeedbackData,
+  isAnalysisFresh,
   storedPromptText,
 } from "./prompt-analysis";
-export type { AnalysisIntent, ErrorHintFile, ExtractedHints, PromptAnalysis, SuggestedPath } from "./prompt-analysis";
+export type { AnalysisFreshnessSignals, AnalysisIntent, ErrorHintFile, ExtractedHints, PromptAnalysis, SuggestedPath } from "./prompt-analysis";
 export { BROWSER_CHECK_OPENING, browserCheckStatus, isBrowserCheckStatus } from "./browser-check-status";
 export { PlannedSectionSchema, SECTION_PLAN_LIMITS } from "./section-plan.schema";
 export type { PlannedSection, SectionPurpose, SectionSurface, SectionWidth } from "./section-plan.schema";

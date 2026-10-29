@@ -47,6 +47,7 @@ import { recordTurnCommit } from "./record-turn-commit";
 import { reportSandboxStartFailure } from "./report-sandbox-start-failure";
 import { runBlueprintPath } from "./run-blueprint-path";
 import { shouldRunBlueprintPath } from "./should-run-blueprint";
+import { freshStoredAnalysis } from "./stored-analysis";
 import type { AgentJobResult } from "./types";
 import { runVerifyStep } from "./verify-step";
 
@@ -177,8 +178,10 @@ export async function executeAgentJob(
 
     const turnRows = currentTurnRows(priorRows);
     const approvedBlueprintId = approvedBlueprintIdFromRows(turnRows);
+    const storedAnalysis = await freshStoredAnalysis(job.analysis, turnRows);
+    log.info("routing analysis", { sessionId: session.id, reused: storedAnalysis !== undefined });
     const planInDetail = await shouldRunBlueprintPath(
-      { theme: chosenThemeFromRows(turnRows), approvedBlueprintId },
+      { theme: chosenThemeFromRows(turnRows), approvedBlueprintId, analysis: storedAnalysis },
       () =>
         classify(
           currentTurnText(effectiveRows),

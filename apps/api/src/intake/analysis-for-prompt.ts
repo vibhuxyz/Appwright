@@ -1,9 +1,10 @@
-import { ANALYZE_PROMPT_VERSION, hashPrompt, type PromptAnalysis } from "@repo/contracts";
+import { hashPrompt, isAnalysisFresh, type PromptAnalysis } from "@repo/contracts";
 
 export async function analysisForPrompt(
   analysis: PromptAnalysis | undefined,
-  prompt: string,
+  turn: { prompt: string; hasPlanFeedback: boolean },
 ): Promise<PromptAnalysis | undefined> {
-  if (!analysis || analysis.promptVersion !== ANALYZE_PROMPT_VERSION) return undefined;
-  return analysis.promptHash === (await hashPrompt(prompt)) ? analysis : undefined;
+  if (!analysis) return undefined;
+  const isFresh = isAnalysisFresh(analysis, { promptHash: await hashPrompt(turn.prompt), hasPlanFeedback: turn.hasPlanFeedback });
+  return isFresh ? analysis : undefined;
 }

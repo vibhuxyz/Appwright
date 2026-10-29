@@ -1,3 +1,4 @@
+import type { PromptAnalysis } from "@repo/contracts";
 import type { DecisionResult, ExecutionMode } from "./types";
 
 // Still not a general policy engine — project/component-level config has no
@@ -65,6 +66,14 @@ export function isNewBuildRequest(result: DecisionResult): boolean {
 // Same fail-closed rule as resolvePolicy: anything other than a confident,
 // accepted "create" reads as "no plan" and falls through to the existing
 // single-pass path, which already handles everything safely.
+export function analysisNeedsDetailedPlan(analysis: PromptAnalysis): boolean {
+  return (
+    analysis.intent === "create" &&
+    analysis.complexity >= MIN_COMPLEXITY_FOR_PLAN &&
+    analysis.confidence >= MIN_CONFIDENCE_FOR_INTENT
+  );
+}
+
 export function needsDetailedPlan(result: DecisionResult): boolean {
   if (result.status !== "accepted") return false;
   const { decision } = result;

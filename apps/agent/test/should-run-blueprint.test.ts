@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import type { ThemeOption } from "@repo/contracts";
+import type { PromptAnalysis, ThemeOption } from "@repo/contracts";
 import { UNKNOWN_DECISION, type Decision, type DecisionResult } from "@repo/decision-engine";
 import { shouldRunBlueprintPath } from "../src/worker/should-run-blueprint";
 
@@ -52,13 +52,13 @@ function classifierReturning(result: DecisionResult) {
   return { classifyTurn, calls };
 }
 
-const noSignals = { theme: undefined, approvedBlueprintId: undefined };
+const noSignals = { theme: undefined, approvedBlueprintId: undefined, analysis: undefined };
 
 describe("shouldRunBlueprintPath", () => {
   it("always plans after the user picks a design system, without classifying", async () => {
     const { classifyTurn, calls } = classifierReturning({ status: "invalid", decision: UNKNOWN_DECISION });
     expect(
-      await shouldRunBlueprintPath({ theme, approvedBlueprintId: undefined }, classifyTurn),
+      await shouldRunBlueprintPath({ theme, approvedBlueprintId: undefined, analysis: undefined }, classifyTurn),
     ).toBe(true);
     expect(calls).toHaveLength(0);
   });
@@ -68,7 +68,7 @@ describe("shouldRunBlueprintPath", () => {
       accepted({ intent: "create", complexity: 4, confidence: 0.9 }),
     );
     expect(
-      await shouldRunBlueprintPath({ theme: undefined, approvedBlueprintId: "bp-1" }, classifyTurn),
+      await shouldRunBlueprintPath({ theme: undefined, approvedBlueprintId: "bp-1", analysis: undefined }, classifyTurn),
     ).toBe(true);
     expect(calls).toHaveLength(0);
   });
@@ -85,4 +85,34 @@ describe("shouldRunBlueprintPath", () => {
     );
     expect(await shouldRunBlueprintPath(noSignals, classifyTurn)).toBe(true);
   });
+
+  it("trusts a fresh stored analysis instead of classifying again", async () => {
+    const { classifyTurn, calls } = classifierReturning(accepted({}));
+    const signals = { ...noSignals, analysis: analysisWith({ intent: "create", complexity: 8 }) };
+    expect(await shouldRunBlueprintPath(signals, classifyTurn)).toBe(true);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("keeps a small stored change on the direct loop without classifying", async () => {
+    const { classifyTurn, calls } = classifierReturning(accepted({ intent: "create", complexity: 9 }));
+    const signals = { ...noSignals, analysis: analysisWith({ intent: "debug", complexity: 2 }) };
+    expect(await shouldRunBlueprintPath(signals, classifyTurn)).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
 });
+
+function analysisWith(overrides: Partial<PromptAnalysis>): PromptAnalysis {
+  return {
+    intent: "modify",
+    confidence: 0.9,
+    complexity: 3,
+    ambiguity: 1,
+    needsQuestions: false,
+    suggestedPath: "send-direct",
+    extractedHints: { files: [], errorLines: [], mentionedFeatures: [] },
+    source: "model",
+    promptHash: "0".repeat(64),
+    promptVersion: "analyze@1",
+    ...overrides,
+  };
+}

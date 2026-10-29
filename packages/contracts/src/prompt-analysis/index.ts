@@ -14,3 +14,5 @@ export type {
   SuggestedPath,
 } from "./schema";
 export { hashPrompt, storedPromptText } from "./prompt-hash";
+export { isAnalysisFresh, type AnalysisFreshnessSignals } from "./is-fresh";
+export { hasPlanFeedbackData } from "./plan-feedback";

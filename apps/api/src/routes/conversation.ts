@@ -219,7 +219,7 @@ conversationRouter.post("/conversation", async (req, res) => {
     selection: body.selection,
     blueprintId: body.blueprintId,
     planFeedback: body.planFeedback,
-    analysis: await analysisForPrompt(body.analysis, prompt),
+    analysis: await analysisForPrompt(body.analysis, { prompt, hasPlanFeedback: Boolean(body.planFeedback?.length) }),
   });
   res.status(202).json({ jobId: job.id, sessionId: session.id });
 });

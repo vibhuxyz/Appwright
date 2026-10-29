@@ -24,7 +24,7 @@ export {
   type ErrorHints,
   type PromptAnalysisReading,
 } from "./analyze";
-export { resolvePolicy, needsDetailedPlan, isNewBuildRequest, isChatRequest } from "./policy";
+export { resolvePolicy, analysisNeedsDetailedPlan, needsDetailedPlan, isNewBuildRequest, isChatRequest } from "./policy";
 export { shouldRetryVerification, type VerifyOutcome } from "./verify";
 export {
   isDeniedInMode,
