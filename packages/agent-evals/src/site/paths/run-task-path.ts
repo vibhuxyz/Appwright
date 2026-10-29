@@ -2,6 +2,7 @@ import { buildTaskDetail, createRunTaskGenerator, type TaskDetail } from "@repo/
 import { generateDependencyManifest } from "@repo/planner";
 import { runTsc } from "@repo/verify";
 import {
+  DEFAULT_MAX_ATTEMPTS_PER_TASK,
   DEFAULT_MAX_CONCURRENT_TASKS,
   createPostgresPorts,
   executeRun,
@@ -70,15 +71,17 @@ export async function runTaskPath(context: PathContext): Promise<PathOutcome> {
     ports,
     {
       maxConcurrent: DEFAULT_MAX_CONCURRENT_TASKS,
-      maxAttemptsPerTask: TASK_MAX_ATTEMPTS,
+      maxAttemptsPerTask: context.repair === "production" ? DEFAULT_MAX_ATTEMPTS_PER_TASK : TASK_MAX_ATTEMPTS,
       budgetCents: Math.ceil(context.generationCapUsd * CENTS_PER_USD),
       estimatedCostCents: 0,
       retryFailed: false,
     },
     AbortSignal.any([signal, deadline]),
   );
+  const attemptedTaskIds = new Set(store.attempts.map((attempt) => attempt.taskId));
   return {
     stopReason: summary.outcome,
+    repairRounds: store.attempts.length - attemptedTaskIds.size,
     toolCalls: collector.toolCalls().map((call) => ({ name: call.name, isError: call.isError })),
     errors: collector.events.flatMap((event) => (event.type === "error" ? [event.message] : [])),
     deliveredFiles: [],

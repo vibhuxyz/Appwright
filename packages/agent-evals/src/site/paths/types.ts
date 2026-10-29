@@ -1,5 +1,6 @@
 import type { Provider, Runtime } from "@repo/agent-core";
 import type { Plan } from "@repo/planner";
+import type { RepairMode } from "../types";
 
 export interface PathContext {
   readonly plan: Plan;
@@ -9,6 +10,7 @@ export interface PathContext {
   readonly provider: Provider;
   readonly signal: AbortSignal;
   readonly generationCapUsd: number;
+  readonly repair: RepairMode;
 }
 
 export interface ToolCallSummary {
@@ -18,6 +20,7 @@ export interface ToolCallSummary {
 
 export interface PathOutcome {
   readonly stopReason: string;
+  readonly repairRounds: number;
   readonly toolCalls: readonly ToolCallSummary[];
   readonly errors: readonly string[];
   readonly deliveredFiles: readonly string[];

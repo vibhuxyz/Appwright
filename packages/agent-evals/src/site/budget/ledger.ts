@@ -3,7 +3,6 @@ import type { SpendEntry } from "../types";
 export interface SpendCaps {
   readonly generationUsd: number;
   readonly totalUsd: number;
-  readonly priorSpentUsd?: number;
 }
 
 export class BudgetExceededError extends Error {
@@ -47,7 +46,7 @@ export class SpendLedger {
   }
 
   totalSpentUsd(): number {
-    return (this.caps.priorSpentUsd ?? 0) + this.allEntries.reduce((sum, entry) => sum + entry.costUsd, 0);
+    return this.allEntries.reduce((sum, entry) => sum + entry.costUsd, 0);
   }
 
   entriesFor(label: string): SpendEntry[] {

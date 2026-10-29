@@ -1,6 +1,7 @@
 import type { Blueprint } from "@repo/contracts";
 
 export type SiteGroup = "A" | "B" | "C";
+export type RepairMode = "off" | "production";
 export type ArtDirection = "fashion" | "saas" | "portfolio" | "local-business";
 
 export interface SiteBrief {

@@ -7,7 +7,7 @@ import { AppFailedError, captureSite, findMissingImports, readWorkspaceSource } 
 import { MAX_GENERATION_COST_USD } from "../constants";
 import { GROUP_CONFIGS } from "../groups";
 import { prepareWorkspace, runSinglePassPath, runTaskPath, type PathOutcome } from "../paths";
-import type { SiteBrief, SiteGroup } from "../types";
+import type { RepairMode, SiteBrief, SiteGroup } from "../types";
 import type { FailureKind, GenerationResult, PromptRecord } from "./result-types";
 import { writeGenerationResult } from "./write-result";
 
@@ -15,6 +15,7 @@ const PROMPT_ROLES = new Set(["user", "system"]);
 const MAX_PROMPT_MESSAGES_SCANNED = 3;
 const EMPTY_OUTCOME: PathOutcome = {
   stopReason: "not-run",
+  repairRounds: 0,
   toolCalls: [],
   errors: [],
   deliveredFiles: [],
@@ -32,6 +33,7 @@ export interface RunGenerationInput {
   readonly templatesRoot: string;
   readonly workspacesRoot: string;
   readonly signal: AbortSignal;
+  readonly repair: RepairMode;
 }
 
 function collectPrompts(into: Map<string, PromptRecord>): (messages: Message[]) => void {
@@ -72,6 +74,7 @@ export async function runGeneration(input: RunGenerationInput): Promise<Generati
       provider,
       signal: input.signal,
       generationCapUsd: MAX_GENERATION_COST_USD,
+      repair: input.repair,
     });
     if (outcome.stopReason !== "completed") failure = { kind: "generation", message: `Generation stopped: ${outcome.stopReason}` };
   } catch (error) {
