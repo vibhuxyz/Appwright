@@ -1,4 +1,3 @@
-import { isRepairPrompt } from "@repo/contracts";
 import { useMemo, useState } from "react";
 import type { Session } from "../schemas/agentSchemas";
 import { useAgentStore } from "../store/agentStore";
@@ -68,10 +67,9 @@ export function ChatPane({
     draft.clear();
     uploads.clearAttachments();
     const selection = selectionStore.getState().selection;
-    const alreadyTalking = messages.some((message) => message.role === "user");
-    if (selection) selectionStore.getState().clearSelection();
-    if (selection || alreadyTalking || isRepairPrompt(prompt)) {
-      intake.sendNow(prompt, selection ?? undefined, activeAttachments);
+    if (selection) {
+      selectionStore.getState().clearSelection();
+      intake.sendNow(prompt, selection, activeAttachments);
       return;
     }
     intake.ask(prompt, activeAttachments);

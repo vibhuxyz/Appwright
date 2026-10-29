@@ -4,7 +4,8 @@ const CONVERSATIONAL_WORDS: ReadonlySet<string> = new Set([
   "h", "hi", "hy", "hii", "hiii", "hey", "heyy", "hello", "helo", "hallo", "yo", "sup", "hola", "namaste",
   "good", "morning", "afternoon", "evening", "night", "there", "bro", "buddy", "friend", "team",
   "how", "are", "you", "u", "r", "doing", "going", "whats", "what", "s", "up", "is", "new",
-  "i", "am", "m", "fine", "well", "great", "ok", "okay", "cool", "nice", "thanks", "thank", "thx", "bye",
+  "i", "am", "m", "fine", "well", "great", "ok", "okay", "cool", "nice", "thanks", "thank", "thx", "ty", "bye",
+  "looks", "look", "lgtm", "awesome", "perfect", "it",
   "who", "can", "do", "test", "testing", "please", "again", "so", "much", "very",
 ]);
 

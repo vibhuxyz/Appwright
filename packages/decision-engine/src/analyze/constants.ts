@@ -1,0 +1,5 @@
+export const ANALYZE_TIMEOUT_MS = 10_000;
+export const MAX_ANALYZED_PROMPT_CHARS = 6_000;
+export const MAX_RECENT_MESSAGES = 2;
+export const MAX_RECENT_MESSAGE_CHARS = 600;
+export const MIN_CONFIDENCE_FOR_ROUTE = 0.5;

@@ -4,6 +4,7 @@ import {
   type Attachment,
   type PlanPreviewRequest,
   type ElementSelection,
+  type PromptAnalysis,
   type PromptAnswerValue,
   type PromptQuestion,
   type ThemeOption,
@@ -30,6 +31,7 @@ export interface SendMessagePayload {
   blueprintId?: string;
   planFeedback?: readonly string[];
   attachments?: readonly Attachment[];
+  analysis?: PromptAnalysis;
 }
 
 export const agentApi = {

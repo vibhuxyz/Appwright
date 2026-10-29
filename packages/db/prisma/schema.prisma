@@ -496,6 +496,7 @@ model Job {
   // in-memory LeaseManager only protects against a stall inside one process.
   leaseExpiresAt DateTime?
   error      String?
+  analysis   Json?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @default(now()) @updatedAt
 

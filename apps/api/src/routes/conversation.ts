@@ -10,7 +10,7 @@ import { worktreeSessionIdOf } from "@repo/workspace";
 import { Router } from "express";
 import { requireAuthAllowingQueryToken } from "@repo/auth";
 import { setTraceContext } from "@repo/logger";
-import { IntakeQuestionsError, persistChatTurn, runIntakeRound } from "../intake";
+import { analysisForPrompt, IntakeQuestionsError, persistChatTurn, runIntakeRound } from "../intake";
 import { log } from "../log";
 import { ownedBlueprintSessionId, ownedSessionProjectId } from "../ownership";
 import { attachSseClient, publishIntakeProgress, publishStatus } from "../stream/sse";
@@ -113,7 +113,7 @@ conversationRouter.post("/conversation/questions", async (req, res) => {
     log.info("intake questions model", { userId: req.userId, model: provider.model, provider: providerFor(provider.model) });
     const sessionId = parsed.data.sessionId;
     const projectId = sessionId ? await ownedSessionProjectId(sessionId, req.userId!) : null;
-    const { questions, action, reply } = await runIntakeRound({
+    const { questions, action, reply, analysis } = await runIntakeRound({
       request: parsed.data,
       projectId,
       provider,
@@ -124,7 +124,7 @@ conversationRouter.post("/conversation/questions", async (req, res) => {
     if (action === "reply" && reply && sessionId) {
       await persistChatTurn({ sessionId, prompt: parsed.data.prompt, reply });
     }
-    const body = PromptQuestionsResponse.safeParse({ questions, action });
+    const body = PromptQuestionsResponse.safeParse({ questions, action, analysis });
     if (!body.success) {
       throw new IntakeQuestionsError(
         "GENERATION_FAILED",
@@ -219,6 +219,7 @@ conversationRouter.post("/conversation", async (req, res) => {
     selection: body.selection,
     blueprintId: body.blueprintId,
     planFeedback: body.planFeedback,
+    analysis: await analysisForPrompt(body.analysis, prompt),
   });
   res.status(202).json({ jobId: job.id, sessionId: session.id });
 });

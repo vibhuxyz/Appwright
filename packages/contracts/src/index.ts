@@ -8,6 +8,19 @@ export * from "./theme";
 export * from "./user.schema";
 export * from "./blueprint.schema";
 export { isRepairPrompt } from "./repair-prompt";
+export { isConversationalMessage, looksLikeBuildRequest } from "./conversational-message";
+export {
+  ANALYZE_PROMPT_VERSION,
+  PROMPT_ANALYSIS_LIMITS,
+  AnalysisIntentSchema,
+  ErrorHintFileSchema,
+  ExtractedHintsSchema,
+  PromptAnalysisSchema,
+  SuggestedPathSchema,
+  hashPrompt,
+  storedPromptText,
+} from "./prompt-analysis";
+export type { AnalysisIntent, ErrorHintFile, ExtractedHints, PromptAnalysis, SuggestedPath } from "./prompt-analysis";
 export { BROWSER_CHECK_OPENING, browserCheckStatus, isBrowserCheckStatus } from "./browser-check-status";
 export { PlannedSectionSchema, SECTION_PLAN_LIMITS } from "./section-plan.schema";
 export type { PlannedSection, SectionPurpose, SectionSurface, SectionWidth } from "./section-plan.schema";

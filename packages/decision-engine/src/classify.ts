@@ -12,7 +12,7 @@ const COMPONENT_OPTIONS = ComponentSchema.options
   .map((name) => `"${name}"`)
   .join("|");
 
-const PROMPT = `Classify the user's request below. Use intent "chat" when the message is a greeting, small talk, a thank-you, or a question that needs no change to the project (for example "hi", "hy how are you", "what can you do?"). Use "create" only when the user asks for a new app or site to be built. Reply with ONLY a JSON object, no prose, matching:
+export const CLASSIFY_INSTRUCTIONS = `Classify the user's request below. Use intent "chat" when the message is a greeting, small talk, a thank-you, or a question that needs no change to the project (for example "hi", "hy how are you", "what can you do?"). Use "create" only when the user asks for a new app or site to be built. Reply with ONLY a JSON object, no prose, matching:
 {"intent": "chat"|"create"|"modify"|"debug"|"delete"|"test"|"unknown",
  "changeType": "style"|"text"|"component"|"api"|"database"|"config"|"unknown",
  "risk": "low"|"medium"|"high",
@@ -20,10 +20,7 @@ const PROMPT = `Classify the user's request below. Use intent "chat" when the me
  "component": ${COMPONENT_OPTIONS} (the existing UI primitive this request most directly targets — never a name outside this list; use "none" if no single primitive applies, e.g. backend work or a change spanning many components),
  "complexity": number 0-10 (0 = trivial one-line edit, 10 = major cross-cutting change),
  "ambiguity": number 0-10 (0 = fully specified, 10 = no actionable detail),
- "confidence": number between 0 and 1}
-
-Request:
-`;
+ "confidence": number between 0 and 1}`;
 
 // The placeholder Decision carried by a non-"accepted" DecisionResult.
 // Never read directly for policy — resolvePolicy() checks `status` first
@@ -54,35 +51,55 @@ export async function classify(
   provider: Provider,
   signal: AbortSignal = AbortSignal.timeout(CLASSIFY_TIMEOUT_MS),
 ): Promise<DecisionResult> {
+  const { result } = await readDecision(`${CLASSIFY_INSTRUCTIONS}\n\nRequest:\n${message}`, provider, signal);
+  return result;
+}
+
+export interface DecisionReading {
+  result: DecisionResult;
+  json: unknown;
+}
+
+async function streamText(content: string, provider: Provider, signal: AbortSignal): Promise<string> {
   let text = "";
-  try {
-    for await (const chunk of provider.stream(
-      [{ role: "user", type: "text", content: `${PROMPT}${message}` }],
-      [],
-      { signal },
-    )) {
-      if (chunk.type === "text_delta") text += chunk.delta;
-    }
-  } catch (error) {
-    return {
-      status: "provider_error",
-      decision: UNKNOWN_DECISION,
-      errorMessage: error instanceof Error ? error.message : String(error),
-    };
+  for await (const chunk of provider.stream([{ role: "user", type: "text", content }], [], { signal })) {
+    if (chunk.type === "text_delta") text += chunk.delta;
   }
+  return text;
+}
 
+function parseJson(text: string): unknown {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) return { status: "invalid", decision: UNKNOWN_DECISION };
-
+  if (!jsonMatch) return undefined;
   try {
-    const parsed = DecisionSchema.safeParse(JSON.parse(jsonMatch[0]));
-    if (!parsed.success) return { status: "invalid", decision: UNKNOWN_DECISION };
-    if (parsed.data.confidence < 0.5) {
-      return { status: "low_confidence", decision: parsed.data };
-    }
-    return { status: "accepted", decision: parsed.data };
-  } catch {
-    return { status: "invalid", decision: UNKNOWN_DECISION };
+    return JSON.parse(jsonMatch[0]);
+  } catch (error) {
+    if (error instanceof SyntaxError) return undefined;
+    throw error;
   }
 }
 
+export async function readDecision(
+  content: string,
+  provider: Provider,
+  signal: AbortSignal,
+): Promise<DecisionReading> {
+  let text: string;
+  try {
+    text = await streamText(content, provider, signal);
+  } catch (error) {
+    return {
+      result: {
+        status: "provider_error",
+        decision: UNKNOWN_DECISION,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      },
+      json: undefined,
+    };
+  }
+  const json = parseJson(text);
+  const parsed = DecisionSchema.safeParse(json);
+  if (!parsed.success) return { result: { status: "invalid", decision: UNKNOWN_DECISION }, json };
+  if (parsed.data.confidence < 0.5) return { result: { status: "low_confidence", decision: parsed.data }, json };
+  return { result: { status: "accepted", decision: parsed.data }, json };
+}

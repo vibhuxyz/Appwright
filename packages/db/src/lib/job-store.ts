@@ -1,14 +1,19 @@
 import { prisma } from "./prisma";
-import type { Job } from "../../generated/prisma/client";
+import type { Job, Prisma } from "../../generated/prisma/client";
 
 const TERMINAL_STATUSES: Job["status"][] = ["SUCCEEDED", "FAILED", "CANCELLED"];
 
 export async function enqueueJob(input: {
   sessionId: string;
   projectId: string;
+  analysis?: Prisma.InputJsonObject;
 }): Promise<Job> {
   return prisma.job.create({
-    data: { sessionId: input.sessionId, projectId: input.projectId },
+    data: {
+      sessionId: input.sessionId,
+      projectId: input.projectId,
+      ...(input.analysis ? { analysis: input.analysis } : {}),
+    },
   });
 }
 

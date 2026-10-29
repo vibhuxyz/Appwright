@@ -5,6 +5,7 @@ import {
   isDecideForMe,
   type Attachment,
   type ElementSelection,
+  type PromptAnalysis,
   type ThemeOption,
 } from "@repo/contracts";
 import { enqueueJob, prisma, type Job, type Prisma } from "@repo/db";
@@ -33,6 +34,7 @@ export interface EnqueueConversationOptions {
   selection?: ElementSelection;
   blueprintId?: string;
   planFeedback?: readonly string[];
+  analysis?: PromptAnalysis;
 }
 
 export async function recordRequirementTurns<T>(
@@ -77,6 +79,7 @@ export async function enqueueConversation(
     selection,
     blueprintId,
     planFeedback,
+    analysis,
   } = opts;
 
   const lastMessage = await prisma.message.findFirst({
@@ -129,5 +132,5 @@ export async function enqueueConversation(
     await persistTurn({ role: "user", type: "text", content: PLAN_APPROVED_AUTO_DESIGN_TEXT, data: { intake: true, ...planChoice } });
   }
   await createSessionWorktree(projectId, worktreeSessionId);
-  return enqueueJob({ sessionId, projectId });
+  return enqueueJob({ sessionId, projectId, analysis });
 }

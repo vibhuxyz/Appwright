@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { FakeProvider, type Provider } from "@repo/agent-core";
-import { intakeAction } from "../src/intake";
-import { promptKind } from "../src/intake/prompt-kind";
+import { intakeAction, runIntakeRound } from "../src/intake";
 import { replyToChat } from "../src/intake/reply-to-chat";
 
 function throwingProvider(message: string): Provider {
@@ -18,30 +17,46 @@ const CHAT_DECISION = JSON.stringify({
   component: "none", complexity: 0, ambiguity: 0, confidence: 0.95,
 });
 
-describe("promptKind", () => {
-  it("answers a greeting without calling the model", async () => {
-    expect(await promptKind("hy how are you", throwingProvider("must not be called"))).toBe("chat");
+const TWEAK_DECISION = JSON.stringify({
+  intent: "modify", changeType: "style", risk: "low", route: "none",
+  component: "none", complexity: 1, ambiguity: 0, confidence: 0.9,
+});
+
+function roundFor(prompt: string, provider: Provider) {
+  return runIntakeRound({ request: { prompt }, projectId: null, provider, onProgress: () => {} });
+}
+
+describe("intakeAction", () => {
+  it("replies in chat only when the session can take a chat reply", () => {
+    expect(intakeAction("reply", { canReplyInChat: true })).toBe("reply");
+    expect(intakeAction("reply", { canReplyInChat: false })).toBe("send");
   });
 
-  it("treats a model chat verdict as chat", async () => {
-    const provider = new FakeProvider([{ kind: "text", text: CHAT_DECISION }]);
-    expect(await promptKind("what can you actually do for me", provider)).toBe("chat");
-  });
-
-  it("falls back to keywords when the model is down", async () => {
-    expect(await promptKind("build a bakery website", throwingProvider("503"))).toBe("new-app");
-    expect(await promptKind("tell me a joke about cats", throwingProvider("503"))).toBe("other");
+  it("maps plan and direct sends", () => {
+    expect(intakeAction("plan", { canReplyInChat: true })).toBe("plan");
+    expect(intakeAction("send-direct", { canReplyInChat: true })).toBe("send");
   });
 });
 
-describe("intakeAction chat", () => {
-  it("replies to chat even in a project that already has an app", () => {
-    expect(intakeAction({ prompt: "thanks", isFollowUp: true, isNewApp: false, isChat: true })).toBe("reply");
+describe("runIntakeRound", () => {
+  it("sends a chat verdict when there is no project to reply in", async () => {
+    const round = await roundFor("what can you actually do for me", new FakeProvider([{ kind: "text", text: CHAT_DECISION }]));
+    expect(round.action).toBe("send");
+    expect(round.analysis?.suggestedPath).toBe("reply");
   });
 
-  it("never replies to a repair prompt", () => {
-    const prompt = "fix why getting this error, app is not starting";
-    expect(intakeAction({ prompt, isFollowUp: false, isNewApp: false, isChat: true })).toBe("send");
+  it("sends a small tweak with its analysis attached", async () => {
+    const round = await roundFor("make the button blue", new FakeProvider([{ kind: "text", text: TWEAK_DECISION }]));
+    expect(round.action).toBe("send");
+    expect(round.questions).toEqual([]);
+    expect(round.analysis?.intent).toBe("modify");
+  });
+
+  it("sends a pasted error straight to the agent even when the model is down", async () => {
+    const round = await roundFor("TypeError: x is undefined, fix it", throwingProvider("503"));
+    expect(round.action).toBe("send");
+    expect(round.analysis?.source).toBe("fallback");
+    expect(round.analysis?.intent).toBe("debug");
   });
 });
 

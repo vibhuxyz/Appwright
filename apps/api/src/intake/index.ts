@@ -3,10 +3,10 @@ export {
   IntakeQuestionsError,
   QUESTIONS_TIMEOUT_MS,
 } from "./generate-questions";
-export { isNewAppRequest } from "./is-new-app-request";
 export { projectHasBuiltApp } from "./has-built-app";
-export { intakeAction, isRepairPrompt, type IntakeAction } from "./repair-prompt";
+export { intakeAction, type IntakeAction } from "./intake-action";
 export { INTAKE_PROGRESS, type IntakeProgress } from "./progress-steps";
 export { runIntakeRound } from "./run-intake-round";
 export { persistChatTurn } from "./persist-chat-turn";
 export { withCreativeChoiceQuestions } from "./with-creative-choice-questions";
+export { analysisForPrompt } from "./analysis-for-prompt";

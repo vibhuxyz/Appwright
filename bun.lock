@@ -329,6 +329,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@repo/agent-core": "workspace:*",
+        "@repo/contracts": "workspace:*",
         "@repo/ui-system": "workspace:*",
         "zod": "^4.4.3",
       },

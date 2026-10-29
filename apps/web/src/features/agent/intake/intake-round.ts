@@ -95,6 +95,7 @@ export function fetchRound(
         prompt,
         ...(activeAttachments && activeAttachments.length > 0 ? { attachments: activeAttachments } : {}),
         ...(asked.length > 0 ? { answers, questions: asked } : {}),
+        ...(round.analysis ? { analysis: round.analysis } : {}),
       });
     },
     (error: unknown) => {

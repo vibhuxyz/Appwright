@@ -1,30 +1,15 @@
 import { describe, expect, it } from "bun:test";
-import { intakeAction, isRepairPrompt } from "../src/intake";
+import { isRepairPrompt } from "@repo/contracts";
 
 describe("repair prompts", () => {
   it("treats a preview failure as a fix, not a new site", () => {
     const prompt =
       '{"error":{"code":"BAD_GATEWAY","message":"preview server unreachable"}} fix why getting this why app is not starting';
     expect(isRepairPrompt(prompt)).toBe(true);
-    expect(intakeAction({ prompt, isFollowUp: false, isNewApp: true })).toBe("send");
   });
 
-  it("still plans a new app", () => {
-    const prompt = "build a bakery website with a menu";
-    expect(isRepairPrompt(prompt)).toBe(false);
-    expect(intakeAction({ prompt, isFollowUp: false, isNewApp: true })).toBe("plan");
-  });
-
-  it("sends a follow-up on a project that already has a plan", () => {
-    expect(intakeAction({ prompt: "change the header", isFollowUp: true, isNewApp: true })).toBe("send");
-  });
-
-  it("plans a simple new landing page", () => {
-    expect(intakeAction({ prompt: "landing page for my design studio", isFollowUp: false, isNewApp: true })).toBe("plan");
-  });
-
-  it("sends a small tweak without opening a plan", () => {
-    expect(intakeAction({ prompt: "make the button blue", isFollowUp: false, isNewApp: false })).toBe("send");
+  it("does not treat a new app request as a fix", () => {
+    expect(isRepairPrompt("build a bakery website with a menu")).toBe(false);
   });
 
   it("treats a pasted hydration error as a fix, including the word fixing", () => {
@@ -36,6 +21,5 @@ src/components/SiteHeader.tsx (62:13)
 
 why getting this ? insted of fixing ?`;
     expect(isRepairPrompt(prompt)).toBe(true);
-    expect(intakeAction({ prompt, isFollowUp: false, isNewApp: true })).toBe("send");
   });
 });
