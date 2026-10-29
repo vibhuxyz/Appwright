@@ -174,16 +174,18 @@ export async function executeAgentJob(
     let verificationPassed = false;
     let verifyGaveUp = false;
 
-    const decisionResult = await classify(
-      currentTurnText(effectiveRows),
-      provider ?? new OpenAiProvider({ model: plannerModel(user.plan) }),
-    );
-    const planInDetail = shouldRunBlueprintPath(
-      chosenThemeFromRows(currentTurnRows(priorRows)),
-      decisionResult,
+    const turnRows = currentTurnRows(priorRows);
+    const approvedBlueprintId = approvedBlueprintIdFromRows(turnRows);
+    const planInDetail = await shouldRunBlueprintPath(
+      { theme: chosenThemeFromRows(turnRows), approvedBlueprintId },
+      () =>
+        classify(
+          currentTurnText(effectiveRows),
+          provider ?? new OpenAiProvider({ model: plannerModel(user.plan) }),
+        ),
     );
 
-    const userRow = currentTurnRows(priorRows).find((r) => r.role === "user");
+    const userRow = turnRows.find((r) => r.role === "user");
     const turnAttachments = (userRow?.data as { attachments?: Attachment[] } | null | undefined)?.attachments;
     const blueprintOutcome = planInDetail
       ? await runBlueprintPath({
@@ -200,8 +202,8 @@ export async function executeAgentJob(
           runtime,
           signal: controller.signal,
           persist,
-          approvedBlueprintId: approvedBlueprintIdFromRows(currentTurnRows(priorRows)),
-          isAutoImageChoice: isAutoImageChoice(currentTurnRows(priorRows)),
+          approvedBlueprintId,
+          isAutoImageChoice: isAutoImageChoice(turnRows),
         })
       : undefined;
 

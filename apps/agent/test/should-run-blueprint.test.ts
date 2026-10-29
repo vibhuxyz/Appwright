@@ -43,24 +43,46 @@ const theme = {
   radius: "lg",
 } satisfies ThemeOption;
 
+function classifierReturning(result: DecisionResult) {
+  const calls: number[] = [];
+  const classifyTurn = async (): Promise<DecisionResult> => {
+    calls.push(calls.length);
+    return result;
+  };
+  return { classifyTurn, calls };
+}
+
+const noSignals = { theme: undefined, approvedBlueprintId: undefined };
+
 describe("shouldRunBlueprintPath", () => {
-  it("always plans after the user picks a design system", () => {
-    expect(shouldRunBlueprintPath(theme, accepted({}))).toBe(true);
+  it("always plans after the user picks a design system, without classifying", async () => {
+    const { classifyTurn, calls } = classifierReturning({ status: "invalid", decision: UNKNOWN_DECISION });
     expect(
-      shouldRunBlueprintPath(theme, { status: "invalid", decision: UNKNOWN_DECISION }),
+      await shouldRunBlueprintPath({ theme, approvedBlueprintId: undefined }, classifyTurn),
     ).toBe(true);
+    expect(calls).toHaveLength(0);
   });
 
-  it("still skips a tiny style tweak when no theme was chosen", () => {
-    expect(shouldRunBlueprintPath(undefined, accepted({}))).toBe(false);
+  it("runs an approved plan even when the classifier scores it as small", async () => {
+    const { classifyTurn, calls } = classifierReturning(
+      accepted({ intent: "create", complexity: 4, confidence: 0.9 }),
+    );
+    expect(
+      await shouldRunBlueprintPath({ theme: undefined, approvedBlueprintId: "bp-1" }, classifyTurn),
+    ).toBe(true);
+    expect(calls).toHaveLength(0);
   });
 
-  it("plans a complex create with no theme", () => {
-    expect(
-      shouldRunBlueprintPath(
-        undefined,
-        accepted({ intent: "create", complexity: 8, confidence: 0.8 }),
-      ),
-    ).toBe(true);
+  it("still skips a tiny style tweak when no theme or plan was chosen", async () => {
+    const { classifyTurn, calls } = classifierReturning(accepted({}));
+    expect(await shouldRunBlueprintPath(noSignals, classifyTurn)).toBe(false);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("plans a complex create with no theme", async () => {
+    const { classifyTurn } = classifierReturning(
+      accepted({ intent: "create", complexity: 8, confidence: 0.8 }),
+    );
+    expect(await shouldRunBlueprintPath(noSignals, classifyTurn)).toBe(true);
   });
 });
