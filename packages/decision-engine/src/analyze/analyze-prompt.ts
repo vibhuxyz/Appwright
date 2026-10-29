@@ -12,6 +12,7 @@ import { readDecision } from "../classify";
 import type { DecisionResult } from "../types";
 import { buildAnalyzePrompt } from "./build-analyze-prompt";
 import { ANALYZE_TIMEOUT_MS } from "./constants";
+import { extractErrorHints } from "./extract-error-hints";
 import { fallbackPath, suggestPath, type RouteSignals } from "./suggest-path";
 import type { AnalyzeInput } from "./types";
 
@@ -59,7 +60,7 @@ export async function analyzePrompt(
     ambiguity: result.decision.ambiguity,
     needsQuestions: suggestedPath === "plan",
     suggestedPath,
-    extractedHints: { files: [], errorLines: [], mentionedFeatures: mentionedFeatures(reading.json) },
+    extractedHints: { ...extractErrorHints(input.prompt), mentionedFeatures: mentionedFeatures(reading.json) },
     source: isClassifierUnavailable(result) ? "fallback" : "model",
     promptHash,
     promptVersion: ANALYZE_PROMPT_VERSION,

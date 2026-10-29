@@ -16,7 +16,14 @@ export {
   type DecisionResult,
 } from "./types";
 export { classify, CLASSIFY_TIMEOUT_MS, UNKNOWN_DECISION } from "./classify";
-export { analyzePrompt, ANALYZE_TIMEOUT_MS, type AnalyzeInput, type PromptAnalysisReading } from "./analyze";
+export {
+  analyzePrompt,
+  extractErrorHints,
+  ANALYZE_TIMEOUT_MS,
+  type AnalyzeInput,
+  type ErrorHints,
+  type PromptAnalysisReading,
+} from "./analyze";
 export { resolvePolicy, needsDetailedPlan, isNewBuildRequest, isChatRequest } from "./policy";
 export { shouldRetryVerification, type VerifyOutcome } from "./verify";
 export {

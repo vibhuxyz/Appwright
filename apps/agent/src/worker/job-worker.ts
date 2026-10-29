@@ -36,6 +36,7 @@ import { worktreeChangeScope } from "./browser-scope";
 import { checkpointSession } from "./checkpoint";
 import { currentTurnRows, currentTurnText } from "./current-turn-text";
 import { createEmitAdapter } from "./emit-adapter";
+import { hintMessageForTurn } from "./error-hints";
 import { historyMessages } from "./history-messages";
 import { HostMirrorRuntime } from "./host-mirror-runtime";
 import { isAutoImageChoice } from "./image-choice";
@@ -239,6 +240,9 @@ export async function executeAgentJob(
       if (blueprintOutcome?.kind === "single-pass") {
         messages.push({ role: "user", type: "text", content: blueprintOutcome.brief });
       }
+      const errorHints = await hintMessageForTurn(currentTurnText(effectiveRows), worktreeDir);
+      if (errorHints.skipped.length > 0) log.info("error hints skipped", { sessionId: session.id, skipped: errorHints.skipped });
+      if (errorHints.message) messages.push({ role: "user", type: "text", content: errorHints.message });
       const verifyHistory: VerifyOutcome[] = [];
 
       for (let attempt = 0; attempt <= MAX_VERIFY_ATTEMPTS; attempt++) {
