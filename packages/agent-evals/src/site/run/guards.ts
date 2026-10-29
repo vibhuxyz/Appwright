@@ -1,4 +1,5 @@
-import { STUB_DATABASE_HOST } from "../constants";
+import { ENDPOINTS, providerFor } from "@repo/agent-core";
+import { SITE_MODEL_ENV_KEY, STUB_DATABASE_HOST } from "../constants";
 
 export class HarnessGuardError extends Error {}
 
@@ -11,6 +12,10 @@ export function assertIsolatedDatabase(env: NodeJS.Dict<string>): void {
   }
 }
 
-export function assertModelKey(env: NodeJS.Dict<string>): void {
-  if (!env.DEEPSEEK_API_KEY) throw new HarnessGuardError("DEEPSEEK_API_KEY is not set, so the DeepSeek model cannot be called");
+export function requireSiteModel(env: NodeJS.Dict<string>): string {
+  const model = env[SITE_MODEL_ENV_KEY]?.trim();
+  if (!model) throw new HarnessGuardError(`${SITE_MODEL_ENV_KEY} is not set, so the eval has no model to call`);
+  const { envKey } = ENDPOINTS[providerFor(model)];
+  if (!env[envKey]) throw new HarnessGuardError(`${envKey} is not set, so ${model} cannot be called`);
+  return model;
 }

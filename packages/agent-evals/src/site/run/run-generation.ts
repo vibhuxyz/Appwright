@@ -4,7 +4,7 @@ import type { Plan } from "@repo/planner";
 import { runBuild, runTsc } from "@repo/verify";
 import { BudgetExceededError, MeteredProvider, type SpendLedger } from "../budget";
 import { AppFailedError, captureSite, findMissingImports, readWorkspaceSource } from "../capture";
-import { MAX_GENERATION_COST_USD, SITE_MODEL } from "../constants";
+import { MAX_GENERATION_COST_USD } from "../constants";
 import { GROUP_CONFIGS } from "../groups";
 import { prepareWorkspace, runSinglePassPath, runTaskPath, type PathOutcome } from "../paths";
 import type { SiteBrief, SiteGroup } from "../types";
@@ -23,6 +23,7 @@ const EMPTY_OUTCOME: PathOutcome = {
 
 export interface RunGenerationInput {
   readonly runId: string;
+  readonly model: string;
   readonly group: SiteGroup;
   readonly brief: SiteBrief;
   readonly plan: Plan;
@@ -53,13 +54,13 @@ async function runPath(input: RunGenerationInput, context: Parameters<typeof run
 }
 
 export async function runGeneration(input: RunGenerationInput): Promise<GenerationResult> {
-  const { runId, group, brief, plan, ledger } = input;
+  const { runId, model, group, brief, plan, ledger } = input;
   const label = `${group}-${brief.id}`;
   const startedAt = Date.now();
   ledger.beginGeneration(label);
   const workspace = await prepareWorkspace({ templatesRoot: input.templatesRoot, workspacesRoot: input.workspacesRoot, briefId: brief.id, group, runId });
   const prompts = new Map<string, PromptRecord>();
-  const provider = new MeteredProvider(new OpenAiProvider({ model: SITE_MODEL }), ledger, collectPrompts(prompts));
+  const provider = new MeteredProvider(new OpenAiProvider({ model }), ledger, collectPrompts(prompts));
   let failure: GenerationResult["failure"];
   let outcome = EMPTY_OUTCOME;
   try {
@@ -93,13 +94,13 @@ export async function runGeneration(input: RunGenerationInput): Promise<Generati
     throw error;
   });
   const entries = ledger.entriesFor(label);
-  const price = priceFor(SITE_MODEL);
+  const price = priceFor(model);
   const result: GenerationResult = {
     runId,
     label,
     briefId: brief.id,
     config: GROUP_CONFIGS[group],
-    model: { id: SITE_MODEL, usdPerMillionInput: price.in, usdPerMillionOutput: price.out },
+    model: { id: model, usdPerMillionInput: price.in, usdPerMillionOutput: price.out },
     status: failure ? "failed" : "succeeded",
     ...(failure ? { failure } : {}),
     costUsd: ledger.generationSpentUsd(),

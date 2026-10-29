@@ -1,4 +1,4 @@
-export const SITE_MODEL = "deepseek-flash";
+export const SITE_MODEL_ENV_KEY = "EVAL_SITE_MODEL";
 export const MAX_GENERATION_COST_USD = 0.5;
 export const MAX_TOTAL_COST_USD = 6;
 export const STUB_DATABASE_HOST = "stub.invalid";

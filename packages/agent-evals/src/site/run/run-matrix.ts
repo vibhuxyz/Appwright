@@ -4,11 +4,11 @@ import path from "node:path";
 import { OpenAiProvider } from "@repo/agent-core";
 import { MeteredProvider, SpendLedger } from "../budget";
 import { SITE_BRIEFS } from "../briefs";
-import { MAX_GENERATION_COST_USD, MAX_TOTAL_COST_USD, SITE_MODEL } from "../constants";
+import { MAX_GENERATION_COST_USD, MAX_TOTAL_COST_USD } from "../constants";
 import { GROUP_CONFIGS, PILOT_LIMITATIONS } from "../groups";
 import { planSite, SitePlanError } from "../plan";
 import type { ArtDirection, SiteGroup } from "../types";
-import { assertIsolatedDatabase, assertModelKey } from "./guards";
+import { assertIsolatedDatabase, requireSiteModel } from "./guards";
 import { runGeneration } from "./run-generation";
 import type { GenerationResult } from "./result-types";
 
@@ -49,13 +49,13 @@ function isFailure(result: GenerationResult): boolean {
 
 export async function runMatrix(options: MatrixOptions): Promise<MatrixSummary> {
   assertIsolatedDatabase(process.env);
-  assertModelKey(process.env);
+  const model = requireSiteModel(process.env);
   const ledger = new SpendLedger({ generationUsd: MAX_GENERATION_COST_USD, totalUsd: MAX_TOTAL_COST_USD, priorSpentUsd: await earlierSpendUsd(options.resultsRoot, options.runId) });
   const outputDir = path.join(options.resultsRoot, options.runId);
   const workspacesRoot = await mkdtemp(path.join(tmpdir(), "appwright-site-"));
   process.env.WORKSPACE_ROOT = workspacesRoot;
   await mkdir(outputDir, { recursive: true });
-  const planner = new MeteredProvider(new OpenAiProvider({ model: SITE_MODEL }), ledger);
+  const planner = new MeteredProvider(new OpenAiProvider({ model }), ledger);
   const briefs = SITE_BRIEFS.filter((brief) => options.briefs.includes(brief.id));
   const plans = new Map<ArtDirection, Awaited<ReturnType<typeof planSite>>["plan"]>();
   const ineligible: ArtDirection[] = [];
@@ -75,7 +75,7 @@ export async function runMatrix(options: MatrixOptions): Promise<MatrixSummary> 
     const plan = plans.get(brief.id);
     for (const group of options.groups) {
       if (!plan || stoppedEarly) break;
-      const result = await runGeneration({ runId: options.runId, group, brief, plan, ledger, outputDir, templatesRoot: options.templatesRoot, workspacesRoot, signal: new AbortController().signal });
+      const result = await runGeneration({ runId: options.runId, model, group, brief, plan, ledger, outputDir, templatesRoot: options.templatesRoot, workspacesRoot, signal: new AbortController().signal });
       results.push(result);
       consecutiveFailures = isFailure(result) ? consecutiveFailures + 1 : 0;
       if (ledger.totalSpentUsd() >= MAX_TOTAL_COST_USD) stoppedEarly = "total cost cap reached";
@@ -88,7 +88,7 @@ export async function runMatrix(options: MatrixOptions): Promise<MatrixSummary> 
     totalCostUsd: ledger.totalSpentUsd(),
     results: results.map((result) => ({ label: result.label, status: result.status, costUsd: result.costUsd, durationMs: result.durationMs, failure: result.failure?.message })),
   };
-  const experiment = { summary, groups: GROUP_CONFIGS, limitations: PILOT_LIMITATIONS, model: SITE_MODEL, caps: { generationUsd: MAX_GENERATION_COST_USD, totalUsd: MAX_TOTAL_COST_USD }, spend: ledger.entries() };
+  const experiment = { summary, groups: GROUP_CONFIGS, limitations: PILOT_LIMITATIONS, model, caps: { generationUsd: MAX_GENERATION_COST_USD, totalUsd: MAX_TOTAL_COST_USD }, spend: ledger.entries() };
   await writeFile(path.join(outputDir, "summary.json"), `${JSON.stringify(experiment, null, 2)}\n`, "utf8");
   return summary;
 }

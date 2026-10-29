@@ -22,6 +22,7 @@ const PRICES: Record<string, Price> = {
   "llama-3.3-70b-versatile": { in: 0.59, out: 0.79 },
   "llama-3.1-8b-instant": { in: 0.05, out: 0.08 },
   "qwen/qwen3.6-27b": { in: 0.29, out: 0.59 },
+  "gemini-3.1-flash-lite": { in: 0.25, out: 1.5, cachedIn: 0.025 },
   "gemini-3.7-flash": { in: 0.3, out: 2.5 },
   "gemini-3.1-pro-preview": { in: 1.25, out: 10 },
   "gemini-flash-latest": { in: 0.3, out: 2.5 },

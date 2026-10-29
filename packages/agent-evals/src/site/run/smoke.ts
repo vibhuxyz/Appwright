@@ -6,8 +6,8 @@ import { runBuild } from "@repo/verify";
 import { MeteredProvider, SpendLedger } from "../budget";
 import { captureSite } from "../capture";
 import { cloneTemplate } from "../paths";
-import { MAX_GENERATION_COST_USD, MAX_TOTAL_COST_USD, SITE_MODEL, SITE_TEMPLATE, SMOKE_PROMPT } from "../constants";
-import { assertIsolatedDatabase, assertModelKey } from "./guards";
+import { MAX_GENERATION_COST_USD, MAX_TOTAL_COST_USD, SITE_TEMPLATE, SMOKE_PROMPT } from "../constants";
+import { assertIsolatedDatabase, requireSiteModel } from "./guards";
 
 export interface SmokeResult {
   readonly modelReplied: string;
@@ -16,9 +16,9 @@ export interface SmokeResult {
   readonly captured: { readonly shots: number; readonly findings: number };
 }
 
-async function callModel(ledger: SpendLedger): Promise<string> {
+async function callModel(model: string, ledger: SpendLedger): Promise<string> {
   ledger.beginGeneration("smoke");
-  const provider = new MeteredProvider(new OpenAiProvider({ model: SITE_MODEL }), ledger);
+  const provider = new MeteredProvider(new OpenAiProvider({ model }), ledger);
   const messages = [{ role: "user" as const, type: "text" as const, content: SMOKE_PROMPT }];
   let text = "";
   for await (const chunk of provider.stream(messages, [], { signal: AbortSignal.timeout(60_000) })) {
@@ -43,12 +43,12 @@ async function captureTemplate(templatesRoot: string, shotsDir: string): Promise
 
 export async function runSmoke(options: { templatesRoot: string; resultsRoot: string }): Promise<SmokeResult> {
   assertIsolatedDatabase(process.env);
-  assertModelKey(process.env);
+  const model = requireSiteModel(process.env);
   const ledger = new SpendLedger({ generationUsd: MAX_GENERATION_COST_USD, totalUsd: MAX_TOTAL_COST_USD });
-  const modelReplied = await callModel(ledger);
+  const modelReplied = await callModel(model, ledger);
   const entries = ledger.entries();
   const usageReported = entries.length > 0 && entries.every((entry) => entry.inputTokens > 0);
-  if (!usageReported) throw new Error(`Model ${SITE_MODEL} reported no token usage, so spend caps cannot be enforced`);
+  if (!usageReported) throw new Error(`Model ${model} reported no token usage, so spend caps cannot be enforced`);
   const captured = await captureTemplate(options.templatesRoot, path.join(options.resultsRoot, "smoke-shots"));
   return { modelReplied, usageReported, smokeCostUsd: ledger.totalSpentUsd(), captured };
 }
