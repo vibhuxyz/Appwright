@@ -27,4 +27,5 @@ export {
   type PatternDeliveryResult,
 } from "./patterns";
 export { createRunTaskGenerator, type RunTaskGeneratorOptions } from "./run-task-generator";
+export { codingModelFor, codingProfileFor, delegatedStatus, type CodingProfile } from "./coding-agent";
 export { buildTaskDetail, type TaskDetail, type TaskDetailSource } from "./build-task-detail";

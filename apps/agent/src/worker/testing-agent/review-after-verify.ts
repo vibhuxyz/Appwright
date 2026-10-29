@@ -10,7 +10,7 @@ import { measuredMustFix, testingEvidence } from "./evidence";
 import { decideRepair } from "./parse-review";
 import { formatTestingRepairPrompt } from "./prompt";
 import { runTestingAgent } from "./run-testing-agent";
-import type { ReviewInput, TestingReview } from "./types";
+import type { ReviewInput, ReviewOutcome, TestingReview } from "./types";
 
 const log = createLogger("testing-agent");
 const SUMMARY_NOTE_CHARS = 180;
@@ -37,7 +37,7 @@ function summaryNotes(review: TestingReview | undefined, measured: readonly stri
   return review.notes;
 }
 
-async function repairOnce(input: ReviewInput, mustFix: readonly string[], measured: readonly string[], browser: BrowserBundle, changedPaths: readonly string[]): Promise<void> {
+async function repairOnce(input: ReviewInput, mustFix: readonly string[], measured: readonly string[], browser: BrowserBundle, changedPaths: readonly string[]): Promise<boolean> {
   const repairTurn = input.repairTurn ?? createRepairTurn({
     messages: input.messages,
     provider: codingProvider(input),
@@ -63,7 +63,7 @@ async function repairOnce(input: ReviewInput, mustFix: readonly string[], measur
       runRepairTurn: repairTurn,
     });
     log.info("testing repair", { sessionId: input.sessionId, outcome });
-    return;
+    return outcome === "fixed";
   }
   const prompt = formatTestingRepairPrompt(mustFix, changedPaths);
   await input.persist({ role: "user", type: "text", content: prompt, data: { verificationRetry: true, testingRepair: true } });
@@ -73,10 +73,11 @@ async function repairOnce(input: ReviewInput, mustFix: readonly string[], measur
     : "❌ The testing repair did not pass typecheck and build, so the must-fix items remain.";
   await input.persist({ role: "assistant", type: "text", content });
   log.info("testing repair", { sessionId: input.sessionId, outcome: passed ? "fixed" : "repair-failed" });
+  return passed;
 }
 
-export async function reviewAfterVerification(input: ReviewInput): Promise<void> {
-  if (input.signal.aborted) return;
+export async function reviewAfterVerification(input: ReviewInput): Promise<ReviewOutcome> {
+  if (input.signal.aborted) return { passed: false, notes: "" };
   const publish = input.publish ?? ((detail: string) => publishStatus(input.sessionId, "RUNNING", detail));
   const changedPaths = (await worktreeChangeScope(input.worktreeDir))?.changedPaths ?? [];
   const browser = await loadBrowser(input);
@@ -93,6 +94,8 @@ export async function reviewAfterVerification(input: ReviewInput): Promise<void>
     content: `Testing Agent: ${decision.status}.${notes.length > 0 ? ` ${notes}` : ""}`,
     data: { transcriptOnly: true, testingAgent: true, status: decision.status },
   });
-  if (input.signal.aborted || decision.mustFix.length === 0) return;
-  await repairOnce(input, decision.mustFix, measured, browser, changedPaths);
+  if (input.signal.aborted) return { passed: false, notes };
+  if (decision.mustFix.length === 0) return { passed: true, notes };
+  const repaired = await repairOnce(input, decision.mustFix, measured, browser, changedPaths);
+  return { passed: repaired && !input.signal.aborted, notes };
 }

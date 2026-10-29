@@ -16,6 +16,7 @@ import { createLogger } from "@repo/logger";
 import { ALL_TOOLS, guardTools } from "@repo/tools";
 import type { FencedAttemptInput, GeneratedAttempt, TaskGenerator } from "orchestrator";
 import { isUiTaskType, loadDesignSkills } from "./art-direction";
+import { codingModelFor, codingProfileFor, withCodingBrief } from "./coding-agent";
 import { buildTaskPrompt } from "./build-task-prompt";
 import { buildRetryPrompt, isVerificationFailure } from "./retry-prompt";
 import { generateAdminCrudAttempt } from "./generate-admin-crud-attempt";
@@ -124,6 +125,7 @@ async function taskMessages(task: TaskDetail, runtime: Runtime, previousError: s
     includeReference: includeDesign,
     includeUiPrimitives: isUiTaskType(task.type),
   });
+  const brief = codingProfileFor(task.type).brief;
   const taskPrompt = isVerificationFailure(previousError)
     ? buildRetryPrompt(task, previousError)
     : buildTaskPrompt(task, previousError, {
@@ -132,7 +134,7 @@ async function taskMessages(task: TaskDetail, runtime: Runtime, previousError: s
       });
   return [
     { role: "user", type: "text", content: systemPrompt },
-    { role: "user", type: "text", content: taskPrompt },
+    { role: "user", type: "text", content: withCodingBrief(brief, taskPrompt) },
   ];
 }
 
@@ -142,11 +144,13 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
   return {
     async generate(input: FencedAttemptInput): Promise<GeneratedAttempt> {
       const task = await loadDetail(input.task.id);
+      const profile = codingProfileFor(task.type);
+      log.info("coding agent", { sessionId, taskId: input.task.id, type: task.type, agent: profile.label });
       const deterministicGenerator = DETERMINISTIC_GENERATORS[taskTypeFromPrisma(task.type)];
       if (deterministicGenerator) return deterministicGenerator(task, runtime);
 
       const { emit, totals } = trackAttempt(conversationEmit);
-      const [primary, ...fallback] = options.providers ?? providerChain(model, plan);
+      const [primary, ...fallback] = options.providers ?? providerChain(codingModelFor(profile, model), plan);
       const guard = guardTools([...ALL_TOOLS, ...(options.extraTools ?? [])]);
       const stopReason = await runAgentLoop({
         messages: await taskMessages(task, runtime, input.previousError),

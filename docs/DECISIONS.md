@@ -2475,6 +2475,9 @@ summary, one verification line, confirmed decisions, open blockers, and reverted
 The plan text, assumed defaults, and file ledger are no longer rendered. The system's own
 "Verification failed, retrying" row is marked `verificationRetry`, so it is never shown as
 something the user said.
+[D87](#decision-87-a-verified-turn-can-write-one-user-handoff-file--active-2026-10-29-amends-d80)
+allows one user-facing file, `app/memory/PRD.md`, after testing passes. That file is not loaded
+into this block.
 
 **Why:** a user asked for an Emergent-style `/app/memory/PRD.md` plus a `TASKS.md` handoff. Checked
 first: **no such file or mechanism exists in Appwright.** Every agent input (history, blueprint)
@@ -2871,6 +2874,59 @@ less to attend to besides the current task.
 **Revisit when:** a measured session shows the direct or single-pass input is still mostly the
 file tree or the UI list, or a continued run loses a decision the summary clipped. An explicit
 cache breakpoint waits until a provider API accepts one and the saving is measured.
+
+---
+
+## Decision 87: A verified turn can write one user handoff file ✅ ACTIVE _(2026-10-29, amends D80)_
+
+**Decision:** after the testing review passes, the worker calls a handoff agent
+(`apps/agent/src/worker/handoff-agent/`). It does not see the coding transcript and it cannot
+message the testing agent. Its only tool writes `app/memory/PRD.md`. The prompt carries the
+project-memory block, the verification lines, the testing notes, the previous commit subject,
+and the changed paths. The worker then posts `Created /app/memory/PRD.md` and the agent's short
+summary. The file is committed with the turn. A failed repair does not write it. Set
+`HANDOFF_AGENT_MODEL` to choose the model; otherwise the session model is used. The budget is
+8 iterations, 60 seconds, and $0.25.
+
+**Why:** the user wants the Emergent handoff, a memory file plus a clean final summary, without
+a second conversation between agents. D80 still refuses to treat a model-written file as the
+project's memory. This file is a note for the person, and the system prompt says it is not
+instructions.
+
+**What we gave up:**
+- The generated app now contains `app/memory/PRD.md`. It can ship with the project.
+- The next coding turn can see the file in the tree. It is not copied into the memory block.
+- If the handoff model writes a poor summary, that text is what the user sees. There is no
+  second writer.
+
+**Revisit when:** users treat the file as the spec, or ask for it not to be committed.
+
+---
+
+## Decision 88: The task scheduler picks a coding profile; agents do not call each other ✅ ACTIVE _(2026-10-29)_
+
+**Decision:** each blueprint task has one coding profile (`packages/blueprint/src/coding-agent/`).
+The profile is chosen from the task type by `codingProfileFor`. UI tasks (page, component,
+app-shell, layout, and the other visual types) get a one-line UI brief. Auth, integration
+(payment, api, media, security, admin), and data (schema, migration, seed) get their own line.
+Everything else stays the general coding agent with no extra line. The scheduler still runs the
+existing DAG. A profile does not call another profile. Deterministic generators for schema,
+admin, seo, deploy, theme, api, seed, and payment stay in front of the model. When a model is
+used, `UI_AGENT_MODEL`, `AUTH_AGENT_MODEL`, `INTEGRATION_AGENT_MODEL`, `DATA_AGENT_MODEL`, or
+`CODING_AGENT_MODEL` overrides the session model for that profile. The status line while a task
+runs is `Delegated to UI Agent: Home`.
+
+**Why:** large task runs were still one coding prompt. A specialist line and an optional model
+are enough. A network of agents that message each other is harder to debug and was not needed.
+
+**What we gave up:**
+- There is no separate tool list per profile. Auth and UI tasks still have the same six tools.
+- The specialist model is an environment override, not a measured router. An unset variable
+  keeps the session model.
+- Payment and the other deterministic types never see their brief, because no model runs.
+
+**Revisit when:** a measured task run shows one profile still failing for a reason the one-line
+brief cannot fix.
 
 ---
 

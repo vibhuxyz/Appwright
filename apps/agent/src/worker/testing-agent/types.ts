@@ -21,6 +21,11 @@ export interface RepairDecision {
   readonly mustFix: readonly string[];
 }
 
+export interface ReviewOutcome {
+  readonly passed: boolean;
+  readonly notes: string;
+}
+
 export interface ReviewInput {
   readonly projectId: string;
   readonly sessionId: string;

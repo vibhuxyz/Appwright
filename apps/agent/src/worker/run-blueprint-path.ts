@@ -15,6 +15,8 @@ import {
 } from "@repo/contracts";
 import {
   buildBlueprint,
+  codingProfileFor,
+  delegatedStatus,
   executeBlueprintRun,
   isSinglePassBlueprint,
   loadApprovedBlueprint,
@@ -67,9 +69,8 @@ type FreshPlanOptions = Pick<
   "sessionId" | "prompt" | "theme" | "userPlan" | "attachments" | "persist" | "answers"
 >;
 
-function runningTasksStatus(titles: ReadonlySet<string>): string {
-  if (titles.size === 0) return "Building…";
-  return `Building: ${[...titles].join(", ")}`;
+function delegatedEntries(labelByTitle: ReadonlyMap<string, string>): { title: string; label: string }[] {
+  return [...labelByTitle.entries()].map(([title, label]) => ({ title, label }));
 }
 
 async function approvedPlan(blueprintId: string, theme: ThemeOption | undefined): Promise<ApprovedBlueprint> {
@@ -124,8 +125,9 @@ async function runPlannedTasks(options: RunBlueprintPathOptions, approved: Appro
   publishStatus(sessionId, "RUNNING", "Plan formulated. Building tasks…");
 
   const titleById = new Map(approved.persisted.tasks.map((task) => [task.id, task.title]));
+  const typeById = new Map(approved.persisted.tasks.map((task) => [task.id, task.type]));
   const reportedTasks = new Set<string>();
-  const runningTitles = new Set<string>();
+  const labelByTitle = new Map<string, string>();
   const { emit: conversationEmit } = createEmitAdapter({ sessionId, userId, persist });
 
   const summary = await executeBlueprintRun(
@@ -142,15 +144,13 @@ async function runPlannedTasks(options: RunBlueprintPathOptions, approved: Appro
       extraTools: createTaskInteractiveTools({ projectId, sessionId, worktreeSessionId, signal, persist }),
       onTaskStatus: (taskId, status) => {
         const title = titleById.get(taskId) ?? taskId;
-        if (status === "running") {
-          runningTitles.add(title);
-          publishStatus(sessionId, "RUNNING", runningTasksStatus(runningTitles));
-          return;
+        const label = codingProfileFor(typeById.get(taskId) ?? "").label;
+        if (status === "running") labelByTitle.set(title, label);
+        if (status === "done" || status === "failed") labelByTitle.delete(title);
+        if (status === "running" || status === "done" || status === "failed") {
+          publishStatus(sessionId, "RUNNING", delegatedStatus(delegatedEntries(labelByTitle)));
         }
-        if (status === "done" || status === "failed") {
-          runningTitles.delete(title);
-          publishStatus(sessionId, "RUNNING", runningTasksStatus(runningTitles));
-        }
+        if (status === "running") return;
         if ((status === "done" || status === "failed") && !reportedTasks.has(taskId)) {
           reportedTasks.add(taskId);
           void persist({

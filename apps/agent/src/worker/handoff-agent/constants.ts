@@ -1,0 +1,12 @@
+export const HANDOFF_PATH = "app/memory/PRD.md";
+export const HANDOFF_DISPLAY_PATH = "/app/memory/PRD.md";
+export const HANDOFF_MAX_ITERATIONS = 8;
+export const HANDOFF_DEADLINE_MS = 60_000;
+export const HANDOFF_MAX_COST_USD = 0.25;
+export const HANDOFF_MAX_TOKENS = 40_000;
+export const MAX_PRD_CHARS = 6_000;
+export const MAX_SUMMARY_CHARS = 400;
+export const MAX_CHANGED_FILES = 20;
+export const MAX_COMMIT_CHARS = 120;
+export const DELEGATED_STATUS = "Delegated to Handoff Agent";
+export const FINISHED_STATUS = "Handoff Agent finished";

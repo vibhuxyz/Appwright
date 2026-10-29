@@ -47,6 +47,7 @@ import { runBlueprintPath } from "./run-blueprint-path";
 import { shouldRunBlueprintPath } from "./should-run-blueprint";
 import { freshStoredAnalysis } from "./stored-analysis";
 import type { AgentJobResult } from "./types";
+import { runHandoffAgent } from "./handoff-agent";
 import { reviewAfterVerification } from "./testing-agent";
 import { runVerifyStep } from "./verify-step";
 
@@ -322,7 +323,7 @@ export async function executeAgentJob(
     }
 
     if (verificationPassed) {
-      await reviewAfterVerification({
+      const review = await reviewAfterVerification({
         projectId: job.projectId,
         sessionId: session.id,
         userId,
@@ -336,6 +337,21 @@ export async function executeAgentJob(
         persist,
         messages,
       });
+      if (review.passed) {
+        await runHandoffAgent({
+          sessionId: session.id,
+          sessionModel,
+          worktreeDir,
+          memory: memorySection,
+          verifyResults,
+          testingNotes: review.notes,
+          ...(provider ? { provider } : {}),
+          runtime,
+          emit,
+          signal: controller.signal,
+          persist,
+        });
+      }
     }
 
     if (stopReason !== "completed" && !verifyGaveUp) {

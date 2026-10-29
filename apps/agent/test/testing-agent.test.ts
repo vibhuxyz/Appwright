@@ -107,7 +107,7 @@ describe("reviewAfterVerification", () => {
     const published: string[] = [];
     const repairs: string[] = [];
     const persisted: PersistFields[] = [];
-    await reviewAfterVerification(reviewInput({
+    const outcome = await reviewAfterVerification(reviewInput({
       provider: new FakeProvider([
         { kind: "text", text: '{"status":"fail","notes":"Overflow on the shop page","mustFix":["Fix the shop page overflow"]}' },
       ]),
@@ -128,12 +128,13 @@ describe("reviewAfterVerification", () => {
     expect(repairs[0]).toContain("Fix the shop page overflow");
     expect(persisted.some((row) => row.content.startsWith("Testing Agent: fail."))).toBe(true);
     expect(persisted.some((row) => row.data?.transcriptOnly === true)).toBe(true);
+    expect(outcome.passed).toBe(true);
   });
 
   it("does not repair a clean pass", async () => {
     const repairs: string[] = [];
     const persisted: PersistFields[] = [];
-    await reviewAfterVerification(reviewInput({
+    const outcome = await reviewAfterVerification(reviewInput({
       provider: new FakeProvider([{ kind: "text", text: '{"status":"pass","notes":"No defect.","mustFix":[]}' }]),
       persist: async (fields) => {
         persisted.push(fields);
@@ -146,5 +147,16 @@ describe("reviewAfterVerification", () => {
     }));
     expect(repairs).toEqual([]);
     expect(persisted.some((row) => row.content.includes("No defect."))).toBe(true);
+    expect(outcome.passed).toBe(true);
+  });
+
+  it("does not report a pass when the repair turn fails", async () => {
+    const outcome = await reviewAfterVerification(reviewInput({
+      provider: new FakeProvider([
+        { kind: "text", text: '{"status":"fail","notes":"Broken import","mustFix":["Fix the import"]}' },
+      ]),
+      repairTurn: async () => false,
+    }));
+    expect(outcome.passed).toBe(false);
   });
 });
