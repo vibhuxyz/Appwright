@@ -44,6 +44,19 @@ describe("scheduler", () => {
     expect(decision.waiting[0]?.reason).toEqual({ kind: "ownership", conflictsWith: "a" });
   });
 
+  it("never runs two page tasks that both edit the root layout at once", () => {
+    const decision = selectNextTasks(
+      [
+        task("menu", { owns: ["src/app/menu/page.tsx", "src/app/layout.tsx"] }),
+        task("about", { owns: ["src/app/about/page.tsx", "src/app/layout.tsx"] }),
+        task("contact", { owns: ["src/app/contact/page.tsx"] }),
+      ],
+      { ...ROOMY, maxConcurrent: 3 },
+    );
+    expect(decision.dispatch).toEqual(["menu", "contact"]);
+    expect(decision.waiting[0]?.reason).toEqual({ kind: "ownership", conflictsWith: "menu" });
+  });
+
   it("serialises tasks sharing a non-file resource", () => {
     const decision = selectNextTasks(
       [task("a", { owns: ["db:app"] }), task("b", { owns: ["db:app"] })],
