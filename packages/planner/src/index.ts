@@ -34,6 +34,7 @@ export {
   withoutKnownFacts,
   applyPromptAnswers,
   requirementTurns,
+  structuredAnswers,
   SKIP_PROMPT_ANSWER,
   NEED_NAMES,
   type DetectedNeed,

@@ -1,7 +1,8 @@
 import type { Provider } from "@repo/agent-core";
 import { buildBlueprint, persistBlueprint } from "@repo/blueprint";
-import type { PlanPreview, PlanPreviewRequest } from "@repo/contracts";
+import { answersByNeed, type PlanPreview, type PlanPreviewRequest } from "@repo/contracts";
 import { detectAssetSlots } from "@repo/media";
+import { structuredAnswers } from "@repo/planner";
 import type { IntakeProgress } from "../intake";
 import { toPlannerProgress } from "./plan-progress";
 import { planRequestText } from "./plan-request-text";
@@ -15,6 +16,7 @@ export async function createPlanPreview(input: {
 }): Promise<PlanPreview> {
   const plan = await buildBlueprint(planRequestText(input.request), {
     provider: input.provider,
+    answers: answersByNeed(structuredAnswers(input.request.answers, input.request.questions ?? [])),
     onProgress: (progress) => input.onProgress(toPlannerProgress(progress)),
   });
   const persisted = await persistBlueprint(input.sessionId, plan);

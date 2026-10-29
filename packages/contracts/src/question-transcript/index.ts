@@ -39,3 +39,10 @@ export type {
   QuestionSetKind,
 } from "./question-transcript.schema";
 export { flattenTranscriptText } from "./transcript-text";
+export {
+  answersByNeed,
+  IntakeAnswerSchema,
+  IntakeAnswersDataSchema,
+  IntakeAnswersSchema,
+  type IntakeAnswer,
+} from "./intake-answer.schema";

@@ -27,6 +27,7 @@ import { SandboxRuntime, type SandboxProvider } from "@repo/sandbox";
 import { ALL_TOOLS, guardTools } from "@repo/tools";
 import { sessionWorktreePath, worktreeSessionIdOf } from "@repo/workspace";
 import { restoreWorkspace } from "../recovery";
+import { answersFromRows } from "./answers-from-rows";
 import { withSelectionApplied } from "./apply-selection";
 import { approvedBlueprintIdFromRows } from "./approved-blueprint-id";
 import { autoMergeSession } from "./auto-merge-session";
@@ -208,6 +209,7 @@ export async function executeAgentJob(
           persist,
           approvedBlueprintId,
           isAutoImageChoice: isAutoImageChoice(turnRows),
+          answers: answersFromRows(turnRows),
         })
       : undefined;
 

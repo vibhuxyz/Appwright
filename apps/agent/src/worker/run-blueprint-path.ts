@@ -58,7 +58,13 @@ export interface RunBlueprintPathOptions {
   persist: (fields: PersistFields) => Promise<unknown>;
   approvedBlueprintId?: string;
   isAutoImageChoice: boolean;
+  answers?: Readonly<Record<string, string>>;
 }
+
+type FreshPlanOptions = Pick<
+  RunBlueprintPathOptions,
+  "sessionId" | "prompt" | "theme" | "userPlan" | "attachments" | "persist" | "answers"
+>;
 
 function runningTasksStatus(titles: ReadonlySet<string>): string {
   if (titles.size === 0) return "Building…";
@@ -71,14 +77,8 @@ async function approvedPlan(blueprintId: string, theme: ThemeOption | undefined)
   return approved;
 }
 
-async function freshPlan(
-  sessionId: string,
-  prompt: string,
-  theme: ThemeOption | undefined,
-  userPlan: PlanId,
-  attachments?: readonly Attachment[],
-  persist?: (fields: PersistFields) => Promise<unknown>,
-): Promise<ApprovedBlueprint> {
+async function freshPlan(options: FreshPlanOptions): Promise<ApprovedBlueprint> {
+  const { sessionId, prompt, theme, userPlan, attachments, persist } = options;
   let specification: ProjectSpecification | undefined;
   if (attachments && attachments.length > 0) {
     publishStatus(sessionId, "RUNNING", "Analyzing request and reference attachments…");
@@ -102,6 +102,7 @@ async function freshPlan(
   const plan = await buildBlueprint(prompt, {
     theme,
     specification,
+    answers: options.answers,
     provider: new OpenAiProvider({ model: plannerModel(userPlan) }),
   });
   return { plan, persisted: await persistBlueprint(sessionId, plan, { specification }) };
@@ -170,7 +171,7 @@ export async function runBlueprintPath(options: RunBlueprintPathOptions): Promis
 
   const approved = options.approvedBlueprintId
     ? await approvedPlan(options.approvedBlueprintId, theme)
-    : await freshPlan(sessionId, prompt, theme, userPlan, options.attachments, persist);
+    : await freshPlan(options);
   const { plan, persisted } = approved;
   const preparation = await prepareBuildEnvironment({
     projectId,

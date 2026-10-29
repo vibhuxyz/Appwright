@@ -47,6 +47,7 @@ export interface BuildBlueprintOptions {
   directionId?: string;
   theme?: ThemeOption;
   specification?: ProjectSpecification;
+  answers?: Readonly<Record<string, string>>;
   onProgress?: (progress: BlueprintProgress) => void;
 }
 
@@ -76,7 +77,7 @@ export async function buildBlueprint(
   prompt: string,
   options: BuildBlueprintOptions = {},
 ): Promise<Plan> {
-  const { provider, directionId, theme, specification, onProgress } = options;
+  const { provider, directionId, theme, specification, answers, onProgress } = options;
   const signal = options.signal ?? AbortSignal.timeout(BUILD_BLUEPRINT_TIMEOUT_MS);
   try {
     onProgress?.({ stage: "intent", detail: "Understanding what you want to build" });
@@ -122,7 +123,7 @@ export async function buildBlueprint(
       );
     }
 
-    const resolved = resolveRequirements({ blueprint: draft.data, prompt, needs });
+    const resolved = resolveRequirements({ blueprint: draft.data, prompt, needs, answers });
     const plan = planBlueprint(resolved.blueprint);
     if (!plan.ok) {
       throw new BuildBlueprintError(

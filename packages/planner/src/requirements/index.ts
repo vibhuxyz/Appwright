@@ -7,6 +7,7 @@ export { groundedKnownNeeds, withoutKnownFacts } from "./known-facts";
 export { applyPromptAnswers, SKIP_PROMPT_ANSWER } from "./apply-prompt-answers";
 export type { PromptAnswer } from "./apply-prompt-answers";
 export { INTAKE_QUESTIONS_INTRO, requirementTurns } from "./requirement-turns";
+export { structuredAnswers } from "./structured-answers";
 export type { RequirementTurn } from "./requirement-turns";
 export { NEED_NAMES } from "./types";
 export type { DetectedNeed, NeedName, Needs, Question, IntakeQuestion } from "./types";

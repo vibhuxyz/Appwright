@@ -3,10 +3,12 @@ import {
   flattenTranscriptText,
   formatQuestionReplyContent,
   formatQuestionSetContent,
+  type IntakeAnswer,
   type QuestionReplyData,
   type QuestionSetData,
 } from "@repo/contracts";
 import { defaultOptionText, SKIP_PROMPT_ANSWER, type PromptAnswer } from "./apply-prompt-answers";
+import { structuredAnswers } from "./structured-answers";
 import type { IntakeQuestion } from "./types";
 
 const limits = QUESTION_TRANSCRIPT_LIMITS;
@@ -14,7 +16,7 @@ export const INTAKE_QUESTIONS_INTRO = "Before I start, please confirm these key 
 
 export type RequirementTurn =
   | { readonly role: "assistant"; readonly content: string; readonly data: { questionSet: QuestionSetData } }
-  | { readonly role: "user"; readonly content: string; readonly data: { questionReply: QuestionReplyData } };
+  | { readonly role: "user"; readonly content: string; readonly data: { questionReply: QuestionReplyData; answers: IntakeAnswer[] } };
 
 function isSkipped(raw: PromptAnswer | undefined): boolean {
   return raw === undefined || raw === SKIP_PROMPT_ANSWER;
@@ -58,6 +60,10 @@ export function requirementTurns(
   };
   return [
     { role: "assistant", content: formatQuestionSetContent(set), data: { questionSet: set } },
-    { role: "user", content: formatQuestionReplyContent(reply), data: { questionReply: reply } },
+    {
+      role: "user",
+      content: formatQuestionReplyContent(reply),
+      data: { questionReply: reply, answers: structuredAnswers(answers, questions) },
+    },
   ];
 }
