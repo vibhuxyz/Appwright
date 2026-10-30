@@ -56,6 +56,28 @@ export const CREATIVE_PATTERNS: readonly PatternEntry[] = [
     antiPatterns: ["Products from another collection", "More than four products"],
   },
   {
+    id: "commerce.mosaic",
+    file: "commerce/mosaic-grid.tsx",
+    exportName: "MosaicGrid",
+    requires: [],
+    effects: [],
+    motion: "subtle",
+    usage:
+      "Three or four collection tiles: one large tile beside two stacked (three tiles) or a 2x2 grid (four), each with a short uppercase title centred on the image and a Shop now link. Category entry points for stores.",
+    antiPatterns: ["More than four tiles", "Product cut-outs instead of collection photos", "Boxes or panels behind the tile text"],
+  },
+  {
+    id: "commerce.split-promo",
+    file: "commerce/split-promo.tsx",
+    exportName: "SplitPromo",
+    requires: [],
+    effects: [],
+    motion: "subtle",
+    usage:
+      "Half image, half solid colour panel with a centred title, one short paragraph and one underlined link. One offer or collection story between product rows.",
+    antiPatterns: ["Invented discounts or sale dates", "Two promos in a row", "Body copy longer than two sentences"],
+  },
+  {
     id: "story.case-row",
     file: "editorial/case-row.tsx",
     exportName: "CaseRow",

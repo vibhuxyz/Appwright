@@ -27,6 +27,16 @@ function homeSectionIds(purpose: string, fixtureName = "portfolio"): readonly st
 }
 
 describe("playbook section selection", () => {
+  it("gives store briefs the collection mosaic and split promo, and no other site type", () => {
+    const store = homeSectionIds("Online store for sneakers with cart and checkout", "fashion-store");
+    expect(store).toContain("commerce.mosaic");
+    expect(store).toContain("commerce.split-promo");
+    for (const [purpose, fixtureName] of [["B2B marketing agency home", "portfolio"], ["Luxury resort and villa bookings home", "local-business"], ["Neighbourhood plumber home", "local-business"]] as const) {
+      const ids = homeSectionIds(purpose, fixtureName);
+      expect({ purpose, mosaic: ids.includes("commerce.mosaic"), promo: ids.includes("commerce.split-promo") }).toEqual({ purpose, mosaic: false, promo: false });
+    }
+  });
+
   it("uses the case rows for agency briefs only", () => {
     expect(homeSectionIds("B2B marketing agency home with selected work and case studies")).toContain("story.case-row");
     expect(homeSectionIds("Architecture studio home with selected projects")).not.toContain("story.case-row");

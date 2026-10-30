@@ -6,7 +6,7 @@ export const PLAYBOOKS = {
     examples: "Puma, Wonder, Zepto",
     hero: "Utility first: full-bleed product or campaign image with one clear action; no cinematic scroll scene.",
     heroSectionIds: ["hero.cinematic", "commerce.campaign-banner"],
-    sectionOrder: ["commerce.product-rail", "commerce.featured-collection", "commerce.campaign-banner", "commerce.product-grid", "categories.scroller"],
+    sectionOrder: ["commerce.product-rail", "commerce.mosaic", "commerce.split-promo", "commerce.featured-collection", "commerce.product-grid"],
     imageRules: [
       "Products are 1:1 on a light grey ground with one ratio per row.",
       "Banners are 16:9 or 21:9; collection tiles are 4:5.",
