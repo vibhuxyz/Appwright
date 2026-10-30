@@ -36,6 +36,7 @@ export {
   compositionEvidence,
   compositionFingerprint,
   critique,
+  detectPagePlaybook,
   detectPlaybook,
   experienceEffectIds,
   experienceSeed,

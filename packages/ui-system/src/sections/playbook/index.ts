@@ -1,4 +1,4 @@
-export { detectPlaybook } from "./detect";
+export { detectPagePlaybook, detectPlaybook } from "./detect";
 export { formatPlaybook } from "./format";
 export { PLAYBOOKS } from "./playbooks";
 export { PLAYBOOK_IDS } from "./types";

@@ -1,5 +1,5 @@
 import type { Page } from "@repo/contracts";
-import { detectPlaybook } from "../playbook";
+import { detectPagePlaybook } from "../playbook";
 import { critique } from "./critique";
 import { findRenderedSections } from "./markers";
 
@@ -30,7 +30,7 @@ function markerEvidence(pages: readonly Page[], html: string | undefined): Check
 
 export function compositionEvidence(pages: readonly Page[], html?: string): CheckEvidence[] {
   const pageChecks = pages.slice(0, 12).map((page): CheckEvidence => {
-    const issues = critique(page.sections ?? [], detectPlaybook(page.purpose));
+    const issues = critique(page.sections ?? [], detectPagePlaybook(page));
     return {
       id: `composition:${page.route}`,
       status: issues.length === 0 ? "passed" : "failed",

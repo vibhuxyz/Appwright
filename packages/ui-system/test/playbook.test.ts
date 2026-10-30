@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { FIXTURES, PLAYBOOKS, PLAYBOOK_IDS, applyComposition, detectPlaybook, formatComposition, planComposition, planExperience, sectionById } from "../src";
+import { FIXTURES, PLAYBOOKS, PLAYBOOK_IDS, applyComposition, detectPagePlaybook, detectPlaybook, formatComposition, planComposition, planExperience, sectionById } from "../src";
 
 const BRIEFS: ReadonlyArray<readonly [string, string | null]> = [
   ["Online store for sneakers with cart and checkout", "commerce"],
@@ -27,6 +27,17 @@ function homeSectionIds(purpose: string, fixtureName = "portfolio"): readonly st
 }
 
 const MIXED_PURPOSE = "Single-page landing for Arbor & Oak architecture studio, resort, furniture collection, and consultancy";
+
+describe("detectPagePlaybook", () => {
+  it("reads the page's component names when the purpose is vague", () => {
+    const page = {
+      purpose: "Single-page hub for all four business units",
+      components: ["TopBanner", "ArchitectureSection", "ResortSection", "ShopSection", "ConsultancySection", "ProductGrid"],
+    };
+    expect(detectPlaybook(page.purpose)).toBeNull();
+    expect([...(detectPagePlaybook(page)?.ids ?? [])].sort()).toEqual(["agency", "commerce", "hospitality", "studio"]);
+  });
+});
 
 describe("mixed briefs", () => {
   it("merge every matching playbook, with one primary and the most permissive motion budget", () => {

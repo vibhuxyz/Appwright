@@ -14,3 +14,16 @@ export function detectPlaybook(text: string): Playbook | null {
   const [first, ...others] = matched.map((candidate) => PLAYBOOKS[candidate.id]);
   return first ? mergePlaybooks([first, ...others]) : null;
 }
+
+export interface PlaybookPage {
+  readonly purpose: string;
+  readonly components: readonly string[];
+}
+
+function splitCamelCase(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[._-]+/g, " ");
+}
+
+export function detectPagePlaybook(page: PlaybookPage): Playbook | null {
+  return detectPlaybook([page.purpose, ...page.components.map(splitCamelCase)].join(" "));
+}

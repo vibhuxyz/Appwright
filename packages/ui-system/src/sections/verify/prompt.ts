@@ -4,7 +4,7 @@ import { sectionById } from "../catalog";
 import { formatComposition, planComposition } from "../compose";
 import { experienceSeed, formatExperience, planExperience } from "../experience";
 import { themeFit } from "../theme";
-import { detectPlaybook } from "../playbook";
+import { detectPagePlaybook } from "../playbook";
 import { critique } from "./critique";
 
 const MAX_LINE = 500;
@@ -52,7 +52,7 @@ export function formatSectionBrief(page: Page, design: DesignBlock, projectId?: 
     const pattern = patternLine(section.sectionId);
     if (pattern) lines.push(pattern);
   });
-  const issues = critique(sections, detectPlaybook(page.purpose));
+  const issues = critique(sections, detectPagePlaybook(page));
   if (issues.length > 0) lines.push(`Composition notes: ${issues.join("; ")}`);
   return lines;
 }
@@ -74,7 +74,7 @@ export function formatEvidenceBrief(pages: readonly Page[]): string[] {
     if (ids.length > 0) lines.push(`${page.route}: render data-section markers for ${ids.join(", ")}.`);
   }
   lines.push("Screenshots, overflow, and click-through stay not-executed until a browser run records them.");
-  const issues = pages.flatMap((page) => critique(page.sections ?? [], detectPlaybook(page.purpose)).map((issue) => `${page.route}: ${issue}`));
+  const issues = pages.flatMap((page) => critique(page.sections ?? [], detectPagePlaybook(page)).map((issue) => `${page.route}: ${issue}`));
   if (issues.length > 0) lines.push(`Composition issues: ${issues.slice(0, 8).join("; ")}`);
   return lines;
 }

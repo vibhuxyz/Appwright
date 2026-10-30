@@ -1,6 +1,6 @@
 import type { Blueprint, DesignBlock, Page, ProjectType } from "@repo/contracts";
 import { detectArtDirection } from "../direction";
-import { detectPlaybook } from "../playbook";
+import { detectPagePlaybook } from "../playbook";
 import type { ArtDirection, SectionEntry } from "../registry";
 import { chooseAll } from "./choose";
 import { isHome, purposesFor, wantsPlayful, wantsTestimonials } from "./purposes";
@@ -44,7 +44,7 @@ function composePage(page: Page, { design, projectType, direction }: PageContext
     allowPlayful: wantsPlayful(`${text} ${design.style}`),
     previousLayout: null,
     direction,
-    playbook: detectPlaybook(page.purpose),
+    playbook: detectPagePlaybook(page),
     isHome: isHome(page.route, text),
   };
   const chosen = repairLayouts(chooseAll(purposesFor(page.route, text, projectType, direction, context.playbook), context), context);

@@ -3,7 +3,7 @@ export { formatComposition, planComposition } from "./compose";
 export type { ComposedSection, PageCompositionPlan, VisualStrategy } from "./compose";
 export { SIGNATURE_IDEAS, experienceEffectIds, experienceSeed, formatExperience, imageTreatmentFor, planExperience } from "./experience";
 export type { ExperienceStrategy, ImageTreatment, SignatureIdea } from "./experience";
-export { PLAYBOOKS, PLAYBOOK_IDS, detectPlaybook, formatPlaybook } from "./playbook";
+export { PLAYBOOKS, PLAYBOOK_IDS, detectPagePlaybook, detectPlaybook, formatPlaybook } from "./playbook";
 export type { Playbook, PlaybookId } from "./playbook";
 export { FIXTURES, measureFixture, measureFixtures } from "./fixtures";
 export type { FixturePageResult, FixtureResult } from "./fixtures";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { FIXTURES, PATTERNS, applyComposition, critique, detectPlaybook, planComposition, planPatternDelivery } from "../src";
+import { FIXTURES, PATTERNS, applyComposition, critique, detectPagePlaybook, planComposition, planPatternDelivery } from "../src";
 import { SHARED_PATTERN_FILES } from "../src/patterns";
 import { EFFECTS } from "../src";
 
@@ -30,7 +30,7 @@ describe("planComposition", () => {
     for (const fixture of FIXTURES) {
       const blueprint = applyComposition(fixture.blueprint, fixture.blueprint.projectType ?? "other");
       for (const page of blueprint.pages) {
-        expect({ page: page.route, issues: critique(page.sections ?? [], detectPlaybook(page.purpose)) }).toEqual({ page: page.route, issues: [] });
+        expect({ page: page.route, issues: critique(page.sections ?? [], detectPagePlaybook(page)) }).toEqual({ page: page.route, issues: [] });
         expect(planComposition(page, blueprint.design)).not.toBeNull();
       }
     }

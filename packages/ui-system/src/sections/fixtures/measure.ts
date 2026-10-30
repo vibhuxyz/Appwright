@@ -1,5 +1,5 @@
 import type { ProjectType } from "@repo/contracts";
-import { detectPlaybook } from "../playbook";
+import { detectPagePlaybook } from "../playbook";
 import { applyComposition, shellFor, type ShellChoice } from "../select";
 import { compositionEvidence, critique, type CheckEvidence } from "../verify";
 import { FIXTURES } from "./projects";
@@ -32,7 +32,7 @@ export function measureFixture(name: string): FixtureResult | undefined {
     pages: composed.pages.map((page) => ({
       route: page.route,
       sectionIds: (page.sections ?? []).map((section) => section.sectionId),
-      issues: critique(page.sections ?? [], detectPlaybook(page.purpose)),
+      issues: critique(page.sections ?? [], detectPagePlaybook(page)),
     })),
     evidence: compositionEvidence(composed.pages),
     durationMs,

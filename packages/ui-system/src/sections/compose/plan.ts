@@ -1,6 +1,6 @@
 import type { DesignBlock, Page } from "@repo/contracts";
 import { sectionById } from "../catalog";
-import { detectPlaybook } from "../playbook";
+import { detectPagePlaybook } from "../playbook";
 import type { SectionEntry } from "../registry";
 import { CONVERSION_PURPOSES, DENSITY_BY_DESIGN, IMAGE_TREATMENT, MAX_GOAL_CHARS, TYPOGRAPHY_STYLE } from "./constants";
 import { expressiveBudget } from "./budget";
@@ -32,7 +32,7 @@ export function planComposition(page: Page, design: DesignBlock): PageCompositio
   }));
   const motions = entries.map(motionOf);
   const artDirection = page.artDirection ?? directionOfSections(entries, page.purpose);
-  const playbook = detectPlaybook(page.purpose);
+  const playbook = detectPagePlaybook(page);
   const visualStrategy = {
     density: DENSITY_BY_DESIGN[design.density],
     imageTreatment: IMAGE_TREATMENT[artDirection],
