@@ -56,6 +56,17 @@ export const CREATIVE_PATTERNS: readonly PatternEntry[] = [
     antiPatterns: ["Products from another collection", "More than four products"],
   },
   {
+    id: "story.case-row",
+    file: "editorial/case-row.tsx",
+    exportName: "CaseRow",
+    requires: [],
+    effects: [],
+    motion: "subtle",
+    usage:
+      "Up to four case studies as alternating rows: a 4:5 image on one side; eyebrow, title, two-line summary and a Case study link with a line on the other. Agencies, consultancies, studios.",
+    antiPatterns: ["Invented clients or results", "More than four rows", "Rows without a real image of the work"],
+  },
+  {
     id: "portfolio.index-list",
     file: "editorial/index-list.tsx",
     exportName: "IndexList",

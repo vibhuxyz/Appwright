@@ -19,14 +19,25 @@ describe("detectPlaybook", () => {
   }
 });
 
-function homeSectionIds(purpose: string): readonly string[] {
-  const found = FIXTURES.find((entry) => entry.name === "portfolio");
-  if (!found) throw new Error("no portfolio fixture");
+function homeSectionIds(purpose: string, fixtureName = "portfolio"): readonly string[] {
+  const found = FIXTURES.find((entry) => entry.name === fixtureName);
+  if (!found) throw new Error(`no fixture ${fixtureName}`);
   const blueprint = { ...found.blueprint, pages: found.blueprint.pages.map((page, index) => (index === 0 ? { ...page, purpose } : page)) };
-  return applyComposition(blueprint, "portfolio").pages[0]?.sections?.map((section) => section.sectionId) ?? [];
+  return applyComposition(blueprint, found.blueprint.projectType ?? "other").pages[0]?.sections?.map((section) => section.sectionId) ?? [];
 }
 
 describe("playbook section selection", () => {
+  it("uses the case rows for agency briefs only", () => {
+    expect(homeSectionIds("B2B marketing agency home with selected work and case studies")).toContain("story.case-row");
+    expect(homeSectionIds("Architecture studio home with selected projects")).not.toContain("story.case-row");
+    expect(homeSectionIds("Personal photography gallery home")).not.toContain("story.case-row");
+  });
+
+  it("gives hospitality briefs the manifesto statement and keeps it off ordinary local businesses", () => {
+    expect(homeSectionIds("Luxury resort and villa bookings home", "local-business")).toContain("statement.manifesto");
+    expect(homeSectionIds("Neighbourhood plumber home with opening hours", "local-business")).not.toContain("statement.manifesto");
+  });
+
   it("uses the index list for studio and agency briefs only", () => {
     expect(homeSectionIds("Architecture studio home with selected projects")).toContain("portfolio.index-list");
     expect(homeSectionIds("B2B marketing agency home with selected work")).toContain("portfolio.index-list");

@@ -21,7 +21,7 @@ export const PLAYBOOKS = {
     examples: "The Leela, Belgrade Arbor",
     hero: "Cinematic full-bleed photo or video with centred or bottom-left text and the booking or enquiry action over it.",
     heroSectionIds: ["hero.cinematic"],
-    sectionOrder: ["statement.manifesto", "brand.intro", "gallery.editorial", "location.panel", "story.sticky-scroll"],
+    sectionOrder: ["statement.manifesto", "gallery.editorial", "location.panel", "story.sticky-scroll"],
     imageRules: [
       "Images are 16:9 or wider, at least viewport height for the hero.",
       "Section titles may sit over a photo in large type with no scrim box.",
@@ -36,7 +36,7 @@ export const PLAYBOOKS = {
     examples: "MDS Collective",
     hero: "Type-led: one oversized serif or grotesk headline with a single italic emphasis line, or a muted full-screen video.",
     heroSectionIds: ["hero.editorial"],
-    sectionOrder: ["statement.manifesto", "portfolio.index-list", "story.case-study", "proof.quote-band", "stats.band"],
+    sectionOrder: ["statement.manifesto", "portfolio.index-list", "story.case-row", "story.case-study", "proof.quote-band", "stats.band"],
     imageRules: [
       "Editorial 4:5 portraits and 3:2 case images with minimal chrome and no shadows.",
       "Quotes and proof stay text-only; no avatars.",

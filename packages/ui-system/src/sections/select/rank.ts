@@ -61,7 +61,8 @@ export function isEligible(section: SectionEntry, context: RankContext): boolean
   if (context.usedIds?.has(section.id)) return false;
   if (section.characteristics.includes("playful") && !context.allowPlayful) return false;
   if (section.businesses.length > 0 && !section.businesses.includes(context.projectType)) return false;
-  return fitsDirection(section, context.direction) && fitsPlaybook(section, context.playbook);
+  const isAllowedByDirection = fitsDirection(section, context.direction) || isPlaybookPreferred(section, context.playbook);
+  return isAllowedByDirection && fitsPlaybook(section, context.playbook);
 }
 
 function sequenceScore(section: SectionEntry, context: RankContext): number {
