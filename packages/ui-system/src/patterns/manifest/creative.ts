@@ -56,6 +56,17 @@ export const CREATIVE_PATTERNS: readonly PatternEntry[] = [
     antiPatterns: ["Products from another collection", "More than four products"],
   },
   {
+    id: "portfolio.index-list",
+    file: "editorial/index-list.tsx",
+    exportName: "IndexList",
+    requires: ["editorial/index-list-preview.tsx"],
+    effects: [],
+    motion: "subtle",
+    usage:
+      "Numbered rows of projects, services or awards with a title, tag and year on hairline rules; on desktop hover a floating image follows the cursor and the other rows dim. Studios, agencies, architects.",
+    antiPatterns: ["More than twelve rows", "Rows without a real project behind them", "Cards or shadows around rows"],
+  },
+  {
     id: "stats.band",
     file: "editorial/stats-band.tsx",
     exportName: "StatsBand",

@@ -36,7 +36,7 @@ export const PLAYBOOKS = {
     examples: "MDS Collective",
     hero: "Type-led: one oversized serif or grotesk headline with a single italic emphasis line, or a muted full-screen video.",
     heroSectionIds: ["hero.editorial"],
-    sectionOrder: ["statement.manifesto", "story.case-study", "proof.quote-band", "stats.band"],
+    sectionOrder: ["statement.manifesto", "portfolio.index-list", "story.case-study", "proof.quote-band", "stats.band"],
     imageRules: [
       "Editorial 4:5 portraits and 3:2 case images with minimal chrome and no shadows.",
       "Quotes and proof stay text-only; no avatars.",
@@ -50,7 +50,7 @@ export const PLAYBOOKS = {
     examples: "BCG Building Design",
     hero: "Full-bleed photo of the actual work with one line of promise at the bottom-left and a giant wordmark later.",
     heroSectionIds: ["hero.cinematic", "hero.editorial"],
-    sectionOrder: ["statement.manifesto", "portfolio.editorial", "gallery.editorial", "story.sticky-scroll"],
+    sectionOrder: ["statement.manifesto", "portfolio.index-list", "portfolio.editorial", "gallery.editorial", "story.sticky-scroll"],
     imageRules: [
       "Full-bleed or half-screen images of the work, one image per idea.",
       "Warm neutral palette; no overlays on the work itself.",

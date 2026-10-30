@@ -1,6 +1,7 @@
 import type { DesignBlock, ProjectType, SectionPurpose } from "@repo/contracts";
 import { SECTION_CATALOG } from "../catalog";
 import { MAX_EXPRESSIVE_SECTIONS, densityOfLayout, motionOf } from "../compose";
+import type { Playbook } from "../playbook";
 import { ingestionAllowed, isStackCompatible, type ArtDirection, type SectionEntry } from "../registry";
 
 const STYLE_MATCH = 4;
@@ -9,6 +10,7 @@ const BUSINESS_MATCH = 3;
 const LAYOUT_CHANGE = 3;
 const LAYOUT_REPEAT = -6;
 const DIRECTION_MATCH = 5;
+const PLAYBOOK_MATCH = 6;
 const PLACEMENT_MATCH = 2;
 const DENSE_REPEAT = -3;
 const DENSITY_CONTRAST = 2;
@@ -24,6 +26,7 @@ export interface RankContext {
   previousLayout: string | null;
   forbidId?: string;
   direction?: ArtDirection;
+  playbook?: Playbook | null;
   isHome?: boolean;
   previousDensity?: string | null;
   previousMotion?: string | null;
@@ -34,6 +37,15 @@ export interface RankContext {
 function fitsDirection(section: SectionEntry, direction: ArtDirection | undefined): boolean {
   if (!section.directions || section.directions.length === 0) return true;
   return direction !== undefined && section.directions.includes(direction);
+}
+
+function fitsPlaybook(section: SectionEntry, playbook: Playbook | null | undefined): boolean {
+  if (!section.playbooks || section.playbooks.length === 0) return true;
+  return playbook != null && section.playbooks.includes(playbook.id);
+}
+
+function isPlaybookPreferred(section: SectionEntry, playbook: Playbook | null | undefined): boolean {
+  return playbook != null && playbook.sectionOrder.includes(section.id);
 }
 
 function placementScore(section: SectionEntry, isHome: boolean | undefined): number {
@@ -49,7 +61,7 @@ export function isEligible(section: SectionEntry, context: RankContext): boolean
   if (context.usedIds?.has(section.id)) return false;
   if (section.characteristics.includes("playful") && !context.allowPlayful) return false;
   if (section.businesses.length > 0 && !section.businesses.includes(context.projectType)) return false;
-  return fitsDirection(section, context.direction);
+  return fitsDirection(section, context.direction) && fitsPlaybook(section, context.playbook);
 }
 
 function sequenceScore(section: SectionEntry, context: RankContext): number {
@@ -67,6 +79,7 @@ export function scoreSection(section: SectionEntry, context: RankContext): numbe
   if (section.densities.includes(context.density)) score += DENSITY_MATCH;
   if (section.businesses.includes(context.projectType)) score += BUSINESS_MATCH;
   if (context.direction && section.directions?.includes(context.direction)) score += DIRECTION_MATCH;
+  if (isPlaybookPreferred(section, context.playbook)) score += PLAYBOOK_MATCH;
   score += placementScore(section, context.isHome);
   score += sequenceScore(section, context);
   score += context.previousLayout && section.layoutPattern === context.previousLayout ? LAYOUT_REPEAT : LAYOUT_CHANGE;

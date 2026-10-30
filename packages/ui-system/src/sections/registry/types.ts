@@ -1,5 +1,6 @@
 import type { DesignBlock, ProjectType, SectionPurpose, SectionWidth } from "@repo/contracts";
 import type { ArtDirection } from "../../patterns";
+import type { PlaybookId } from "../playbook";
 
 export type { ArtDirection };
 
@@ -37,6 +38,7 @@ export interface SectionEntry {
   width: SectionWidth;
   componentName?: string;
   directions?: readonly ArtDirection[];
+  playbooks?: readonly PlaybookId[];
   placement?: "home" | "inner";
   patternId?: string;
   quality: "accepted";

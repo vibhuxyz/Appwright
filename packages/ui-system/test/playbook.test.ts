@@ -19,6 +19,23 @@ describe("detectPlaybook", () => {
   }
 });
 
+function homeSectionIds(purpose: string): readonly string[] {
+  const found = FIXTURES.find((entry) => entry.name === "portfolio");
+  if (!found) throw new Error("no portfolio fixture");
+  const blueprint = { ...found.blueprint, pages: found.blueprint.pages.map((page, index) => (index === 0 ? { ...page, purpose } : page)) };
+  return applyComposition(blueprint, "portfolio").pages[0]?.sections?.map((section) => section.sectionId) ?? [];
+}
+
+describe("playbook section selection", () => {
+  it("uses the index list for studio and agency briefs only", () => {
+    expect(homeSectionIds("Architecture studio home with selected projects")).toContain("portfolio.index-list");
+    expect(homeSectionIds("B2B marketing agency home with selected work")).toContain("portfolio.index-list");
+    const personal = homeSectionIds("Personal photography gallery home");
+    expect(personal).toContain("portfolio.editorial");
+    expect(personal).not.toContain("portfolio.index-list");
+  });
+});
+
 describe("playbooks", () => {
   it("only reference sections that exist in the catalog", () => {
     for (const id of PLAYBOOK_IDS) {

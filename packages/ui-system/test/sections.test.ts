@@ -94,7 +94,7 @@ describe("fixtures", () => {
     expect(saas?.pages[0]?.sectionIds).not.toContain("location.panel");
     expect(saas?.pages[1]?.sectionIds).toContain("pricing.columns");
     expect(dashboard?.pages[1]?.sectionIds).toEqual(["data.table"]);
-    expect(portfolio?.pages[0]?.sectionIds).toContain("portfolio.editorial");
+    expect(portfolio?.pages[0]?.sectionIds).toContain("portfolio.index-list");
     expect(portfolio?.pages[0]?.sectionIds.join(" ")).not.toContain("pricing");
     expect(dashboard?.pages[0]?.sectionIds).toEqual(["dashboard.metric-strip", "data.table"]);
     expect(dashboard?.shell.navigationId).toBe("nav.sidebar");
