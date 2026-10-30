@@ -162,6 +162,16 @@ function isExcluded(facts: ExtractedFacts, topicId: string): boolean {
   return false;
 }
 
+const MENU_WORDS = /\bmenu\b/i;
+const OPENING_HOURS_WORDS = /\b(opening hours|open hours|hours|restaurant|cafe|bakery|salon|clinic|gym|barber|pharmacy|open (daily|late|7))\b/i;
+
+function isIrrelevantToBrief(facts: ExtractedFacts, topicId: string): boolean {
+  if (topicId === "site-pages") return facts.signals.singlePage;
+  if (topicId === "menu-structure") return !facts.signals.bakery && !MENU_WORDS.test(facts.prompt);
+  if (topicId === "opening-hours") return !facts.signals.bakery && !facts.signals.storefront && !OPENING_HOURS_WORDS.test(facts.prompt);
+  return false;
+}
+
 function isAnswered(facts: ExtractedFacts, topicId: string): boolean {
   const value = facts.answered[topicId];
   return typeof value === "string" && value.length > 0;
@@ -220,5 +230,5 @@ export function materialTopics(facts: ExtractedFacts): MaterialTopic[] {
     topics.push(...(sellsGoods(facts) ? goodsTopics(facts) : serviceBusinessTopics()));
   }
 
-  return topics.filter((item) => !isAnswered(facts, item.id) && !isExcluded(facts, item.id));
+  return topics.filter((item) => !isAnswered(facts, item.id) && !isExcluded(facts, item.id) && !isIrrelevantToBrief(facts, item.id));
 }

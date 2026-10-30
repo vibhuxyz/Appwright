@@ -99,7 +99,8 @@ function collectGoals(prompt: string, signals: DomainSignals): string[] {
 }
 
 function detectSignals(prompt: string): DomainSignals {
-  const browseOnly = detectScope(prompt).isBrowseOnly;
+  const scope = detectScope(prompt);
+  const browseOnly = scope.isBrowseOnly;
   const pickup = /\bpickup\b/i.test(prompt);
   const delivery = ORDER_DELIVERY.test(prompt);
   const customOrders = /\b(custom cake|event requests?|custom orders?|bespoke)\b/i.test(prompt);
@@ -118,6 +119,7 @@ function detectSignals(prompt: string): DomainSignals {
     paymentsMentioned: /\b(pay|payment|checkout|stripe|card)\b/i.test(prompt),
     accountsMentioned: /\b(account|log ?in|sign ?up|guest)\b/i.test(prompt),
     adminMentioned: /\b(admin|staff dashboard|back office)\b/i.test(prompt),
+    singlePage: scope.isSinglePage,
     existingAdmin: /\b(existing|already have|current) (an )?admin\b/i.test(prompt),
     existingImages: /\b(existing|our own|brand) (photos?|images?|assets?|logo)\b/i.test(prompt),
   };

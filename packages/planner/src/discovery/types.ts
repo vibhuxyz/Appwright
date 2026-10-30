@@ -39,6 +39,7 @@ export interface DomainSignals {
   readonly paymentsMentioned: boolean;
   readonly accountsMentioned: boolean;
   readonly adminMentioned: boolean;
+  readonly singlePage: boolean;
   readonly existingAdmin: boolean;
   readonly existingImages: boolean;
 }
