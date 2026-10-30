@@ -6,7 +6,7 @@ import type { QuestionCardStatus, TranscriptItem } from "./types";
 type AgentItem = Extract<TranscriptItem, { kind: "agent" }> & { calls: Msg[] };
 
 function isNewPrompt(msg: Msg): boolean {
-  return msg.role === "user" && !msg.data?.questionReply && msg.data?.intake !== true;
+  return msg.role === "user" && !msg.data?.questionReply && msg.data?.intake !== true && !msg.data?.verificationRetry;
 }
 
 function setStatus(messages: readonly Msg[], index: number, kind: QuestionSetKind): QuestionCardStatus {
@@ -26,6 +26,7 @@ function themeItems(msg: Msg, theme: NonNullable<NonNullable<Msg["data"]>["theme
 }
 
 function userItems(msg: Msg): TranscriptItem[] {
+  if (msg.data?.verificationRetry) return [{ kind: "retry", id: msg.id, msg }];
   if (msg.data?.theme) return themeItems(msg, msg.data.theme);
   const reply = msg.data?.questionReply;
   return [reply ? { kind: "reply", id: msg.id, reply } : { kind: "user", id: msg.id, msg }];
@@ -56,7 +57,7 @@ function markTurnEnds(items: readonly TranscriptItem[]): TranscriptItem[] {
   return items.map((item, index) => {
     if (item.kind !== "agent" || !item.text) return item;
     const next = items[index + 1];
-    return { ...item, isTurnEnd: !next || next.kind === "user" };
+    return { ...item, isTurnEnd: !next || next.kind === "user", isSuperseded: next?.kind === "retry" };
   });
 }
 

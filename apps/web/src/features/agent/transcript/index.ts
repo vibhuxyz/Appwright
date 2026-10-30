@@ -5,6 +5,7 @@ export { findLateQuestions } from "./find-late-questions";
 export { PlanDecisionBubble } from "./plan-decision";
 export { ThemeChoiceCard } from "./ThemeChoiceCard";
 export { QuestionCard, QuestionReplyBubble } from "./question-card";
+export { RetryNotice, retryLabel } from "./RetryNotice";
 export { RunningStatusRow } from "./RunningStatusRow";
 export { cardFromSet } from "./question-card-model";
 export { AgentTurn, activityChips, delegationAgent, presentAgentText, visibleTranscriptItems } from "./chips";

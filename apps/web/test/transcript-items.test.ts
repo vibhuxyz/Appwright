@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { THEME_FONT_NAMES } from "@repo/contracts";
 import type { Msg } from "../src/features/agent/schemas/agentSchemas";
-import { activityChips, buildTranscriptItems, delegationAgent, findLateQuestions, presentAgentText, summarizeToolGroup } from "../src/features/agent/transcript";
+import { activityChips, buildTranscriptItems, delegationAgent, findLateQuestions, presentAgentText, retryLabel, summarizeToolGroup } from "../src/features/agent/transcript";
 import { parseMessageBlocks } from "../src/features/agent/transcript/message-text/parse-message-blocks";
 
 let nextSeq = 0;
@@ -50,6 +50,39 @@ describe("buildTranscriptItems", () => {
     const set = { kind: "intake", intro: "Before I start", items: [{ label: "Language", text: "Which language?", options: ["English"] }], moreCount: 0 };
     const waiting = buildTranscriptItems([msg({ role: "assistant", type: "text", data: { questionSet: set } })]);
     expect(waiting[0]?.kind === "question" && waiting[0].card.status).toBe("waiting");
+  });
+});
+
+describe("verification retries", () => {
+  const retry = (content: string) => msg({ role: "user", type: "text", content, data: { verificationRetry: true } });
+
+  it("shows a retry prompt as a status row, not as a message from the user", () => {
+    const items = buildTranscriptItems([
+      msg({ role: "user", type: "text", content: "Build it" }),
+      msg({ role: "assistant", type: "text", content: "## Done" }),
+      retry("Verification failed, retrying:\nsrc/a.ts:1:1 bad\nsrc/b.ts:2:2 worse"),
+    ]);
+    expect(items.map((item) => item.kind)).toEqual(["user", "agent", "retry"]);
+    expect(retryLabel("Verification failed, retrying:\nsrc/a.ts:1:1 bad\nsrc/b.ts:2:2 worse")).toBe("Checks found 2 issues: the agent is fixing them");
+    expect(retryLabel("Verification failed, retrying:\nonly one")).toBe("Checks found 1 issue: the agent is fixing them");
+  });
+
+  it("marks a summary that a retry follows as superseded, and the last summary as the real turn end", () => {
+    const items = buildTranscriptItems([
+      msg({ role: "assistant", type: "text", content: "First summary" }),
+      retry("Verification failed, retrying:\nx"),
+      msg({ role: "assistant", type: "text", content: "Second summary" }),
+    ]);
+    const [first, , last] = items;
+    expect(first?.kind === "agent" && first.isSuperseded).toBe(true);
+    expect(last?.kind === "agent" && last.isSuperseded).toBe(false);
+    expect(last?.kind === "agent" && last.isTurnEnd).toBe(true);
+  });
+
+  it("does not let a retry prompt count as a new user prompt for earlier questions", () => {
+    const set = { kind: "intake", intro: "Before I start", items: [{ label: "Language", text: "Which language?", options: ["English"] }], moreCount: 0 };
+    const items = buildTranscriptItems([msg({ role: "assistant", type: "text", data: { questionSet: set } }), retry("Verification failed, retrying:\nx")]);
+    expect(items[0]?.kind === "question" && items[0].card.status).toBe("waiting");
   });
 });
 

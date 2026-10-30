@@ -64,6 +64,7 @@ export const msgSchema = z.object({
       imageChoice: z.literal(IMAGE_CHOICE_AUTO).optional().catch(undefined),
       planFeedback: z.array(z.string()).optional().catch(undefined),
       transcriptOnly: z.boolean().optional(),
+      verificationRetry: z.boolean().optional(),
       delegation: z.string().optional(),
       testingAgent: z.boolean().optional(),
       handoff: z.boolean().optional(),

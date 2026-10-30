@@ -9,6 +9,7 @@ import {
   AgentBlock,
   QuestionCard,
   QuestionReplyBubble,
+  RetryNotice,
   RunningStatusRow,
   PlanDecisionBubble,
   ThemeChoiceCard,
@@ -53,6 +54,8 @@ function TranscriptRow({ item, responses, showMeta, projectId, onViewAgent }: Tr
       return <UserMessageItem msg={item.msg} />;
     case "reply":
       return <QuestionReplyBubble reply={item.reply} />;
+    case "retry":
+      return <RetryNotice msg={item.msg} />;
     case "plan-decision":
       return <PlanDecisionBubble feedback={item.feedback} isApproved={item.isApproved} />;
     case "theme-choice":
@@ -68,6 +71,7 @@ function TranscriptRow({ item, responses, showMeta, projectId, onViewAgent }: Tr
           showMeta={showMeta}
           {...(projectId ? { projectId } : {})}
           verification={verificationOf(item.text)}
+          isSuperseded={item.isSuperseded === true}
           onViewAgent={onViewAgent}
         />
       );

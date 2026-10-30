@@ -21,7 +21,8 @@ export type TranscriptItem =
   | { kind: "reply"; id: string; reply: QuestionReplyData }
   | { kind: "plan-decision"; id: string; feedback: readonly string[]; isApproved: boolean }
   | { kind: "theme-choice"; id: string; theme: ThemeOption }
-  | { kind: "agent"; id: string; text: Msg | null; calls: readonly Msg[]; isTurnEnd: boolean }
+  | { kind: "retry"; id: string; msg: Msg }
+  | { kind: "agent"; id: string; text: Msg | null; calls: readonly Msg[]; isTurnEnd: boolean; isSuperseded?: boolean }
   | { kind: "question"; id: string; card: QuestionCardModel };
 
 export type LateQuestions =
