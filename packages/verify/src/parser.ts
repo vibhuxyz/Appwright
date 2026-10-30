@@ -57,9 +57,29 @@ export function parseBuildErrors(rawOutput: string): VerificationError[] {
   return errors;
 }
 
+const STYLISH_FILE = /^\S.*\.[cm]?[jt]sx?$/;
+const STYLISH_ROW = /^\s+(\d+):(\d+)\s+(error|warning)\s+(.+?)(?:\s{2,}[\w@/-]+)?$/;
+
+function parseStylishLintErrors(lines: readonly string[]): VerificationError[] {
+  const errors: VerificationError[] = [];
+  let file: string | undefined;
+  for (const line of lines) {
+    if (STYLISH_FILE.test(line)) {
+      file = line.trim();
+      continue;
+    }
+    const row = STYLISH_ROW.exec(line);
+    if (!file || row?.[1] === undefined || row[2] === undefined || row[3] !== "error" || row[4] === undefined) continue;
+    errors.push({ file, line: Number(row[1]), col: Number(row[2]), message: row[4].trim() });
+  }
+  return errors;
+}
+
 export function parseLintErrors(rawOutput: string): VerificationError[] {
   if (!rawOutput.trim()) return [];
   const lines = rawOutput.split(/\r?\n/);
+  const stylish = parseStylishLintErrors(lines);
+  if (stylish.length > 0) return stylish;
   const errors: VerificationError[] = [];
 
   for (const line of lines) {

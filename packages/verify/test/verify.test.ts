@@ -36,6 +36,39 @@ describe("parseBuildErrors", () => {
   });
 });
 
+const STYLISH_OUTPUT = [
+  "/work/src/components/patterns/effects/text/blur-text.tsx",
+  "  245:3   error  Error: Cannot access refs during render",
+  "",
+  "React refs are values that are not needed for rendering.",
+  "",
+  "  243 |   const settledRef = useRef(phase === 'rest');",
+  "> 245 |   completeRef.current = onAnimationComplete;",
+  "      |   ^^^^^^^^^^^^^^^^^^^ Cannot update ref during render",
+  "                                react-hooks/refs",
+  "  298:7   error  Calling setState synchronously within an effect  react-hooks/set-state-in-effect",
+  "  12:1    warning  Unused variable  no-unused-vars",
+  "",
+  "/work/src/components/patterns/layout/overlay-nav.tsx",
+  "  51:11  error  Do not use an `<a>` element to navigate to `/`  @next/next/no-html-link-for-pages",
+  "",
+  "✖ 4 problems (3 errors, 1 warning)",
+].join("\n");
+
+describe("parseLintErrors (default stylish format)", () => {
+  it("keeps the file, line and column of every error and skips warnings and code frames", () => {
+    expect(parseLintErrors(STYLISH_OUTPUT)).toEqual([
+      { file: "/work/src/components/patterns/effects/text/blur-text.tsx", line: 245, col: 3, message: "Error: Cannot access refs during render" },
+      { file: "/work/src/components/patterns/effects/text/blur-text.tsx", line: 298, col: 7, message: "Calling setState synchronously within an effect" },
+      { file: "/work/src/components/patterns/layout/overlay-nav.tsx", line: 51, col: 11, message: "Do not use an `<a>` element to navigate to `/`" },
+    ]);
+  });
+
+  it("returns nothing for warnings only", () => {
+    expect(parseLintErrors("/work/src/a.tsx\n  1:1  warning  Unused  no-unused-vars\n")).toEqual([]);
+  });
+});
+
 describe("parseLintErrors", () => {
   it("parses lint errors", () => {
     const raw = "src/index.ts: line 5, col 1, Error - 'x' is defined but never used.";
