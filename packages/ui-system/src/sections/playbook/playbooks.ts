@@ -50,7 +50,7 @@ export const PLAYBOOKS = {
     examples: "BCG Building Design",
     hero: "Full-bleed photo of the actual work with one line of promise at the bottom-left and a giant wordmark later.",
     heroSectionIds: ["hero.cinematic", "hero.editorial"],
-    sectionOrder: ["statement.manifesto", "portfolio.index-list", "portfolio.editorial", "gallery.editorial", "story.sticky-scroll"],
+    sectionOrder: ["statement.manifesto", "story.expand-statement", "portfolio.index-list", "portfolio.editorial", "gallery.editorial", "story.sticky-scroll"],
     imageRules: [
       "Full-bleed or half-screen images of the work, one image per idea.",
       "Warm neutral palette; no overlays on the work itself.",

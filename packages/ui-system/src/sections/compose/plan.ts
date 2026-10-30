@@ -3,6 +3,7 @@ import { sectionById } from "../catalog";
 import { detectPlaybook } from "../playbook";
 import type { SectionEntry } from "../registry";
 import { CONVERSION_PURPOSES, DENSITY_BY_DESIGN, IMAGE_TREATMENT, MAX_GOAL_CHARS, TYPOGRAPHY_STYLE } from "./constants";
+import { expressiveBudget } from "./budget";
 import { compositionConstraints } from "./constraints";
 import { directionOfSections } from "./direction";
 import { densityOfLayout, motionOf, strongestMotion } from "./traits";
@@ -31,6 +32,7 @@ export function planComposition(page: Page, design: DesignBlock): PageCompositio
   }));
   const motions = entries.map(motionOf);
   const artDirection = page.artDirection ?? directionOfSections(entries, page.purpose);
+  const playbook = detectPlaybook(page.purpose);
   const visualStrategy = {
     density: DENSITY_BY_DESIGN[design.density],
     imageTreatment: IMAGE_TREATMENT[artDirection],
@@ -39,10 +41,10 @@ export function planComposition(page: Page, design: DesignBlock): PageCompositio
   } as const;
   return {
     artDirection,
-    playbook: detectPlaybook(page.purpose),
+    playbook,
     pageGoal: flat(page.purpose),
     visualStrategy,
     sections,
-    constraints: compositionConstraints(sections, motions, visualStrategy),
+    constraints: compositionConstraints(sections, motions, visualStrategy, expressiveBudget(playbook)),
   };
 }

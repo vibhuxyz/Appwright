@@ -36,6 +36,7 @@ export const DENSITY_BY_LAYOUT: Readonly<Record<string, VisualDensity>> = {
   "split-story": "low",
   "index-list": "medium",
   "case-row": "low",
+  expand: "low",
   mosaic: "medium",
   "split-promo": "low",
   stage: "low",

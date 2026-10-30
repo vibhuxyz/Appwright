@@ -37,6 +37,19 @@ describe("playbook section selection", () => {
     }
   });
 
+  it("gives studio briefs one expanding statement and then no second pinned scene", () => {
+    const found = FIXTURES.find((entry) => entry.name === "portfolio");
+    if (!found) throw new Error("no portfolio fixture");
+    const purpose = "Architecture studio home with selected projects";
+    const blueprint = { ...found.blueprint, pages: found.blueprint.pages.map((page, index) => (index === 0 ? { ...page, purpose } : page)) };
+    const composed = applyComposition(blueprint, "portfolio");
+    const home = composed.pages[0];
+    const plan = home ? planComposition(home, composed.design) : null;
+    expect(plan?.sections.map((section) => section.sectionId)).toContain("story.expand-statement");
+    expect(plan && planExperience(plan, { briefText: purpose, seed: "studio" }).pinnedStatement).toBeNull();
+    for (const other of ["B2B marketing agency home", "Personal photography gallery home"]) expect(homeSectionIds(other)).not.toContain("story.expand-statement");
+  });
+
   it("uses the case rows for agency briefs only", () => {
     expect(homeSectionIds("B2B marketing agency home with selected work and case studies")).toContain("story.case-row");
     expect(homeSectionIds("Architecture studio home with selected projects")).not.toContain("story.case-row");

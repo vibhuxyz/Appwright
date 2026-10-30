@@ -1,7 +1,7 @@
 import { effectById, type EffectEntry } from "../../patterns";
 import { sectionById } from "../catalog";
 import type { PageCompositionPlan } from "../compose";
-import { FOUNDATION_EFFECT_IDS, PINNED_STATEMENT_EFFECT_ID, PINNED_STATEMENT_HOSTS, SIGNATURE_IDEAS, SUPPORTING_EFFECTS } from "./ideas";
+import { DEFAULT_MAX_PINNED_SCENES, FOUNDATION_EFFECT_IDS, PINNED_SECTION_IDS, PINNED_STATEMENT_EFFECT_ID, PINNED_STATEMENT_HOSTS, SIGNATURE_IDEAS, SUPPORTING_EFFECTS } from "./ideas";
 import { imageTreatmentFor } from "./image-treatments";
 import { hashSeed } from "./seed";
 import type { ExperienceInput, ExperienceStrategy, PinnedStatement, SectionMotion, SignatureIdea } from "./types";
@@ -41,9 +41,17 @@ function chooseSignature(plan: PageCompositionPlan, input: ExperienceInput): Cho
   return pool[hashSeed(input.seed) % pool.length] ?? null;
 }
 
+function pinnedSceneBudget(plan: PageCompositionPlan): number {
+  return plan.playbook?.motion.maxPinnedScenes ?? DEFAULT_MAX_PINNED_SCENES;
+}
+
+function pinnedSceneCount(plan: PageCompositionPlan): number {
+  return plan.sections.filter((section) => PINNED_SECTION_IDS.includes(section.sectionId)).length;
+}
+
 function choosePinnedStatement(plan: PageCompositionPlan, signature: ChosenSignature | null): PinnedStatement | null {
   const effect = effectById(PINNED_STATEMENT_EFFECT_ID);
-  if (!effect || signature?.effect.level === "choreography" || plan.playbook?.motion.maxPinnedScenes === 0) return null;
+  if (!effect || signature?.effect.level === "choreography" || pinnedSceneCount(plan) >= pinnedSceneBudget(plan)) return null;
   const sectionId = plan.sections.map((section) => section.sectionId).find((id) => id !== signature?.sectionId && PINNED_STATEMENT_HOSTS.includes(id));
   return sectionId ? { effectId: effect.id, sectionId } : null;
 }

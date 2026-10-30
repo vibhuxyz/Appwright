@@ -78,6 +78,17 @@ export const CREATIVE_PATTERNS: readonly PatternEntry[] = [
     antiPatterns: ["Invented discounts or sale dates", "Two promos in a row", "Body copy longer than two sentences"],
   },
   {
+    id: "story.expand-statement",
+    file: "editorial/expand-statement.tsx",
+    exportName: "ExpandStatement",
+    requires: [],
+    effects: [],
+    motion: "expressive",
+    usage:
+      "Pinned scene on desktop: a narrow image in the centre of the screen grows to fill the left half while a statement, short paragraph and one link enter on the right. Stacked image then text on phones. One per page, the studio's turning point.",
+    antiPatterns: ["More than one pinned scene on the page", "A stock photo instead of the real work", "More than 40 words of copy"],
+  },
+  {
     id: "story.case-row",
     file: "editorial/case-row.tsx",
     exportName: "CaseRow",

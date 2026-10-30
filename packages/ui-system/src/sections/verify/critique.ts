@@ -1,10 +1,11 @@
 import type { PlannedSection } from "@repo/contracts";
 import { sectionById } from "../catalog";
-import { MAX_DENSE_RUN, MAX_EXPRESSIVE_SECTIONS, densityOfLayout, motionOf } from "../compose";
+import { MAX_DENSE_RUN, densityOfLayout, expressiveBudget, motionOf } from "../compose";
+import type { Playbook } from "../playbook";
 
 const MAX_ISSUES = 8;
 
-function sequenceIssues(sections: readonly PlannedSection[]): string[] {
+function sequenceIssues(sections: readonly PlannedSection[], expressiveLimit: number): string[] {
   const issues: string[] = [];
   const seen = new Set<string>();
   let denseRun = 0;
@@ -20,11 +21,11 @@ function sequenceIssues(sections: readonly PlannedSection[]): string[] {
     if (isExpressive) expressive += 1;
     previousExpressive = isExpressive;
   }
-  if (expressive > MAX_EXPRESSIVE_SECTIONS) issues.push(`${expressive} expressive motion sections; keep ${MAX_EXPRESSIVE_SECTIONS} at most`);
+  if (expressive > expressiveLimit) issues.push(`${expressive} expressive motion sections; keep ${expressiveLimit} at most`);
   return issues;
 }
 
-export function critique(sections: readonly PlannedSection[]): string[] {
+export function critique(sections: readonly PlannedSection[], playbook?: Playbook | null): string[] {
   const issues: string[] = [];
   const layouts = new Map<string, number>();
   let images = 0;
@@ -49,5 +50,5 @@ export function critique(sections: readonly PlannedSection[]): string[] {
   }
   const heroAt = sections.findIndex((section) => section.purpose === "hero");
   if (heroAt > 0) issues.push("hero is not first");
-  return [...issues, ...sequenceIssues(sections)].slice(0, MAX_ISSUES);
+  return [...issues, ...sequenceIssues(sections, expressiveBudget(playbook))].slice(0, MAX_ISSUES);
 }

@@ -1,4 +1,5 @@
 export { MAX_DENSE_RUN, MAX_EXPRESSIVE_SECTIONS } from "./constants";
+export { expressiveBudget } from "./budget";
 export { formatComposition } from "./format";
 export { planComposition } from "./plan";
 export { densityOfLayout, motionOf } from "./traits";

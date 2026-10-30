@@ -1,6 +1,6 @@
 import type { DesignBlock, ProjectType, SectionPurpose } from "@repo/contracts";
 import { SECTION_CATALOG } from "../catalog";
-import { MAX_EXPRESSIVE_SECTIONS, densityOfLayout, motionOf } from "../compose";
+import { densityOfLayout, expressiveBudget, motionOf } from "../compose";
 import type { Playbook } from "../playbook";
 import { ingestionAllowed, isStackCompatible, type ArtDirection, type SectionEntry } from "../registry";
 
@@ -71,7 +71,7 @@ function sequenceScore(section: SectionEntry, context: RankContext): number {
   let score = 0;
   if (context.previousDensity) score += density === "high" && context.previousDensity === "high" ? DENSE_REPEAT : density !== context.previousDensity ? DENSITY_CONTRAST : 0;
   if (isExpressive && context.previousMotion === "expressive") score += EXPRESSIVE_REPEAT;
-  if (isExpressive && (context.expressiveCount ?? 0) >= MAX_EXPRESSIVE_SECTIONS) score += EXPRESSIVE_OVER_BUDGET;
+  if (isExpressive && (context.expressiveCount ?? 0) >= expressiveBudget(context.playbook)) score += EXPRESSIVE_OVER_BUDGET;
   return score;
 }
 

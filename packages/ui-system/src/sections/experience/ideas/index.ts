@@ -26,3 +26,7 @@ export const FOUNDATION_EFFECT_IDS: readonly string[] = ["smooth-scroll"];
 export const PINNED_STATEMENT_EFFECT_ID = "scroll-words";
 
 export const PINNED_STATEMENT_HOSTS: readonly string[] = ["statement.manifesto", "brand.intro", "story.narrative"];
+
+export const PINNED_SECTION_IDS: readonly string[] = ["story.expand-statement", "story.sticky-scroll"];
+
+export const DEFAULT_MAX_PINNED_SCENES = 1;
