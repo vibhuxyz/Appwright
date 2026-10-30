@@ -31,6 +31,7 @@ export const QuestionReplyItemSchema = z.object({
   label,
   text,
   answer: z.string().min(1).max(limits.maxAnswerChars),
+  imageUrl: z.string().url().max(limits.maxImageUrlChars).optional(),
 });
 export type QuestionReplyItem = z.infer<typeof QuestionReplyItemSchema>;
 

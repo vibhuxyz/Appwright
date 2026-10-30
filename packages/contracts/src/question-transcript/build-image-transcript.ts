@@ -14,9 +14,13 @@ const IMAGE_SOURCE_ANSWERS = {
 export type ImageSlotSource = keyof typeof IMAGE_SOURCE_ANSWERS;
 type SectionSlot = Pick<AssetSlot, "componentName" | "pageRoute">;
 
+function capitalizeFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 export function imageSectionLabel(slot: SectionSlot): string {
-  const words = slot.componentName.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[-_]+/g, " ");
-  return flattenTranscriptText(words, limits.maxLabelChars);
+  const words = slot.componentName.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[-_.]+/g, " ");
+  return flattenTranscriptText(capitalizeFirst(words), limits.maxLabelChars);
 }
 
 const HOME_ROUTE = "/";
@@ -45,6 +49,13 @@ export function imageQuestionSet(intro: string, slots: readonly SectionSlot[]): 
 export interface ImageSlotOutcome extends SectionSlot {
   status: AssetSlot["status"];
   source: ImageSlotSource | null;
+  imageUrl?: string | undefined;
+}
+
+function thumbnailOf(slot: ImageSlotOutcome, index: number): { imageUrl: string } | Record<string, never> {
+  const url = slot.imageUrl;
+  const isShown = slot.status === "RESOLVED" && url !== undefined && url.startsWith("https://") && url.length <= limits.maxImageUrlChars;
+  return isShown && index < limits.maxThumbnails ? { imageUrl: url } : {};
 }
 
 function imageAnswer(slot: ImageSlotOutcome): string {
@@ -60,10 +71,11 @@ export function imageReply(slots: readonly ImageSlotOutcome[]): QuestionReplyDat
   return {
     kind: "images",
     outcome: "answered",
-    items: slots.slice(0, limits.maxItems).map((slot) => ({
+    items: slots.slice(0, limits.maxItems).map((slot, index) => ({
       label: imageSectionLabel(slot),
       text: imageSectionQuestion(slot),
       answer: imageAnswer(slot),
+      ...thumbnailOf(slot, index),
     })),
     moreCount: Math.max(0, slots.length - limits.maxItems),
   };

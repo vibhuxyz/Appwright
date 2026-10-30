@@ -18,5 +18,6 @@ export async function loadImageReply(assetRequestId: string): Promise<QuestionRe
     pageRoute: slot.pageRoute,
     status: slot.status,
     source: slot.assetId ? sourceById.get(slot.assetId) ?? null : null,
+    imageUrl: slot.finalPath,
   })));
 }

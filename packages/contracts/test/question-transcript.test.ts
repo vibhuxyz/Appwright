@@ -105,4 +105,20 @@ describe("reply builders", () => {
     expect(reply.items[0]?.answer).toBe("Uploaded my own");
     expect(imageReply([{ ...slot, status: "SKIPPED", source: null }]).outcome).toBe("skipped");
   });
+
+  it("turns pattern ids into readable section names", () => {
+    expect(imageQuestionSet("Choose", [{ componentName: "commerce.split-promo", pageRoute: "/" }]).items[0]?.label).toBe("Commerce split promo");
+    expect(imageQuestionSet("Choose", [{ componentName: "hero.editorial", pageRoute: "/" }]).items[0]?.label).toBe("Hero editorial");
+    expect(imageQuestionSet("Choose", [{ componentName: "OpenGraphImage", pageRoute: "/" }]).items[0]?.label).toBe("Open Graph Image");
+  });
+
+  it("attaches a thumbnail only for resolved photos on https URLs", () => {
+    const base = { componentName: "HeroSection", pageRoute: "/", source: "SEARCHED" as const };
+    const reply = imageReply([
+      { ...base, status: "RESOLVED", imageUrl: "https://images.unsplash.com/photo-1?w=1080" },
+      { ...base, status: "RESOLVED", imageUrl: "/uploads/local.png" },
+      { ...base, status: "SKIPPED", imageUrl: "https://images.unsplash.com/photo-2" },
+    ]);
+    expect(reply.items.map((item) => item.imageUrl)).toEqual(["https://images.unsplash.com/photo-1?w=1080", undefined, undefined]);
+  });
 });

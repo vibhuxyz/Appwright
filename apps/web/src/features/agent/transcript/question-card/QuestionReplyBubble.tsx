@@ -11,7 +11,10 @@ export function QuestionReplyBubble({ reply }: { reply: QuestionReplyData }) {
           {reply.items.map((item, index) => (
             <div key={`${index}-${item.label}`}>
               <dt className="text-foreground-secondary">{item.label} — {item.text}</dt>
-              <dd className="font-semibold text-foreground">{item.answer}</dd>
+              <dd className="flex items-center gap-2 font-semibold text-foreground">
+                {item.imageUrl && <img src={item.imageUrl} alt={item.label} loading="lazy" className="size-10 shrink-0 rounded-md object-cover" />}
+                <span>{item.answer}</span>
+              </dd>
             </div>
           ))}
           {reply.moreCount > 0 && <p className="text-muted">(+{reply.moreCount} more)</p>}

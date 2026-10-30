@@ -11,6 +11,8 @@ export const QUESTION_TRANSCRIPT_LIMITS = {
   maxOptions: 12,
   maxOptionChars: 80,
   maxAnswerChars: 500,
+  maxImageUrlChars: 400,
+  maxThumbnails: 12,
   maxContentBytes: 6000,
 } as const;
 
