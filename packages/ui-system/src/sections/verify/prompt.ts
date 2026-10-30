@@ -1,5 +1,5 @@
 import type { DesignBlock, Page, PlannedSection } from "@repo/contracts";
-import { patternById, patternImportPath } from "../../patterns";
+import { PATTERN_PROPS, patternById, patternImportPath } from "../../patterns";
 import { sectionById } from "../catalog";
 import { formatComposition, planComposition } from "../compose";
 import { experienceSeed, formatExperience, planExperience } from "../experience";
@@ -8,10 +8,11 @@ import { detectPlaybook } from "../playbook";
 import { critique } from "./critique";
 
 const MAX_LINE = 500;
+const MAX_PATTERN_LINE = 1000;
 
-function clip(text: string): string {
+function clip(text: string, limit = MAX_LINE): string {
   const flat = text.replace(/\s+/g, " ").trim();
-  return flat.length <= MAX_LINE ? flat : `${flat.slice(0, MAX_LINE - 1).trimEnd()}…`;
+  return flat.length <= limit ? flat : `${flat.slice(0, limit - 1).trimEnd()}…`;
 }
 
 function sectionLine(section: PlannedSection, previous: PlannedSection | undefined): string {
@@ -28,8 +29,11 @@ function patternLine(sectionId: string): string | undefined {
   const patternId = sectionById(sectionId)?.patternId;
   const pattern = patternId ? patternById(patternId) : undefined;
   if (!pattern) return undefined;
+  const props = PATTERN_PROPS[pattern.id];
+  const propsNote = props ? ` Props ${props}; pass exactly these types (named types such as MediaImage are exported from the same file).` : "";
   return clip(
-    `  Pattern ready on disk: import { ${pattern.exportName} } from "${patternImportPath(pattern.file)}". Render it with this business's real content as props; change classes only to fit the theme, do not rebuild it. Use: ${pattern.usage} Avoid: ${pattern.antiPatterns.join("; ")}.`,
+    `  Pattern ready on disk: import { ${pattern.exportName} } from "${patternImportPath(pattern.file)}". Render it with this business's real content as props; change classes only to fit the theme, do not rebuild it.${propsNote} Use: ${pattern.usage} Avoid: ${pattern.antiPatterns.join("; ")}.`,
+    MAX_PATTERN_LINE,
   );
 }
 

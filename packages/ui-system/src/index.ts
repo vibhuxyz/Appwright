@@ -11,6 +11,7 @@ export { uiSystemPromptSection } from "./prompt";
 export {
   EFFECTS,
   PATTERNS,
+  PATTERN_PROPS,
   PATTERNS_TARGET_DIR,
   VENDORED_EFFECTS,
   effectById,

@@ -16,7 +16,9 @@
     "check-types": "tsc --noEmit",
     "check-patterns": "tsc --noEmit -p patterns/tsconfig.json",
     "vendor:effects": "bun bin/vendor-effects.ts",
-    "build": "tsup src/index.ts --format esm --dts"
+    "build": "tsup src/index.ts --format esm --dts",
+    "emit:props": "bun bin/emit-pattern-props.ts",
+    "emit:props:check": "bun bin/emit-pattern-props.ts --check"
   },
   "dependencies": {
     "@repo/contracts": "workspace:*"
