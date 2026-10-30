@@ -18,6 +18,8 @@ export const STAGGER_S = {
 } as const;
 
 export const REVEAL_OFFSET_PX = 16;
+export const SCROLL_REVEAL_OFFSET_PX = 40;
+export const SCROLL_REVEAL_SCALE = 0.96;
 export const EXIT_OFFSET_PX = -12;
 
 export const INTENSITY_PX = {

@@ -11,8 +11,8 @@ Name the purpose (feedback, where-it-came-from, state change, avoid a jump, expl
 
 ## 2. Use what is on disk
 - `@/components/patterns/shared/motion`: `EASE_OUT`, `EASE_IN_OUT`, `DURATION_S`, `STAGGER_S`, `REVEAL_OFFSET_PX`. Never write a new cubic-bezier or duration.
-- `Reveal` (fade-up on scroll), `MaskedText` (words rise through a mask; headlines only, never paragraphs or text with links).
-- Effects: only the ones the experience strategy names; the brief gives each import, options and fallback. Do not install motion, lenis, three or ogl.
+- `Reveal` (`from` up, left, right or scale; 40px travel; vary `from` between neighbours), `MaskedText` (words rise through a mask; headlines only, never paragraphs or text with links).
+- Effects: only the ones the experience strategy names; the brief gives each import, options and fallback. Mount the brief's `SmoothScroll` (Lenis) once in the root layout. Do not install motion, gsap, three or ogl.
 - Levels per section come from the brief: reveal (Reveal or a Media entrance), choreography (one pinned or scroll-linked scene), interactive (pointer, drag, canvas). "none" means the pattern as delivered.
 - Cheapest tool: CSS/Tailwind transition for hover, press and toggles; framer-motion only for scroll, exit and sequenced motion.
 
@@ -41,7 +41,7 @@ Name the purpose (feedback, where-it-came-from, state change, avoid a jump, expl
 Large headings take negative tracking (`tracking-tight`), body stays at normal tracking, and labels use `text-xs uppercase tracking-widest`. Tight leading on display type (`leading-none`), comfortable leading on body text.
 
 ## Anti-patterns
-Every section fading up on scroll; bounce on menus; motion as the only sign that something changed; an infinite animation behind body text; content that stays hidden if a script fails.
+Every section fading up on scroll the same way; bounce on menus; motion as the only sign that something changed; an infinite animation behind body text; content that stays hidden if a script fails.
 
 ## Done when
 Each animation has a named purpose, uses the shared tokens, has a reduced-motion path, and the page reads fully with motion off.

@@ -18,6 +18,7 @@
     "paths": {
       "@/components/ui/*": ["../components/*"],
       "@/components/patterns/*": ["./*"],
+      "lenis/react": ["../../../templates/nextjs-fullstack/node_modules/lenis/dist/lenis-react.d.ts"],
       "*": ["../../../templates/nextjs-fullstack/node_modules/@types/*", "../../../templates/nextjs-fullstack/node_modules/*"]
     }
   },

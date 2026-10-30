@@ -48,14 +48,25 @@ describe("planExperience", () => {
     expect(homeExperience(fixture("local-business")).strategy.signature?.effectId).not.toBe("image-compare");
   });
 
-  it("adds nothing to a dashboard and nothing beyond one signature plus two supporting effects anywhere", () => {
+  it("adds nothing to a dashboard and nothing beyond foundation, signature, pinned statement and two supporting effects anywhere", () => {
     const dashboard = applyComposition(fixture("dashboard"), "saas");
     const page = dashboard.pages[0];
     const plan = page ? planComposition(page, dashboard.design) : null;
     expect(plan && formatExperience(planExperience(plan, { briefText: page?.purpose ?? "", seed: "dashboard" }))).toEqual([]);
     for (const entry of FIXTURES) {
       const { strategy } = homeExperience(entry.blueprint);
-      expect(experienceEffectIds(strategy).length).toBeLessThanOrEqual(3);
+      expect(experienceEffectIds(strategy).length).toBeLessThanOrEqual(5);
+    }
+  });
+
+  it("mounts smooth scroll on animated pages and pins one statement when a host section exists", () => {
+    for (const entry of FIXTURES) {
+      const { plan, strategy } = homeExperience(entry.blueprint);
+      const isAnimated = strategy.sectionMotion.some((section) => section.level !== "none");
+      expect(strategy.foundationEffectIds).toEqual(isAnimated ? ["smooth-scroll"] : []);
+      if (!strategy.pinnedStatement) continue;
+      expect(plan.sections.map((section) => section.sectionId)).toContain(strategy.pinnedStatement.sectionId);
+      expect(strategy.sectionMotion.find((section) => section.sectionId === strategy.pinnedStatement?.sectionId)?.level).toBe("choreography");
     }
   });
 

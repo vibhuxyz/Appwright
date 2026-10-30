@@ -9,14 +9,22 @@ function effectLine(effectId: string, role: string): string | null {
 
 export function formatExperience(strategy: ExperienceStrategy): string[] {
   const signature = strategy.signature;
-  if (!signature && strategy.imageTreatments.length === 0) return [];
-  const lines = ["Experience strategy (one signature moment; everything else stays calm):"];
+  if (!signature && !strategy.pinnedStatement && strategy.imageTreatments.length === 0) return [];
+  const lines = ["Experience strategy (one signature moment and one pinned statement; everything else stays calm):"];
+  for (const id of strategy.foundationEffectIds) {
+    const line = effectLine(id, "Foundation, mount once in the root layout around the page content");
+    if (line) lines.push(line);
+  }
   if (signature) {
     lines.push(`Signature idea in ${signature.sectionId}: ${signature.idea} Make it specific to this business; adapt it, do not add a second one.`);
     const line = effectLine(signature.effectId, "Signature effect");
     if (line) lines.push(line);
   } else {
     lines.push("No signature effect: let typography, imagery and spacing carry the page.");
+  }
+  if (strategy.pinnedStatement) {
+    const line = effectLine(strategy.pinnedStatement.effectId, `Pinned statement in ${strategy.pinnedStatement.sectionId}, the page's one scroll-linked scene, using the brand's real promise as the sentence`);
+    if (line) lines.push(line);
   }
   for (const id of strategy.supportingEffectIds) {
     const line = effectLine(id, "Optional support");

@@ -31,8 +31,15 @@ export interface SectionMotion {
   readonly level: SectionMotionLevel;
 }
 
+export interface PinnedStatement {
+  readonly effectId: string;
+  readonly sectionId: string;
+}
+
 export interface ExperienceStrategy {
   readonly signature: { readonly idea: string; readonly effectId: string; readonly sectionId: string } | null;
+  readonly foundationEffectIds: readonly string[];
+  readonly pinnedStatement: PinnedStatement | null;
   readonly supportingEffectIds: readonly string[];
   readonly sectionMotion: readonly SectionMotion[];
   readonly imageTreatments: readonly ImageTreatment[];

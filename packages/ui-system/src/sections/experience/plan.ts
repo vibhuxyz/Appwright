@@ -1,10 +1,10 @@
 import { effectById, type EffectEntry } from "../../patterns";
 import { sectionById } from "../catalog";
 import type { PageCompositionPlan } from "../compose";
-import { SIGNATURE_IDEAS, SUPPORTING_EFFECTS } from "./ideas";
+import { FOUNDATION_EFFECT_IDS, PINNED_STATEMENT_EFFECT_ID, PINNED_STATEMENT_HOSTS, SIGNATURE_IDEAS, SUPPORTING_EFFECTS } from "./ideas";
 import { imageTreatmentFor } from "./image-treatments";
 import { hashSeed } from "./seed";
-import type { ExperienceInput, ExperienceStrategy, SectionMotion, SignatureIdea } from "./types";
+import type { ExperienceInput, ExperienceStrategy, PinnedStatement, SectionMotion, SignatureIdea } from "./types";
 
 const MAX_SUPPORTING_EFFECTS = 2;
 const SAME_AS_DESKTOP = "Same as desktop";
@@ -41,9 +41,17 @@ function chooseSignature(plan: PageCompositionPlan, input: ExperienceInput): Cho
   return pool[hashSeed(input.seed) % pool.length] ?? null;
 }
 
-function motionFor(plan: PageCompositionPlan, signature: ChosenSignature | null): SectionMotion[] {
+function choosePinnedStatement(plan: PageCompositionPlan, signature: ChosenSignature | null): PinnedStatement | null {
+  const effect = effectById(PINNED_STATEMENT_EFFECT_ID);
+  if (!effect || signature?.effect.level === "choreography") return null;
+  const sectionId = plan.sections.map((section) => section.sectionId).find((id) => id !== signature?.sectionId && PINNED_STATEMENT_HOSTS.includes(id));
+  return sectionId ? { effectId: effect.id, sectionId } : null;
+}
+
+function motionFor(plan: PageCompositionPlan, signature: ChosenSignature | null, pinned: PinnedStatement | null): SectionMotion[] {
   return plan.sections.map((section) => {
     if (signature?.sectionId === section.sectionId) return { sectionId: section.sectionId, level: signature.effect.level };
+    if (pinned?.sectionId === section.sectionId) return { sectionId: section.sectionId, level: "choreography" };
     if (section.density === "high") return { sectionId: section.sectionId, level: "none" };
     return { sectionId: section.sectionId, level: "reveal" };
   });
@@ -59,11 +67,16 @@ export function planExperience(plan: PageCompositionPlan, input: ExperienceInput
   const supportingEffectIds = (signature ? (SUPPORTING_EFFECTS[plan.artDirection] ?? []) : [])
     .filter((id) => id !== signature?.effect.id && effectById(id) !== undefined)
     .slice(0, MAX_SUPPORTING_EFFECTS);
-  const effects = [signature?.effect, ...supportingEffectIds.map(effectById)].flatMap((effect) => (effect ? [effect] : []));
+  const pinnedStatement = choosePinnedStatement(plan, signature);
+  const sectionMotion = motionFor(plan, signature, pinnedStatement);
+  const isAnimatedPage = sectionMotion.some((entry) => entry.level !== "none");
+  const effects = [signature?.effect, ...supportingEffectIds.map(effectById), pinnedStatement ? effectById(pinnedStatement.effectId) : undefined].flatMap((effect) => (effect ? [effect] : []));
   return {
     signature: signature ? { idea: signature.idea.idea, effectId: signature.effect.id, sectionId: signature.sectionId } : null,
+    foundationEffectIds: isAnimatedPage ? FOUNDATION_EFFECT_IDS.filter((id) => effectById(id) !== undefined) : [],
+    pinnedStatement,
     supportingEffectIds,
-    sectionMotion: motionFor(plan, signature),
+    sectionMotion,
     imageTreatments: imageRoles(plan).map((role) => imageTreatmentFor(role, plan.artDirection)),
     mobile: [...BASE_MOBILE, ...effects.filter((effect) => !effect.touch.startsWith(SAME_AS_DESKTOP)).map((effect) => `${effect.exportName}: ${effect.touch}`)],
     performance: [...BASE_PERFORMANCE, ...effects.filter((effect) => effect.performance !== "light").map((effect) => `${effect.exportName} is ${effect.performance} cost: one instance, only in its section.`)],
@@ -71,5 +84,10 @@ export function planExperience(plan: PageCompositionPlan, input: ExperienceInput
 }
 
 export function experienceEffectIds(strategy: ExperienceStrategy): string[] {
-  return [...(strategy.signature ? [strategy.signature.effectId] : []), ...strategy.supportingEffectIds];
+  return [
+    ...(strategy.signature ? [strategy.signature.effectId] : []),
+    ...(strategy.pinnedStatement ? [strategy.pinnedStatement.effectId] : []),
+    ...strategy.foundationEffectIds,
+    ...strategy.supportingEffectIds,
+  ];
 }
