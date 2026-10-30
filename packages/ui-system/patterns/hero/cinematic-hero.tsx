@@ -1,3 +1,5 @@
+"use client";
+
 import { motion } from "framer-motion";
 import Magnet from "@/components/patterns/effects/pointer/magnet";
 import { MaskedText } from "@/components/patterns/shared/masked-text";

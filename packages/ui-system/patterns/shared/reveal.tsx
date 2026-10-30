@@ -1,3 +1,5 @@
+"use client";
+
 import { useRef, type CSSProperties, type ReactNode } from "react";
 import {
   DURATION_S,

@@ -1,6 +1,7 @@
 import type { VendoredEffect } from "./types";
 
 const USE_CLIENT_DIRECTIVE = /^\s*["']use client["'];?[ \t]*\r?\n+/;
+const CLIENT_DIRECTIVE = '"use client";\n\n';
 const MOTION_IMPORT = /(["'])motion\/react\1/g;
 const SHADCN_UTILS_IMPORT = /(["'])@\/lib\/utils\1/g;
 
@@ -22,10 +23,11 @@ export function adaptEffectSource(
     .replace(USE_CLIENT_DIRECTIVE, "")
     .replace(MOTION_IMPORT, '"framer-motion"')
     .replace(SHADCN_UTILS_IMPORT, '"@/components/ui/utils"');
-  return (effect.vendor.patches ?? []).reduce(
+  const patched = (effect.vendor.patches ?? []).reduce(
     (text, patch) => applyPatch(text, patch, effect),
     base,
   );
+  return `${CLIENT_DIRECTIVE}${patched}`;
 }
 
 export function effectBanner(effect: VendoredEffect): string {

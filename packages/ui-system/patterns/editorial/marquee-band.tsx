@@ -1,3 +1,5 @@
+"use client";
+
 import { useInView } from "framer-motion";
 import { Pause, Play } from "lucide-react";
 import { useRef, useState } from "react";

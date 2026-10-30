@@ -1,3 +1,5 @@
+"use client";
+
 import BlurText from "@/components/patterns/effects/text/blur-text";
 import { Media, type MediaImage } from "@/components/patterns/shared/media";
 import { Reveal } from "@/components/patterns/shared/reveal";

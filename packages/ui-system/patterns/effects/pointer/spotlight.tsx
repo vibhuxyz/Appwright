@@ -1,4 +1,6 @@
 /* VENDORED from https://ui.aceternity.com/registry/spotlight-new.json (aceternity-ui). Regenerate: bun --filter @repo/ui-system vendor:effects */
+"use client";
+
 import { motion } from "framer-motion";
 
 type SpotlightProps = {

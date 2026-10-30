@@ -16,7 +16,7 @@ export const PATTERN_PROPS: Readonly<Record<string, string>> = {
   "hero.editorial": "{ eyebrow: string; title: string; intro: string; image: MediaImage; action?: { label: string; href: string }; meta?: readonly { label: string; value: string }[] }",
   "hero.playground": "{ eyebrow?: string; title: string; intro?: string; items: readonly PlaygroundItem[]; action?: { label: string; href: string } }",
   "hero.spotlight": "{ eyebrow?: string; titleStart: string; rotatingWords: readonly string[]; description: string; primaryAction: { label: string; href: string }; secondaryAction?: { label: string; href: string } }",
-  "nav.overlay-menu": "{ brand: string; links: readonly { label: string; href: string }[]; contact?: { label: string; href: string }; meta?: string }",
+  "nav.overlay-menu": "{ brand: string; links: readonly { label: string; href: string }[]; contact?: { label: string; href: string }; meta?: string; homeHref?: string }",
   "portfolio.index-list": "{ heading?: string; items: readonly IndexItem[] }",
   "promo.bar": "{ message: string; href?: string }",
   "proof.quote-band": "{ heading?: string; quotes: readonly Quote[] }",

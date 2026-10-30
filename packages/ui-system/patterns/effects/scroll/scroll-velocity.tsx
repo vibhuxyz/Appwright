@@ -1,4 +1,6 @@
 /* VENDORED from https://reactbits.dev/r/ScrollVelocity-TS-TW.json (react-bits). Regenerate: bun --filter @repo/ui-system vendor:effects */
+"use client";
+
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import {
   motion,

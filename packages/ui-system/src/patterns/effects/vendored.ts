@@ -43,7 +43,7 @@ export const VENDORED_EFFECTS: readonly VendoredEffect[] = [
     reducedMotion: "Turns itself off; patterns also pass disabled.",
     fallback: "A normal button.",
     testIds: ["patterns:reduced-motion-guard"],
-    vendor: { sourceId: "react-bits", url: `${REACT_BITS}/Magnet-TS-TW.json` },
+    vendor: { sourceId: "react-bits", url: `${REACT_BITS}/Magnet-TS-TW.json`, patches: [["  const settingsRef = useRef(settings);\n  settingsRef.current = settings;\n", "  const settingsRef = useRef(settings);\n  useEffect(() => {\n    settingsRef.current = settings;\n  });\n"]] },
   },
   {
     id: "scroll-velocity",
@@ -83,7 +83,7 @@ export const VENDORED_EFFECTS: readonly VendoredEffect[] = [
     reducedMotion: "MotionConfig skips the movement; the blur and fade still play once.",
     fallback: "Plain headline.",
     testIds: ["patterns:reduced-motion-guard"],
-    vendor: { sourceId: "react-bits", url: `${REACT_BITS}/BlurText-TS-TW.json` },
+    vendor: { sourceId: "react-bits", url: `${REACT_BITS}/BlurText-TS-TW.json`, patches: [["const firstPhase = useRef(phase).current;", "const [firstPhase] = useState(phase);"], ["  const completeRef = useRef(onAnimationComplete);\n  completeRef.current = onAnimationComplete;\n", "  const completeRef = useRef(onAnimationComplete);\n  useEffect(() => {\n    completeRef.current = onAnimationComplete;\n  });\n"], ["    if (trigger === 'load') {\n      setPhase('in');\n      return undefined;\n    }\n    if (trigger === 'hover' || trigger === 'click') {\n      setPhase('rest');\n      return undefined;\n    }\n", "    if (trigger === 'load' || trigger === 'hover' || trigger === 'click') {\n      const nextPhase = trigger === 'load' ? 'in' : 'rest';\n      const frame = window.requestAnimationFrame(() => setPhase(nextPhase));\n      return () => window.cancelAnimationFrame(frame);\n    }\n"], ["onPointerEnter={trigger === 'hover' ? handleEnter : undefined}", "onPointerEnter={() => {\n          if (trigger === 'hover') handleEnter();\n        }}"], ["onClick={trigger === 'click' ? replay : undefined}", "onClick={() => {\n          if (trigger === 'click') replay();\n        }}"]] },
   },
   {
     id: "scroll-reveal",
@@ -103,7 +103,7 @@ export const VENDORED_EFFECTS: readonly VendoredEffect[] = [
     reducedMotion: "gsap.matchMedia skips the scroll animation; text stays at full opacity.",
     fallback: "Plain paragraph.",
     testIds: ["patterns:reduced-motion-guard"],
-    vendor: { sourceId: "react-bits", url: `${REACT_BITS}/ScrollReveal-TS-TW.json` },
+    vendor: { sourceId: "react-bits", url: `${REACT_BITS}/ScrollReveal-TS-TW.json`, patches: [["  useEffect(() => setMounted(true), []);\n", "  useEffect(() => {\n    const frame = window.requestAnimationFrame(() => setMounted(true));\n    return () => window.cancelAnimationFrame(frame);\n  }, []);\n"]] },
   },
   {
     id: "rotating-text",

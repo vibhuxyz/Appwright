@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef, type ElementType } from "react";
 import { usePrefersReducedMotion } from "@/components/patterns/shared/reduced-motion";
 

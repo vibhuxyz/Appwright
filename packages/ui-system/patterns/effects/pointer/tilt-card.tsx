@@ -1,3 +1,5 @@
+"use client";
+
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
 import type { PointerEvent, ReactNode } from "react";
 import { cn } from "@/components/ui/utils";

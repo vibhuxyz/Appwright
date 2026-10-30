@@ -1,4 +1,6 @@
 /* VENDORED from https://reactbits.dev/r/BlurText-TS-TW.json (react-bits). Regenerate: bun --filter @repo/ui-system vendor:effects */
+"use client";
+
 import { motion, MotionConfig, type Easing, type MotionStyle, type Transition } from "framer-motion";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
@@ -236,11 +238,13 @@ const BlurText = ({
 }: BlurTextProps) => {
   const ref = useRef<HTMLParagraphElement>(null);
   const [phase, setPhase] = useState<Phase>(() => startPhase(trigger));
-  const firstPhase = useRef(phase).current;
+  const [firstPhase] = useState(phase);
   const [focusWord, setFocusWord] = useState(-1);
   const settledRef = useRef(phase === 'rest');
   const completeRef = useRef(onAnimationComplete);
-  completeRef.current = onAnimationComplete;
+  useEffect(() => {
+    completeRef.current = onAnimationComplete;
+  });
 
   const fx = useMemo(() => buildEffect(effect, direction, blur, distance), [effect, direction, blur, distance]);
 
@@ -292,13 +296,10 @@ const BlurText = ({
 
   useEffect(() => {
     if (phase !== 'from') return undefined;
-    if (trigger === 'load') {
-      setPhase('in');
-      return undefined;
-    }
-    if (trigger === 'hover' || trigger === 'click') {
-      setPhase('rest');
-      return undefined;
+    if (trigger === 'load' || trigger === 'hover' || trigger === 'click') {
+      const nextPhase = trigger === 'load' ? 'in' : 'rest';
+      const frame = window.requestAnimationFrame(() => setPhase(nextPhase));
+      return () => window.cancelAnimationFrame(frame);
     }
     const element = ref.current;
     if (!element) return undefined;
@@ -414,8 +415,12 @@ const BlurText = ({
         ref={ref}
         className={`blur-text flex flex-wrap ${trigger === 'click' ? 'cursor-pointer' : ''} ${className}`}
         style={{ color }}
-        onPointerEnter={trigger === 'hover' ? handleEnter : undefined}
-        onClick={trigger === 'click' ? replay : undefined}
+        onPointerEnter={() => {
+          if (trigger === 'hover') handleEnter();
+        }}
+        onClick={() => {
+          if (trigger === 'click') replay();
+        }}
       >
         <span className="sr-only select-none">{text}</span>
         {groups.map((indices, w) => (

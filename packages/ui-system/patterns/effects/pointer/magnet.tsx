@@ -1,4 +1,6 @@
 /* VENDORED from https://reactbits.dev/r/Magnet-TS-TW.json (react-bits). Regenerate: bun --filter @repo/ui-system vendor:effects */
+"use client";
+
 import { useEffect, useRef, type HTMLAttributes, type ReactNode } from 'react';
 
 export type MagnetAxis = 'both' | 'x' | 'y';
@@ -156,7 +158,9 @@ const Magnet = ({
     onActiveChange
   };
   const settingsRef = useRef(settings);
-  settingsRef.current = settings;
+  useEffect(() => {
+    settingsRef.current = settings;
+  });
 
   useEffect(() => {
     const wrapper = wrapperRef.current;

@@ -1,3 +1,5 @@
+"use client";
+
 import { useInView } from "framer-motion";
 import { useRef } from "react";
 import { Spotlight } from "@/components/patterns/effects/pointer/spotlight";

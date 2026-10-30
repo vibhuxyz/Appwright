@@ -1,3 +1,5 @@
+"use client";
+
 import { useId, useState } from "react";
 import { cn } from "@/components/ui/utils";
 import { Media, type MediaImage, type MediaRatio } from "@/components/patterns/shared/media";

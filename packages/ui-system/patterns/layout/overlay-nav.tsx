@@ -1,3 +1,5 @@
+"use client";
+
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -10,15 +12,17 @@ import {
 import { usePrefersReducedMotion } from "@/components/patterns/shared/reduced-motion";
 
 const LINKS_DELAY_S = 0.2;
+const DEFAULT_HOME_HREF = "#";
 
 export interface OverlayNavProps {
   brand: string;
   links: readonly { label: string; href: string }[];
   contact?: { label: string; href: string };
   meta?: string;
+  homeHref?: string;
 }
 
-export function OverlayNav({ brand, links, contact, meta }: OverlayNavProps) {
+export function OverlayNav({ brand, links, contact, meta, homeHref = DEFAULT_HOME_HREF }: OverlayNavProps) {
   const [isOpen, setIsOpen] = useState(false);
   const shouldReduceMotion = usePrefersReducedMotion();
   const firstLinkRef = useRef<HTMLAnchorElement>(null);
@@ -48,7 +52,7 @@ export function OverlayNav({ brand, links, contact, meta }: OverlayNavProps) {
         className="fixed inset-x-0 top-0 z-50 bg-background/80 text-foreground backdrop-blur"
       >
         <div className="mx-auto grid max-w-screen-2xl grid-cols-2 items-start gap-4 px-4 py-4 text-xs uppercase tracking-widest md:grid-cols-4 md:px-8">
-          <a href="/" className="inline-flex min-h-6 items-center font-medium">
+          <a href={homeHref} className="inline-flex min-h-6 items-center font-medium">
             {brand}
           </a>
           {meta && (

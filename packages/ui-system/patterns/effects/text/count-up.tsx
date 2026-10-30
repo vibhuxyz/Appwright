@@ -1,4 +1,6 @@
 /* VENDORED from https://reactbits.dev/r/CountUp-TS-TW.json (react-bits). Regenerate: bun --filter @repo/ui-system vendor:effects */
+"use client";
+
 import { animate, cubicBezier, useInView } from "framer-motion";
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 

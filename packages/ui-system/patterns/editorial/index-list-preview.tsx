@@ -1,3 +1,5 @@
+"use client";
+
 import { motion, useSpring, type MotionValue } from "framer-motion";
 import { useEffect } from "react";
 import { Media, type MediaImage } from "@/components/patterns/shared/media";

@@ -1,4 +1,6 @@
 /* VENDORED from https://reactbits.dev/r/ScrollReveal-TS-TW.json (react-bits). Regenerate: bun --filter @repo/ui-system vendor:effects */
+"use client";
+
 import React, {
   Children,
   useEffect,
@@ -152,7 +154,10 @@ const ScrollReveal: React.FC<ScrollRevealProps> = ({
 
   const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
 
   useIsomorphicLayoutEffect(() => {
     const el = containerRef.current;

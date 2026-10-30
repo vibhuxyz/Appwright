@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect, useRef, type RefObject } from "react";
 
 const MIN_THUMB_RATIO = 0.1;

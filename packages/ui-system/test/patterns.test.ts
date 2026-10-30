@@ -113,13 +113,14 @@ describe("planPatternDelivery", () => {
 describe("adaptEffectSource", () => {
   const effect = VENDORED_EFFECTS[0];
 
-  it("drops the client directive and points imports at the template", () => {
+  it("keeps one client directive first and points imports at the template", () => {
     if (!effect) throw new Error("no effect sources");
     const adapted = adaptEffectSource(
       `'use client';\n\nimport { motion } from 'motion/react';\nimport { cn } from "@/lib/utils";\nimport React from "react";\n`,
       effect,
     );
-    expect(adapted.startsWith("import")).toBe(true);
+    expect(adapted.startsWith('"use client";\n\nimport')).toBe(true);
+    expect(adapted.match(/use client/g)).toHaveLength(1);
     expect(adapted).toContain('from "framer-motion"');
     expect(adapted).toContain('from "@/components/ui/utils"');
   });

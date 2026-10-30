@@ -1,3 +1,5 @@
+"use client";
+
 import { Heart, Star } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/components/ui/utils";

@@ -1,3 +1,5 @@
+"use client";
+
 import { useMotionValue } from "framer-motion";
 import { useState, type PointerEvent } from "react";
 import { cn } from "@/components/ui/utils";
