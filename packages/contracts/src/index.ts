@@ -8,6 +8,7 @@ export * from "./theme";
 export * from "./user.schema";
 export * from "./blueprint.schema";
 export { isRepairPrompt } from "./repair-prompt";
+export { RESUME_PROMPT, isResumePrompt, resumePrompt } from "./resume-prompt";
 export { isConversationalMessage, looksLikeBuildRequest } from "./conversational-message";
 export {
   ANALYZE_PROMPT_VERSION,

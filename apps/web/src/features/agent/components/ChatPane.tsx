@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { resumePrompt } from "@repo/contracts";
 import type { Session } from "../schemas/agentSchemas";
 import { useAgentStore } from "../store/agentStore";
 import { useUpdateSessionModel } from "../hooks/useSession";
@@ -7,13 +8,13 @@ import { useAttachmentUpload } from "../hooks/useAttachmentUpload";
 import { IntakeDock, useIntake } from "../intake";
 import { ChatDock } from "../questions";
 import { deriveActiveStopNotice } from "../utils/deriveStopNotice";
+import { isVerificationFailure, stopNoticeDescription } from "../utils/stopNoticePresentation";
 import { Panel } from "@/shared/components/ui/Panel";
 import { SelectionChip, selectionStore } from "@/features/preview";
 import { PaneComposer, useComposerDraft } from "../composer";
 import { MessageList } from "./MessageList";
 import { StopNoticeCard } from "./StopNoticeCard";
 
-const RESUME_PROMPT = "Continue building the remaining tasks in the plan until complete.";
 const ATTACHMENT_ONLY_PROMPT = "Build the application according to the attached reference designs and documents.";
 
 export function ChatPane({
@@ -101,7 +102,7 @@ export function ChatPane({
         <StopNoticeCard
           notice={activeStopNotice}
           userCredits={userCredits}
-          onResume={() => intake.sendNow(RESUME_PROMPT)}
+          onResume={() => intake.sendNow(resumePrompt(isVerificationFailure(activeStopNotice) ? stopNoticeDescription(activeStopNotice, userCredits) : undefined))}
           onAddCredits={onAddCredits}
         />
       )}

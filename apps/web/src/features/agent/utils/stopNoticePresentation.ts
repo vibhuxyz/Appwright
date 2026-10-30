@@ -1,6 +1,13 @@
 import { AGENT_LOOP_LIMITS, creditsToUsd } from "@repo/contracts";
 import type { StopNotice } from "../schemas/agentSchemas";
 
+const VERIFICATION_DETAIL = /verification/i;
+const LEADING_SYMBOLS = /^[^\w]+/;
+
+export function isVerificationFailure(notice: StopNotice): boolean {
+  return notice.reason === "fatalError" && VERIFICATION_DETAIL.test(notice.detail);
+}
+
 export function stopNoticeIcon(reason: string): string {
   switch (reason) {
     case "outOfCredits":
@@ -57,7 +64,7 @@ export function stopNoticeShortLabel(notice: StopNotice, userCredits: number): s
     case "timeout":
       return "Paused: Execution timed out";
     default:
-      return "Stopped: Unexpected error";
+      return isVerificationFailure(notice) ? "Stopped: Checks failed" : "Stopped: Unexpected error";
   }
 }
 
@@ -74,7 +81,7 @@ export function stopNoticeTitle(notice: StopNotice): string {
     case "timeout":
       return "Run Paused: Execution Timed Out";
     default:
-      return "Run Stopped: Unexpected Error";
+      return isVerificationFailure(notice) ? "Run Stopped: Checks Failed" : "Run Stopped: Unexpected Error";
   }
 }
 
@@ -89,6 +96,8 @@ export function stopNoticeDescription(notice: StopNotice, userCredits: number): 
     case "cancelled":
       return "Execution was stopped. Click below to resume where the AI left off.";
     default:
-      return "The run was interrupted by an unexpected error. Click below to retry.";
+      return isVerificationFailure(notice)
+        ? notice.detail.replace(LEADING_SYMBOLS, "").trim()
+        : "The run was interrupted by an unexpected error. Click below to retry.";
   }
 }

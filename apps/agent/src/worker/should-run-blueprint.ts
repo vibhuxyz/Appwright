@@ -5,12 +5,14 @@ export interface PlanSignals {
   readonly theme: ThemeOption | undefined;
   readonly approvedBlueprintId: string | undefined;
   readonly analysis: PromptAnalysis | undefined;
+  readonly isResume: boolean;
 }
 
 export async function shouldRunBlueprintPath(
   signals: PlanSignals,
   classifyTurn: () => Promise<DecisionResult>,
 ): Promise<boolean> {
+  if (signals.isResume) return false;
   if (signals.theme || signals.approvedBlueprintId) return true;
   if (signals.analysis) return analysisNeedsDetailedPlan(signals.analysis);
   return needsDetailedPlan(await classifyTurn());

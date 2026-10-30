@@ -19,7 +19,7 @@ import {
 } from "@repo/cache";
 import { loadMissingAssetsNotice } from "@repo/assets";
 import { applyTheme, chosenThemeFromRows } from "@repo/blueprint";
-import { AGENT_LOOP_LIMITS, loopSpendLimits, type Attachment, type VerificationResult } from "@repo/contracts";
+import { AGENT_LOOP_LIMITS, isResumePrompt, loopSpendLimits, type Attachment, type VerificationResult } from "@repo/contracts";
 import { loadProjectMemoryRows, prisma, type Job } from "@repo/db";
 import { classify, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
@@ -28,6 +28,7 @@ import { ALL_TOOLS, guardTools } from "@repo/tools";
 import { sessionWorktreePath, worktreeSessionIdOf } from "@repo/workspace";
 import { restoreWorkspace } from "../recovery";
 import { answersFromRows } from "./answers-from-rows";
+import { summarizeVerificationFailure } from "./verification-summary";
 import { withSelectionApplied } from "./apply-selection";
 import { approvedBlueprintIdFromRows } from "./approved-blueprint-id";
 import { autoMergeSession } from "./auto-merge-session";
@@ -182,7 +183,7 @@ export async function executeAgentJob(
     const storedAnalysis = await freshStoredAnalysis(job.analysis, turnRows);
     log.info("routing analysis", { sessionId: session.id, reused: storedAnalysis !== undefined });
     const planInDetail = await shouldRunBlueprintPath(
-      { theme: chosenThemeFromRows(turnRows), approvedBlueprintId, analysis: storedAnalysis },
+      { theme: chosenThemeFromRows(turnRows), approvedBlueprintId, analysis: storedAnalysis, isResume: isResumePrompt(currentTurnText(effectiveRows)) },
       () =>
         classify(
           currentTurnText(effectiveRows),
@@ -237,7 +238,7 @@ export async function executeAgentJob(
           await persist({
             role: "assistant",
             type: "text",
-            content: "❌ Built the plan, but verification found real errors. Giving up.",
+            content: `❌ Built the plan, but verification found real errors. ${summarizeVerificationFailure(verify.results)}`.trim(),
             data: { stopReason: "fatalError", verification: verify.results },
           });
         }
@@ -301,8 +302,8 @@ export async function executeAgentJob(
             role: "assistant",
             type: "text",
             content: verify.stuck
-              ? "❌ Verification failed with the same error as the last attempt — retrying wouldn't help. Giving up."
-              : `❌ Verification still failing after ${MAX_VERIFY_ATTEMPTS} attempts. Giving up.`,
+              ? `❌ Verification failed and the same errors came back, so I stopped. ${summarizeVerificationFailure(verify.results)} Retrying will not help until the failing code changes.`
+              : `❌ Verification still failing after ${MAX_VERIFY_ATTEMPTS} attempts. ${summarizeVerificationFailure(verify.results)}`,
             data: { stopReason: "fatalError", verification: verify.results },
           });
           break;

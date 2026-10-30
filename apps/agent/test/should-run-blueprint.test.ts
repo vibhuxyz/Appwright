@@ -52,13 +52,13 @@ function classifierReturning(result: DecisionResult) {
   return { classifyTurn, calls };
 }
 
-const noSignals = { theme: undefined, approvedBlueprintId: undefined, analysis: undefined };
+const noSignals = { theme: undefined, approvedBlueprintId: undefined, analysis: undefined, isResume: false };
 
 describe("shouldRunBlueprintPath", () => {
   it("always plans after the user picks a design system, without classifying", async () => {
     const { classifyTurn, calls } = classifierReturning({ status: "invalid", decision: UNKNOWN_DECISION });
     expect(
-      await shouldRunBlueprintPath({ theme, approvedBlueprintId: undefined, analysis: undefined }, classifyTurn),
+      await shouldRunBlueprintPath({ theme, approvedBlueprintId: undefined, analysis: undefined, isResume: false }, classifyTurn),
     ).toBe(true);
     expect(calls).toHaveLength(0);
   });
@@ -68,7 +68,7 @@ describe("shouldRunBlueprintPath", () => {
       accepted({ intent: "create", complexity: 4, confidence: 0.9 }),
     );
     expect(
-      await shouldRunBlueprintPath({ theme: undefined, approvedBlueprintId: "bp-1", analysis: undefined }, classifyTurn),
+      await shouldRunBlueprintPath({ theme: undefined, approvedBlueprintId: "bp-1", analysis: undefined, isResume: false }, classifyTurn),
     ).toBe(true);
     expect(calls).toHaveLength(0);
   });
@@ -84,6 +84,13 @@ describe("shouldRunBlueprintPath", () => {
       accepted({ intent: "create", complexity: 8, confidence: 0.8 }),
     );
     expect(await shouldRunBlueprintPath(noSignals, classifyTurn)).toBe(true);
+  });
+
+  it("never re-plans a resumed run, even if the resume sentence looks like a big new build", async () => {
+    const { classifyTurn, calls } = classifierReturning(accepted({ intent: "create", complexity: 9, confidence: 0.9 }));
+    const signals = { ...noSignals, isResume: true, analysis: analysisWith({ intent: "create", complexity: 9 }) };
+    expect(await shouldRunBlueprintPath(signals, classifyTurn)).toBe(false);
+    expect(calls).toHaveLength(0);
   });
 
   it("trusts a fresh stored analysis instead of classifying again", async () => {
