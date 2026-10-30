@@ -3,6 +3,7 @@ import type { Playbook, PlaybookId } from "./types";
 export const PLAYBOOKS = {
   commerce: {
     id: "commerce",
+    ids: ["commerce"],
     examples: "Puma, Wonder, Zepto",
     hero: "Utility first: full-bleed product or campaign image with one clear action; no cinematic scroll scene.",
     heroSectionIds: ["hero.cinematic", "commerce.campaign-banner"],
@@ -18,6 +19,7 @@ export const PLAYBOOKS = {
   },
   hospitality: {
     id: "hospitality",
+    ids: ["hospitality"],
     examples: "The Leela, Belgrade Arbor",
     hero: "Cinematic full-bleed photo or video with centred or bottom-left text and the booking or enquiry action over it.",
     heroSectionIds: ["hero.cinematic"],
@@ -33,6 +35,7 @@ export const PLAYBOOKS = {
   },
   agency: {
     id: "agency",
+    ids: ["agency"],
     examples: "MDS Collective",
     hero: "Type-led: one oversized serif or grotesk headline with a single italic emphasis line, or a muted full-screen video.",
     heroSectionIds: ["hero.editorial"],
@@ -47,6 +50,7 @@ export const PLAYBOOKS = {
   },
   studio: {
     id: "studio",
+    ids: ["studio"],
     examples: "BCG Building Design",
     hero: "Full-bleed photo of the actual work with one line of promise at the bottom-left and a giant wordmark later.",
     heroSectionIds: ["hero.cinematic", "hero.editorial"],

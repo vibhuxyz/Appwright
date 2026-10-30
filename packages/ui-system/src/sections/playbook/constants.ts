@@ -1,6 +1,6 @@
 import type { PlaybookId } from "./types";
 
-export const PLAYBOOK_ORDER: readonly PlaybookId[] = ["commerce", "hospitality", "studio", "agency"];
+export const PLAYBOOK_ORDER: readonly PlaybookId[] = ["hospitality", "studio", "agency", "commerce"];
 
 export const PLAYBOOK_KEYWORDS: Readonly<Record<PlaybookId, RegExp>> = {
   commerce: /\b(shop|store|e-?commerce|grocery|groceries|sneakers?|apparel|footwear|furniture|cart|checkout|catalogue|catalog|merch|boutique)\b/i,

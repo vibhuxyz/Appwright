@@ -14,6 +14,7 @@ export interface PlaybookTypography {
 
 export interface Playbook {
   readonly id: PlaybookId;
+  readonly ids: readonly PlaybookId[];
   readonly examples: string;
   readonly hero: string;
   readonly heroSectionIds: readonly string[];

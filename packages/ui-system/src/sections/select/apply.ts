@@ -47,7 +47,7 @@ function composePage(page: Page, { design, projectType, direction }: PageContext
     playbook: detectPlaybook(page.purpose),
     isHome: isHome(page.route, text),
   };
-  const chosen = repairLayouts(chooseAll(purposesFor(page.route, text, projectType, direction), context), context);
+  const chosen = repairLayouts(chooseAll(purposesFor(page.route, text, projectType, direction, context.playbook), context), context);
   return {
     ...page,
     artDirection: direction,

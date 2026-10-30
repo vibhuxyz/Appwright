@@ -3,7 +3,7 @@ import type { Playbook } from "./types";
 export function formatPlaybook(playbook: Playbook): string[] {
   const { motion, typography } = playbook;
   return [
-    `Site-type playbook ${playbook.id} (like ${playbook.examples}; follow it over generic habits):`,
+    `Site-type playbook ${playbook.ids.join(" + ")} (like ${playbook.examples}; follow it over generic habits${playbook.ids.length > 1 ? "; this page mixes site types, so give each business its own section pattern" : ""}):`,
     `- Hero: ${playbook.hero}`,
     `- Preferred section order when the page has them: ${playbook.sectionOrder.join(", ")}.`,
     ...playbook.imageRules.map((rule) => `- Images: ${rule}`),

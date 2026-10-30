@@ -1,4 +1,5 @@
 import type { ProjectType, SectionPurpose } from "@repo/contracts";
+import type { Playbook, PlaybookId } from "../playbook";
 import type { ArtDirection } from "../registry";
 
 const MAX_PURPOSES = 8;
@@ -34,9 +35,9 @@ export function wantsTestimonials(text: string): boolean {
 
 function insertBeforeCta(purposes: SectionPurpose[], purpose: SectionPurpose): void {
   if (purposes.includes(purpose)) return;
-  const ctaAt = purposes.indexOf("cta");
-  if (ctaAt === -1) purposes.push(purpose);
-  else purposes.splice(ctaAt, 0, purpose);
+  const closingAt = purposes.findIndex((entry) => entry === "cta" || entry === "contact");
+  if (closingAt === -1) purposes.push(purpose);
+  else purposes.splice(closingAt, 0, purpose);
 }
 
 function withSignals(base: readonly SectionPurpose[], text: string): SectionPurpose[] {
@@ -46,6 +47,22 @@ function withSignals(base: readonly SectionPurpose[], text: string): SectionPurp
   if (/\b(newsletter|subscribe)\b/i.test(text)) insertBeforeCta(purposes, "newsletter");
   if (/\b(menu|catalog|shop|products?)\b/i.test(text)) insertBeforeCta(purposes, "categories");
   if (wantsTestimonials(text)) insertBeforeCta(purposes, "testimonials");
+  return purposes.slice(0, MAX_PURPOSES);
+}
+
+const PLAYBOOK_PURPOSES: Readonly<Record<PlaybookId, readonly SectionPurpose[]>> = {
+  commerce: ["categories"],
+  hospitality: ["brand", "gallery"],
+  studio: ["portfolio"],
+  agency: ["portfolio", "story"],
+};
+
+function withPlaybook(base: readonly SectionPurpose[], playbook: Playbook | null | undefined): SectionPurpose[] {
+  const purposes = [...base];
+  if (!playbook || playbook.ids.length < 2) return purposes;
+  for (const id of playbook.ids) {
+    for (const purpose of PLAYBOOK_PURPOSES[id]) insertBeforeCta(purposes, purpose);
+  }
   return purposes.slice(0, MAX_PURPOSES);
 }
 
@@ -79,9 +96,10 @@ export function purposesFor(
   text: string,
   projectType: ProjectType,
   direction?: ArtDirection,
+  playbook?: Playbook | null,
 ): SectionPurpose[] {
   if (PRIVATE_ROUTE.test(route)) return privatePurposes(text);
-  if (isHome(route, text)) return withSignals(homePurposes(projectType, direction), text);
+  if (isHome(route, text)) return withPlaybook(withSignals(homePurposes(projectType, direction), text), playbook);
   if (/\b(table|records|list)\b/i.test(text)) return ["data-table"];
   return publicPurposes(text, projectType).slice(0, MAX_PURPOSES);
 }

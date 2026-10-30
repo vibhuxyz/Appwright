@@ -26,6 +26,23 @@ function homeSectionIds(purpose: string, fixtureName = "portfolio"): readonly st
   return applyComposition(blueprint, found.blueprint.projectType ?? "other").pages[0]?.sections?.map((section) => section.sectionId) ?? [];
 }
 
+const MIXED_PURPOSE = "Single-page landing for Arbor & Oak architecture studio, resort, furniture collection, and consultancy";
+
+describe("mixed briefs", () => {
+  it("merge every matching playbook, with one primary and the most permissive motion budget", () => {
+    const merged = detectPlaybook(MIXED_PURPOSE);
+    expect([...(merged?.ids ?? [])].sort()).toEqual(["agency", "commerce", "hospitality", "studio"]);
+    expect(merged?.motion).toEqual({ isSmoothScrollOn: true, maxPinnedScenes: 1 });
+    expect(merged?.sectionOrder.length).toBeLessThanOrEqual(10);
+  });
+
+  it("give each business its own section pattern, with the closing section last", () => {
+    const ids = homeSectionIds(MIXED_PURPOSE);
+    for (const expected of ["portfolio.index-list", "story.case-row", "commerce.mosaic"]) expect(ids).toContain(expected);
+    expect(ids.indexOf("commerce.mosaic")).toBeLessThan(ids.indexOf("contact.split"));
+  });
+});
+
 describe("playbook section selection", () => {
   it("gives store briefs the collection mosaic and split promo, and no other site type", () => {
     const store = homeSectionIds("Online store for sneakers with cart and checkout", "fashion-store");

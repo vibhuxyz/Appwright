@@ -41,7 +41,7 @@ function fitsDirection(section: SectionEntry, direction: ArtDirection | undefine
 
 function fitsPlaybook(section: SectionEntry, playbook: Playbook | null | undefined): boolean {
   if (!section.playbooks || section.playbooks.length === 0) return true;
-  return playbook != null && section.playbooks.includes(playbook.id);
+  return playbook != null && section.playbooks.some((id) => playbook.ids.includes(id));
 }
 
 function isPlaybookPreferred(section: SectionEntry, playbook: Playbook | null | undefined): boolean {
