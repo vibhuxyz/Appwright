@@ -63,7 +63,8 @@ describe("planExperience", () => {
     for (const entry of FIXTURES) {
       const { plan, strategy } = homeExperience(entry.blueprint);
       const isAnimated = strategy.sectionMotion.some((section) => section.level !== "none");
-      expect(strategy.foundationEffectIds).toEqual(isAnimated ? ["smooth-scroll"] : []);
+      const isSmoothScrollAllowed = plan.playbook?.motion.isSmoothScrollOn !== false;
+      expect(strategy.foundationEffectIds).toEqual(isAnimated && isSmoothScrollAllowed ? ["smooth-scroll"] : []);
       if (!strategy.pinnedStatement) continue;
       expect(plan.sections.map((section) => section.sectionId)).toContain(strategy.pinnedStatement.sectionId);
       expect(strategy.sectionMotion.find((section) => section.sectionId === strategy.pinnedStatement?.sectionId)?.level).toBe("choreography");

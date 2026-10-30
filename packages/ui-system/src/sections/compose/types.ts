@@ -1,3 +1,4 @@
+import type { Playbook } from "../playbook";
 import type { ArtDirection } from "../registry";
 
 export type VisualDensity = "low" | "medium" | "high";
@@ -20,6 +21,7 @@ export interface ComposedSection {
 
 export interface PageCompositionPlan {
   readonly artDirection: ArtDirection;
+  readonly playbook: Playbook | null;
   readonly pageGoal: string;
   readonly visualStrategy: VisualStrategy;
   readonly sections: readonly ComposedSection[];

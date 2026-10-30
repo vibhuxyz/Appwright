@@ -1,5 +1,6 @@
 import type { DesignBlock, Page } from "@repo/contracts";
 import { sectionById } from "../catalog";
+import { detectPlaybook } from "../playbook";
 import type { SectionEntry } from "../registry";
 import { CONVERSION_PURPOSES, DENSITY_BY_DESIGN, IMAGE_TREATMENT, MAX_GOAL_CHARS, TYPOGRAPHY_STYLE } from "./constants";
 import { compositionConstraints } from "./constraints";
@@ -38,6 +39,7 @@ export function planComposition(page: Page, design: DesignBlock): PageCompositio
   } as const;
   return {
     artDirection,
+    playbook: detectPlaybook(page.purpose),
     pageGoal: flat(page.purpose),
     visualStrategy,
     sections,

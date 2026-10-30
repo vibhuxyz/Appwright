@@ -43,7 +43,7 @@ function chooseSignature(plan: PageCompositionPlan, input: ExperienceInput): Cho
 
 function choosePinnedStatement(plan: PageCompositionPlan, signature: ChosenSignature | null): PinnedStatement | null {
   const effect = effectById(PINNED_STATEMENT_EFFECT_ID);
-  if (!effect || signature?.effect.level === "choreography") return null;
+  if (!effect || signature?.effect.level === "choreography" || plan.playbook?.motion.maxPinnedScenes === 0) return null;
   const sectionId = plan.sections.map((section) => section.sectionId).find((id) => id !== signature?.sectionId && PINNED_STATEMENT_HOSTS.includes(id));
   return sectionId ? { effectId: effect.id, sectionId } : null;
 }
@@ -69,7 +69,7 @@ export function planExperience(plan: PageCompositionPlan, input: ExperienceInput
     .slice(0, MAX_SUPPORTING_EFFECTS);
   const pinnedStatement = choosePinnedStatement(plan, signature);
   const sectionMotion = motionFor(plan, signature, pinnedStatement);
-  const isAnimatedPage = sectionMotion.some((entry) => entry.level !== "none");
+  const isAnimatedPage = sectionMotion.some((entry) => entry.level !== "none") && plan.playbook?.motion.isSmoothScrollOn !== false;
   const effects = [signature?.effect, ...supportingEffectIds.map(effectById), pinnedStatement ? effectById(pinnedStatement.effectId) : undefined].flatMap((effect) => (effect ? [effect] : []));
   return {
     signature: signature ? { idea: signature.idea.idea, effectId: signature.effect.id, sectionId: signature.sectionId } : null,

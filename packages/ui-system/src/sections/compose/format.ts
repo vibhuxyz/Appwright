@@ -1,3 +1,4 @@
+import { formatPlaybook } from "../playbook";
 import { transitionNote } from "./constraints";
 import type { PageCompositionPlan } from "./types";
 
@@ -11,5 +12,6 @@ export function formatComposition(plan: PageCompositionPlan): string[] {
     `<page-goal>${plan.pageGoal.replaceAll(CLOSING_TAG, "<\\/page-goal>")}</page-goal>`,
     ...plan.sections.map((section, index) => `${index + 1}. ${section.sectionId} (${section.visualRole}, ${section.density} density): ${transitionNote(section, plan.sections[index - 1])}`),
     ...plan.constraints.map((constraint) => `- ${constraint}`),
+    ...(plan.playbook ? formatPlaybook(plan.playbook) : []),
   ];
 }
