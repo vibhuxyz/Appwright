@@ -22,7 +22,7 @@ function photo(id: string, slug: string, description: string | null): UnsplashPh
 
 const RECRUITER = photo("a1", "linkedin-recruiter-hire-candidates-faster-with-robust-tool-pVhI8a4suXE", null);
 const DASHBOARD = photo("a2", "a-laptop-showing-a-website-dashboard-Xq3Lm9PzAbc", "A laptop screen showing a website dashboard");
-const ENGINEER = photo("a3", "woman-working-on-a-laptop-in-a-lab-Zk4Nn8RtUvw", "Engineer working in a lab");
+const ENGINEER = photo("a3", "woman-working-in-a-lab-Zk4Nn8RtUvw", "Engineer working in a lab");
 const BREAD = photo("a4", "fresh-bread-on-a-wooden-table-Bb2Cc3DdEef", "Fresh bread");
 
 describe("hasLegibleText", () => {

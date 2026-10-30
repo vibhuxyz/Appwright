@@ -3,6 +3,7 @@ import { prisma } from "@repo/db";
 import type { UnsplashClient } from "@repo/media";
 import { log } from "../../log";
 import { photoSearchQuery } from "../social-fallback";
+import { stockSearchWords } from "../stock-query";
 import { orientationForAspect } from "./orientation";
 import { persistUnsplashPhoto } from "./persist-photo";
 import { pickUnusedPhoto } from "./pick-unused-photo";
@@ -42,7 +43,7 @@ export async function suggestUnsplashPhoto(input: SuggestUnsplashInput) {
     return null;
   }
 
-  const photo = pickUnusedPhoto(searched.value.items, await usedPhotoIds(input.sessionId));
+  const photo = pickUnusedPhoto(searched.value.items, await usedPhotoIds(input.sessionId), stockSearchWords(input.slot));
   if (!photo) return null;
 
   return persistUnsplashPhoto({

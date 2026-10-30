@@ -1,4 +1,5 @@
 import type { AssetSlot } from "@repo/contracts";
+import { stockSearchQuery } from "./stock-query";
 
 const MAX_SEARCH_CHARS = 120;
 
@@ -10,7 +11,7 @@ function pageSubject(altText: string): string {
 
 export function photoSearchQuery(slot: Pick<AssetSlot, "purpose" | "altText" | "suggestedPrompt">): string {
   const prompt = slot.suggestedPrompt.replace(/\s+/g, " ").trim();
-  if (slot.purpose !== "social") return prompt.slice(0, MAX_SEARCH_CHARS);
+  if (slot.purpose !== "social") return stockSearchQuery(slot) || prompt.slice(0, MAX_SEARCH_CHARS);
   const subject = pageSubject(slot.altText);
   if (!subject) return prompt.slice(0, MAX_SEARCH_CHARS);
   const suffix = " wide photograph";
