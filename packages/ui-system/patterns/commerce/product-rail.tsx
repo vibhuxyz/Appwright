@@ -4,6 +4,7 @@ import {
   ProductCard,
   type Product,
 } from "@/components/patterns/commerce/product-card";
+import { RailProgress } from "@/components/patterns/commerce/rail-progress";
 
 const SCROLL_FRACTION = 0.85;
 const MAX_RAIL_PRODUCTS = 12;
@@ -78,6 +79,7 @@ export function ProductRail({ heading, products, viewAll }: ProductRailProps) {
           </li>
         ))}
       </ul>
+      <RailProgress railRef={railRef} />
     </section>
   );
 }

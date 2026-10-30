@@ -50,7 +50,7 @@ export const COMMERCE_SECTIONS = [
     contentFields: ["heading", "products", "view all link"],
     assets: [{ purpose: "product", aspect: "3:4", required: true, guidance: "One 3:4 product shot per card on a plain background." }],
     responsive: "Cards are 60% wide on phones and 20% on desktop; buttons hide on touch sizes.",
-    interactions: ["Previous and next buttons", "Wishlist toggle per card"],
+    interactions: ["Previous and next buttons", "Thin progress bar tracks the scroll", "Wishlist toggle per card"],
     width: "full",
     componentName: "ProductRail",
   }),

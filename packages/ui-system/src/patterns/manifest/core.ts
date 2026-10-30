@@ -78,11 +78,11 @@ export const CORE_PATTERNS: readonly PatternEntry[] = [
     id: "commerce.product-rail",
     file: "commerce/product-rail.tsx",
     exportName: "ProductRail",
-    requires: [PRODUCT_CARD],
+    requires: [PRODUCT_CARD, "commerce/rail-progress.tsx"],
     effects: [],
     motion: "subtle",
     usage:
-      "A horizontal, snap-scrolling row of product cards with previous/next buttons. Home page 'trending' or 'new in'.",
+      "A horizontal, snap-scrolling row of product cards with previous/next buttons and a thin progress bar under the row. Home page 'trending' or 'new in'.",
     antiPatterns: [
       "Auto-scrolling",
       "Hiding the scroll affordance on touch",

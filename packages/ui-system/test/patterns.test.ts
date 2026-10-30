@@ -95,6 +95,7 @@ describe("planPatternDelivery", () => {
     const sources = plan.files.map((file) => file.source);
     expect(sources).toEqual([...sources].sort());
     expect(sources).toContain("commerce/product-card.tsx");
+    expect(sources).toContain("commerce/rail-progress.tsx");
     expect(sources).toContain("effects/text/blur-text.tsx");
     expect(sources).toContain("shared/media.tsx");
     expect(sources.filter((file) => file === "commerce/product-card.tsx")).toHaveLength(1);
