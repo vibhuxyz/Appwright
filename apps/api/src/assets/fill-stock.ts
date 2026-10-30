@@ -92,14 +92,17 @@ async function failOrReuseSocial(
 export async function fillRemainingStockSlots(
   input: Omit<FillStockInput, "slot"> & { readonly slots: readonly AssetSlot[] },
 ): Promise<FillStockSuccess | FillStockFailure> {
-  let last: FillStockSuccess | FillStockFailure | undefined;
+  let last: FillStockSuccess | undefined;
+  let firstFailure: FillStockFailure | undefined;
   for (const slot of input.slots) {
     if (slot.status === "RESOLVED" || slot.status === "SKIPPED" || slot.status === "UPLOADING" || slot.status === "GENERATING") {
       continue;
     }
-    last = await fillStockSlot({ ...input, slot });
-    if (!last.ok) return last;
+    const result = await fillStockSlot({ ...input, slot });
+    if (!result.ok) firstFailure ??= result;
+    else last = result;
   }
+  if (firstFailure) return firstFailure;
   if (last) return last;
   const row = await prisma.assetRequest.findUniqueOrThrow({ where: { id: input.assetRequestId } });
   const assetRequest = serializeAssetRequest(row);

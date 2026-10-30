@@ -8,7 +8,7 @@ const PAGE_SUBJECT_PATTERN = /The page is: (.*?)(?:\. \S+ style, primary|$)/is;
 const FILLER_WORDS: ReadonlySet<string> = new Set([
   "a", "an", "and", "the", "of", "for", "to", "in", "on", "with", "our", "your", "their", "its", "is", "are", "that", "this", "from", "by", "as",
   "page", "pages", "site", "website", "landing", "single", "home", "homepage", "section", "image", "images", "photo", "photos", "showcase", "showcasing",
-  "unified", "premium", "award", "winning", "modern", "design", "led", "group", "company", "firm", "business", "brand",
+  "unified", "premium", "award", "winning", "modern", "led", "group", "hub", "four", "three", "five", "units", "unit", "all", "company", "firm", "business", "brand",
 ]);
 
 const PURPOSE_SUFFIX: Readonly<Partial<Record<AssetPurpose, string>>> = {

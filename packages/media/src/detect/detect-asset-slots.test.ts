@@ -166,3 +166,18 @@ describe("detectAssetSlots", () => {
     );
   });
 });
+
+describe("suggested prompt topics", () => {
+  it("lists the page's topical component names and drops layout words", () => {
+    const blueprint = BlueprintSchema.parse({
+      blueprintVersion: 1,
+      intent: { type: "business-site", domain: "design group", complexity: "medium" },
+      stack: { framework: "next", db: "none", orm: "none", auth: "authjs", styling: "tailwind" },
+      pages: [{ route: "/", purpose: "Single-page hub", components: ["HeroBanner", "ArchitectureSection", "ResortSection", "BentoGrid"] }],
+      theme: { preset: "warm", primary: "#b45309" },
+    });
+    const prompt = detectAssetSlots(blueprint)[0]?.suggestedPrompt ?? "";
+    expect(prompt).toContain("Topics: architecture, resort");
+    expect(prompt).not.toContain("Topics: hero");
+  });
+});

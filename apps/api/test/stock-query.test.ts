@@ -29,6 +29,25 @@ function slot(purpose: "hero" | "gallery") {
   return found;
 }
 
+function hubSlots() {
+  const blueprint = BlueprintSchema.parse({
+    blueprintVersion: 1,
+    intent: { type: "business-site", domain: "design group", complexity: "medium" },
+    stack: { framework: "next", db: "none", orm: "none", auth: "authjs", styling: "tailwind" },
+    pages: [{ route: "/", purpose: "Single-page hub for all four business units", components: ["TopBanner", "StorySticky", "ArchitectureSection", "ResortSection", "ShopSection", "ConsultancySection", "Gallery"] }],
+    theme: { preset: "warm", primary: "#b45309" },
+  });
+  return detectAssetSlots(blueprint);
+}
+
+describe("stockSearchQuery for a vague page purpose", () => {
+  it("falls back on the page's component topics so the query is not just 'hub four units'", () => {
+    const query = stockSearchQuery(hubSlots().find((entry) => entry.purpose === "gallery") ?? hubSlots()[0]!);
+    for (const word of ["architecture", "resort", "shop", "consultancy"]) expect(query).toContain(word);
+    for (const noise of ["hub", "units", "four", "topbanner", "section"]) expect(query).not.toContain(noise);
+  });
+});
+
 describe("stockSearchQuery", () => {
   it("turns the image-generation prompt into topical keywords, not instructions", () => {
     const query = stockSearchQuery(slot("hero"));
