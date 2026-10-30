@@ -10,6 +10,8 @@ import type { Needs } from "../requirements";
 
 export interface ProjectScope {
   readonly isBrowseOnly: boolean;
+  readonly isSinglePage: boolean;
+  readonly isStatic: boolean;
 }
 
 export interface TemplateAdditions {

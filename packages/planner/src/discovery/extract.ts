@@ -13,7 +13,27 @@ const EXCLUSION_PATTERNS: readonly (readonly [RegExp, string])[] = [
   [/\bno (custom|bespoke) (cakes?|orders?)\b/i, "custom-orders"],
   [/\bno (pop-?ups?|popup)\b/i, "popups"],
   [/\bno (sms|text messages?)\b/i, "sms"],
+  [/\bno (admin|dashboard|back ?office)\b/i, "admin"],
+  [/\bwithout (an? )?(admin|dashboard|back ?office)\b/i, "admin"],
+  [/\bno (database|backend|back-end|cms)\b/i, "database"],
 ];
+
+const EXCLUDED_LIST_PATTERN = /\b(?:no|without)\s+([a-z ,/-]{1,80})/gi;
+const EXCLUDED_LIST_STOP = /\s(?:but|with|except|only|plus)\s/i;
+const EXCLUDED_LIST_SEPARATOR = /,|\s+or\s+|\s+and\s+|\//i;
+
+const LIST_EXCLUSIONS: readonly (readonly [RegExp, string])[] = [
+  [/^(admin|dashboard|back ?office)( pages?)?$/i, "admin"],
+  [/^(database|backend|back-end|cms)( pages?)?$/i, "database"],
+  [/^(accounts?|logins?|sign-?ups?)( pages?)?$/i, "accounts"],
+];
+
+function excludedTerms(text: string): string[] {
+  return [...text.matchAll(EXCLUDED_LIST_PATTERN)].flatMap((match) => {
+    const clause = (match[1] ?? "").split(EXCLUDED_LIST_STOP)[0] ?? "";
+    return clause.split(EXCLUDED_LIST_SEPARATOR).map((term) => term.trim()).filter(Boolean);
+  });
+}
 
 const ORDER_DELIVERY =
   /\b(?:food delivery|home delivery|same[- ]day delivery|local delivery|delivery (?:app|service|option|orders?)|deliver(?:y|ies|ing)? orders?|orders? (?:for |with )?delivery|we deliver|offer delivery)\b/i;
@@ -41,6 +61,11 @@ function collectExclusions(prompt: string): string[] {
   const found: string[] = [];
   for (const [pattern, name] of EXCLUSION_PATTERNS) {
     if (pattern.test(prompt)) found.push(name);
+  }
+  for (const term of excludedTerms(prompt)) {
+    for (const [pattern, name] of LIST_EXCLUSIONS) {
+      if (pattern.test(term)) found.push(name);
+    }
   }
   return clipList(found, MAX_EXCLUSIONS);
 }
@@ -103,7 +128,7 @@ export function extractFacts(
   answers: Readonly<Record<string, string>> = {},
 ): ExtractedFacts {
   const signals = detectSignals(prompt);
-  const exclusions = collectExclusions(prompt);
+  const exclusions = collectExclusions([prompt, ...Object.values(answers)].join("\n"));
   const answered = collectAnswered(prompt, answers);
   if (exclusions.includes("ordering")) {
     answered["ordering-mode"] = answered["ordering-mode"] ?? "Browse only";

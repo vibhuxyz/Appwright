@@ -23,10 +23,10 @@ const SITE_SETTINGS: Entity = {
   relations: [],
 };
 
-export const businessSiteTemplate: ProjectTemplate = (blueprint) => {
+export const businessSiteTemplate: ProjectTemplate = (blueprint, scope) => {
   const hasContactPage = blueprint.pages.some((page) => CONTACT_ROUTE_PATTERN.test(page.route));
   return {
-    pages: hasContactPage ? [] : [CONTACT_PAGE],
+    pages: hasContactPage || scope.isSinglePage ? [] : [CONTACT_PAGE],
     entities: [SITE_SETTINGS],
     features: [],
     acceptance: {

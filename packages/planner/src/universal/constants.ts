@@ -16,6 +16,20 @@ export const BROWSE_ONLY_PATTERNS: readonly RegExp[] = [
   /\bnot (taking|accepting) (online )?orders\b/i,
 ];
 
+export const SINGLE_PAGE_PATTERNS: readonly RegExp[] = [
+  /\b(single|one)[- ]page (website|site|landing|landing page)\b/i,
+  /\b(one|single)[- ]page only\b/i,
+  /\bone page only\b/i,
+  /\bonly (one|a single) page\b/i,
+  /\ba single[- ]page\b/i,
+];
+
+export const NO_BACKEND_PATTERNS: readonly RegExp[] = [
+  /\bno (database|data ?base|backend|back-end|cms)\b/i,
+  /\bwithout (a |any )?(database|backend|back-end|cms)\b/i,
+  /\b(static|frontend[- ]only|front-end only) (site|website|page)\b/i,
+];
+
 export const PROJECT_TYPE_KEYWORDS: readonly (readonly [ProjectType, RegExp])[] = [
   ["wallet", /\b(wallet|ledger|fintech|banking|crypto)\b/i],
   ["marketplace", /\b(marketplace|multi-?vendor|sellers?|classifieds|listings?)\b/i],

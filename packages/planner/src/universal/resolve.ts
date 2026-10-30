@@ -5,6 +5,7 @@ import { adminAdditions } from "./admin-additions";
 import { baseRequirements } from "./base-requirements";
 import { AREA_ORDER } from "./constants";
 import { applyScopeConstraints, mergeAdditions } from "./merge";
+import { collapseToSinglePage } from "./single-page";
 import { normalizeProjectType } from "./project-type";
 import { detectScope } from "./scope";
 import { templateFor } from "./templates";
@@ -57,7 +58,7 @@ function withoutAdmin(requirements: readonly Requirement[]): Requirement[] {
 
 export function resolveRequirements(input: ResolveInput): ResolvedRequirements {
   const projectType = normalizeProjectType(input.blueprint.intent, input.prompt);
-  const scope = detectScope(input.prompt);
+  const scope = detectScope([input.prompt, ...Object.values(input.answers ?? {})].join("\n"));
   const discovery = advanceDiscovery(input.prompt, input.answers);
   const constrained = applyScopeConstraints(input.blueprint, scope);
   const template = templateFor(projectType)(constrained.blueprint, scope);
@@ -95,10 +96,11 @@ export function resolveRequirements(input: ResolveInput): ResolvedRequirements {
       )
     : { blueprint: stored.blueprint, skipped: [] };
 
+  const shaped = scope.isSinglePage ? collapseToSinglePage(admin.blueprint) : { blueprint: admin.blueprint, skipped: [] };
   return {
     blueprint: {
-      ...admin.blueprint,
-      pages: withRequiredUiComponents(admin.blueprint.pages, input.prompt),
+      ...shaped.blueprint,
+      pages: withRequiredUiComponents(shaped.blueprint.pages, input.prompt),
       projectType,
       requirements,
       workflows: discovery.workflows.map((workflow) => ({
@@ -109,6 +111,6 @@ export function resolveRequirements(input: ResolveInput): ResolvedRequirements {
     },
     projectType,
     requirements,
-    skipped: [...constrained.skipped, ...templated.skipped, ...withWorkflows.skipped, ...admin.skipped],
+    skipped: [...constrained.skipped, ...templated.skipped, ...withWorkflows.skipped, ...admin.skipped, ...shaped.skipped],
   };
 }

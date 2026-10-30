@@ -1,4 +1,5 @@
 import { extractFacts, workflowsFrom } from "../discovery";
+import { detectScope } from "../universal/scope";
 
 const EXPLICIT_DATABASE =
   /\b(databases?|mongo(?:db)?|mongoose|postgres(?:ql)?|prisma)\b/i;
@@ -19,9 +20,11 @@ export function appNeedsDatabase(
   answers: Readonly<Record<string, string>> = {},
 ): boolean {
   const text = [prompt, ...Object.values(answers)].join("\n");
+  const scope = detectScope(text);
+  const facts = extractFacts(prompt, answers);
+  if (scope.isStatic || facts.exclusions.includes("database")) return false;
   if (EXPLICIT_DATABASE.test(text)) return true;
 
-  const facts = extractFacts(prompt, answers);
   const storesWorkflow = workflowsFrom(facts).some(
     (workflow) => workflow.inScope && STORED_WORKFLOWS.has(workflow.kind),
   );
@@ -33,7 +36,9 @@ export function appNeedsDatabase(
     facts.answered["ordering-mode"] === "Browse only";
   const wantsAccounts =
     facts.signals.accountsMentioned && !facts.exclusions.includes("accounts");
-  if (browseOnly) return facts.signals.adminMentioned || wantsAccounts;
+  const wantsAdmin = facts.signals.adminMentioned && !facts.exclusions.includes("admin");
+  if (browseOnly) return wantsAdmin || wantsAccounts;
+  if (scope.isSinglePage) return wantsAccounts || wantsAdmin;
   if (wantsAccounts) return true;
   if (facts.signals.paymentsMentioned && !facts.exclusions.includes("ordering")) return true;
   if (facts.signals.todoApp) return true;
