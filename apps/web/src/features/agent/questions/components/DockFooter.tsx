@@ -10,6 +10,7 @@ interface DockFooterProps {
   onBack: () => void;
   onForward: () => void;
   onAutoAnswer: () => void;
+  onAutoAnswerRest?: () => void;
   onNext: () => void;
 }
 
@@ -25,6 +26,7 @@ export function DockFooter({
   onBack,
   onForward,
   onAutoAnswer,
+  onAutoAnswerRest,
   onNext,
 }: DockFooterProps) {
   return (
@@ -39,6 +41,11 @@ export function DockFooter({
         </button>
       </div>
       <div className="flex items-center gap-2">
+        {onAutoAnswerRest && (
+          <Button variant="secondary" size="md" onClick={onAutoAnswerRest} disabled={isSubmitting}>
+            Auto-answer rest
+          </Button>
+        )}
         <Button variant="secondary" size="md" onClick={onAutoAnswer} disabled={!canAutoAnswer || isSubmitting}>
           Auto-answer
         </Button>

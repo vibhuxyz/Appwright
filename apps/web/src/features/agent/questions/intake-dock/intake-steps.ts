@@ -73,6 +73,14 @@ function questionAutoAnswer(step: Extract<IntakeStep, { kind: "question" }>): In
   return { type: "set-answer", stepId: step.id, value: suggestion };
 }
 
+export function intakeAutoAnswerRest(steps: readonly IntakeStep[], fromIndex: number): IntakeDockAction[] {
+  return steps.slice(fromIndex).flatMap((step) => (step.kind === "question" ? questionAutoAnswer(step) ?? [] : []));
+}
+
+export function hasQuestionsAfter(steps: readonly IntakeStep[], index: number): boolean {
+  return steps.slice(index + 1).some((step) => step.kind === "question");
+}
+
 export function intakeAutoAnswer(step: IntakeStep, firstThemeId: string | undefined): IntakeDockAction | null {
   if (step.kind === "plan-review") return { type: "set-choice", stepId: step.id, draft: defaultChoice(0) };
   if (step.kind === "theme") return firstThemeId ? { type: "select-theme", themeId: firstThemeId } : null;

@@ -2,7 +2,7 @@ import type { Dispatch } from "react";
 import type { ThemeOption } from "@repo/contracts";
 import type { ThemeOverrides } from "../step-views";
 import type { ChoiceDraft } from "../types";
-import { intakeAnswers, intakeAutoAnswer, validateIntakeStep } from "./intake-steps";
+import { intakeAnswers, intakeAutoAnswer, intakeAutoAnswerRest, validateIntakeStep } from "./intake-steps";
 import type { IntakeDockAction, IntakeDockControls, IntakeDockState, IntakeStep } from "./types";
 
 export interface IntakeDockActionInput {
@@ -68,6 +68,10 @@ export function createIntakeDockActions(input: IntakeDockActionInput) {
       if (!action) return;
       input.dispatch(action);
       advance();
+    },
+    autoAnswerRest: () => {
+      for (const action of intakeAutoAnswerRest(input.steps, input.stepIndex)) input.dispatch(action);
+      goTo(lastIndex);
     },
     setChoice: (stepId: string, draft: ChoiceDraft) => input.dispatch({ type: "set-choice", stepId, draft }),
     setAnswer: (stepId: string, value: string) => input.dispatch({ type: "set-answer", stepId, value }),

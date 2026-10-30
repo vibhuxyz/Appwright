@@ -1,4 +1,5 @@
 import { DockFooter, DockFrame } from "../components";
+import { hasQuestionsAfter } from "./intake-steps";
 import { IntakeStepBody } from "./IntakeStepBody";
 import type { IntakeDockControls } from "./types";
 import { useIntakeDock } from "./use-intake-dock";
@@ -24,6 +25,7 @@ export function IntakeQuestionsDock({ controls, onCollapse }: IntakeQuestionsDoc
           onBack={dock.actions.back}
           onForward={dock.actions.forward}
           onAutoAnswer={dock.actions.autoAnswer}
+          {...(hasQuestionsAfter(dock.steps, dock.stepIndex) ? { onAutoAnswerRest: dock.actions.autoAnswerRest } : {})}
           onNext={dock.actions.next}
         />
       )}

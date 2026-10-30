@@ -13,7 +13,9 @@ import { INITIAL_INTAKE_DOCK_STATE, intakeDockReducer } from "../src/features/ag
 import {
   buildIntakeSteps,
   intakeAnswers,
+  hasQuestionsAfter,
   intakeAutoAnswer,
+  intakeAutoAnswerRest,
   validateIntakeStep,
 } from "../src/features/agent/questions/intake-dock/intake-steps";
 
@@ -151,5 +153,27 @@ describe("wireframe layout", () => {
       ["Contact", "contact", false],
       ["Footer", "footer", false],
     ]);
+  });
+});
+
+describe("auto-answering the rest", () => {
+  const region = { ...language, need: "region", label: "Region", options: ["EU", "US"], defaultOptionIndex: 1 };
+  const steps = buildIntakeSteps(gate({ questions: [language, region, businessName] }));
+
+  it("fills each remaining question with its suggestion and skips ones with none", () => {
+    const actions = intakeAutoAnswerRest(steps, 1);
+    expect(actions.map((action) => action.type)).toEqual(["set-choice"]);
+    expect(actions[0]).toMatchObject({ stepId: "intake:region" });
+    expect(intakeAutoAnswerRest(steps, 0)).toHaveLength(2);
+  });
+
+  it("never auto-answers the plan review or the theme", () => {
+    const planStep = { kind: "plan-review" as const, id: "plan", plan: {} as never };
+    expect(intakeAutoAnswerRest([planStep, { kind: "theme" as const, id: "theme" }], 0)).toEqual([]);
+  });
+
+  it("only offers the shortcut when a question remains after the current one", () => {
+    expect(hasQuestionsAfter(steps, 0)).toBe(true);
+    expect(hasQuestionsAfter(steps, 2)).toBe(false);
   });
 });
