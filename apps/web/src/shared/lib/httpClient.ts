@@ -1,3 +1,5 @@
+import { parseResponseJson } from "./parse-response";
+
 // Baked into the bundle at build time. A hardcoded localhost here means every
 // visitor's browser calls *their own* machine, not your API — set
 // VITE_API_URL to the same public origin as the API's PUBLIC_API_URL.
@@ -50,7 +52,7 @@ async function rejectIfBad(res: Response): Promise<void> {
 
 async function parseJson<T>(res: Response): Promise<T> {
   await rejectIfBad(res);
-  return res.json();
+  return parseResponseJson<T>(res.status, await res.text());
 }
 
 function request(path: string, init: RequestInit = {}): Promise<Response> {
