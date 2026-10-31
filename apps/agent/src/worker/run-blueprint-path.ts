@@ -9,6 +9,7 @@ import {
   creditsToCents,
   creditsToUsd,
   type Attachment,
+  type EffortLevel,
   type PlanId,
   type ProjectSpecification,
   type ThemeOption,
@@ -62,6 +63,10 @@ export interface RunBlueprintPathOptions {
   approvedBlueprintId?: string;
   isAutoImageChoice: boolean;
   answers?: Readonly<Record<string, string>>;
+  complexity?: number;
+  confidence?: number;
+  intent?: string;
+  effort?: EffortLevel;
 }
 
 type FreshPlanOptions = Pick<
@@ -143,6 +148,10 @@ async function runPlannedTasks(options: RunBlueprintPathOptions, approved: Appro
       runtime,
       conversationEmit,
       extraTools: createTaskInteractiveTools({ projectId, sessionId, worktreeSessionId, signal, persist }),
+      ...(options.complexity !== undefined ? { complexity: options.complexity } : {}),
+      ...(options.confidence !== undefined ? { confidence: options.confidence } : {}),
+      ...(options.intent !== undefined ? { intent: options.intent } : {}),
+      ...(options.effort !== undefined ? { effort: options.effort } : {}),
       onTaskStatus: (taskId, status) => {
         const title = titleById.get(taskId) ?? taskId;
         const label = codingProfileFor(typeById.get(taskId) ?? "").label;

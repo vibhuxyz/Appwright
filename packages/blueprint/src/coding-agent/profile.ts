@@ -1,3 +1,6 @@
+import { resolveRunModel, type AutoProfile } from "@repo/agent-core";
+import type { EffortLevel, PlanId } from "@repo/contracts";
+
 export interface CodingProfile {
   readonly id: "ui" | "auth" | "integration" | "data" | "general";
   readonly label: string;
@@ -63,13 +66,37 @@ export function codingProfileFor(type: string): CodingProfile {
   return GENERAL_PROFILE;
 }
 
+export interface CodingModelOptions {
+  readonly plan: PlanId;
+  readonly complexity?: number;
+  readonly confidence?: number;
+  readonly intent?: string;
+  readonly effort?: EffortLevel;
+}
+
+function autoProfileOf(id: CodingProfile["id"]): AutoProfile {
+  return id === "general" ? "coding" : id;
+}
+
 export function codingModelFor(
   profile: CodingProfile,
   sessionModel: string,
   env: NodeJS.Dict<string> = process.env,
+  options?: CodingModelOptions,
 ): string {
   const configured = env[profile.envKey]?.trim();
-  return configured && configured.length > 0 ? configured : sessionModel;
+  if (configured && configured.length > 0) return configured;
+  if (!options) return sessionModel;
+  return resolveRunModel({
+    sessionModel,
+    plan: options.plan,
+    profile: autoProfileOf(profile.id),
+    env,
+    ...(options.complexity !== undefined ? { complexity: options.complexity } : {}),
+    ...(options.confidence !== undefined ? { confidence: options.confidence } : {}),
+    ...(options.intent !== undefined ? { intent: options.intent } : {}),
+    ...(options.effort !== undefined ? { effort: options.effort } : {}),
+  });
 }
 
 export function withCodingBrief(brief: string, prompt: string): string {

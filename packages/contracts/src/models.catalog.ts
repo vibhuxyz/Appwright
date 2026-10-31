@@ -1,5 +1,18 @@
 import type { AvailableModel, ModelCategory } from "./session.schema";
 
+export const AUTO_MODEL_ID = "auto";
+
+export const AUTO_MODEL: AvailableModel = {
+  id: AUTO_MODEL_ID,
+  name: "Auto",
+  provider: "Appwright",
+  description: "Always selects the best model",
+};
+
+export function isAutoModel(id: string): boolean {
+  return id === AUTO_MODEL_ID;
+}
+
 export const MODEL_CATEGORIES = ["frontier", "standard", "efficient"] as const;
 export const MODEL_CATEGORY_LABEL: Record<ModelCategory, string> = {
   efficient: "Efficient",

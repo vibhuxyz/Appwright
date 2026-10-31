@@ -1,4 +1,4 @@
-import type { Attachment } from "@repo/contracts";
+import type { Attachment, EffortLevel } from "@repo/contracts";
 import { ChatInput } from "../components/ChatInput";
 import { PromptSuggestionBar } from "../components/PromptSuggestionBar";
 import type { PromptQuality } from "../utils/evaluatePrompt";
@@ -17,12 +17,14 @@ export function PaneComposer({
   suggestions,
   canUndo,
   model,
+  effort,
   attachments = [],
   isUploading = false,
   uploadError = null,
   onUndo,
   onApplySuggestion,
   onModelChange,
+  onEffortChange,
   onChange,
   onSubmit,
   onEnhance,
@@ -44,12 +46,14 @@ export function PaneComposer({
   suggestions: PromptSuggestion[];
   canUndo: boolean;
   model: string | undefined;
+  effort: EffortLevel | undefined;
   attachments?: readonly Attachment[];
   isUploading?: boolean;
   uploadError?: string | null;
   onUndo: () => void;
   onApplySuggestion: (appendText: string) => void;
   onModelChange: (model: string) => void;
+  onEffortChange: (effort: EffortLevel) => void;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onEnhance: () => void;
@@ -79,10 +83,12 @@ export function PaneComposer({
         enhanceError={enhanceError}
         quality={quality}
         model={model}
+        effort={effort}
         attachments={attachments}
         isUploading={isUploading}
         uploadError={uploadError}
         onModelChange={onModelChange}
+        onEffortChange={onEffortChange}
         onChange={onChange}
         onSubmit={onSubmit}
         onEnhance={onEnhance}

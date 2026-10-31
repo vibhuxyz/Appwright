@@ -1,13 +1,16 @@
 import {
+  HANDOFF_ENV_KEY,
   OpenAiProvider,
   runAgentLoop,
+  specialistModel,
   type AgentEventSink,
   type Message,
   type Provider,
   type Runtime,
   type Tool,
 } from "@repo/agent-core";
-import type { VerificationResult } from "@repo/contracts";
+import type { EffortLevel, PlanId, VerificationResult } from "@repo/contracts";
+import { createLogger } from "@repo/logger";
 import { worktreeChangeScope } from "../browser-scope";
 import { publishStatus, type PersistFields } from "../persist";
 import { DELEGATED_STATUS, FINISHED_STATUS, HANDOFF_DEADLINE_MS, HANDOFF_MAX_COST_USD, HANDOFF_MAX_ITERATIONS, HANDOFF_MAX_TOKENS } from "./constants";
@@ -19,6 +22,8 @@ import { handoffMessage, parseHandoffSummary } from "./summary";
 export interface HandoffInput {
   readonly sessionId: string;
   readonly sessionModel: string;
+  readonly plan?: PlanId;
+  readonly effort?: EffortLevel;
   readonly worktreeDir: string;
   readonly memory: string;
   readonly verifyResults: readonly VerificationResult[];
@@ -31,10 +36,18 @@ export interface HandoffInput {
   readonly publish?: (detail: string) => void;
 }
 
-function handoffProvider(input: Pick<HandoffInput, "provider" | "sessionModel">): Provider {
+const log = createLogger("handoff-agent");
+
+function handoffProvider(input: Pick<HandoffInput, "provider" | "sessionModel" | "plan" | "effort">): Provider {
   if (input.provider) return input.provider;
-  const configured = process.env.HANDOFF_AGENT_MODEL?.trim();
-  const model = configured && configured.length > 0 ? configured : input.sessionModel;
+  const model = specialistModel({
+    envKey: HANDOFF_ENV_KEY,
+    sessionModel: input.sessionModel,
+    profile: "handoff",
+    plan: input.plan ?? "MAX",
+    ...(input.effort !== undefined ? { effort: input.effort } : {}),
+  });
+  log.info("handoff agent model", { model, sessionModel: input.sessionModel });
   return new OpenAiProvider({ model });
 }
 

@@ -1,4 +1,13 @@
-import { OpenAiProvider, runAgentLoop, type AgentEventSink, type Message, type Provider } from "@repo/agent-core";
+import {
+  OpenAiProvider,
+  runAgentLoop,
+  specialistModel,
+  TESTING_ENV_KEY,
+  type AgentEventSink,
+  type Message,
+  type Provider,
+} from "@repo/agent-core";
+import { createLogger } from "@repo/logger";
 import { grep, readFile } from "@repo/tools";
 import { TESTING_DEADLINE_MS, TESTING_MAX_COST_USD, TESTING_MAX_ITERATIONS, TESTING_MAX_TOKENS } from "./constants";
 import { parseTestingReview } from "./parse-review";
@@ -16,10 +25,18 @@ function testingBudget(nowMs: number) {
   };
 }
 
-function reviewProvider(input: Pick<ReviewInput, "provider" | "sessionModel">): Provider {
+const log = createLogger("testing-agent");
+
+function reviewProvider(input: Pick<ReviewInput, "provider" | "sessionModel" | "plan" | "effort">): Provider {
   if (input.provider) return input.provider;
-  const configured = process.env.TESTING_AGENT_MODEL?.trim();
-  const model = configured && configured.length > 0 ? configured : input.sessionModel;
+  const model = specialistModel({
+    envKey: TESTING_ENV_KEY,
+    sessionModel: input.sessionModel,
+    profile: "testing",
+    plan: input.plan ?? "MAX",
+    ...(input.effort !== undefined ? { effort: input.effort } : {}),
+  });
+  log.info("testing agent model", { model, sessionModel: input.sessionModel });
   return new OpenAiProvider({ model });
 }
 

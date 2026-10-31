@@ -1,5 +1,6 @@
 import {
   AttachmentSchema,
+  EffortLevelSchema,
   IMAGE_CHOICE_AUTO,
   QuestionReplyDataSchema,
   QuestionSetDataSchema,
@@ -23,6 +24,7 @@ export const sessionSchema = z.object({
   projectId: z.string(),
   title: z.string().nullable(),
   model: z.string(),
+  effort: EffortLevelSchema.optional(),
   cost: z.number(),
   tokenIn: z.number(),
   tokenOut: z.number(),

@@ -1,11 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import {
+  AUTO_MODEL_ID,
   AVAILABLE_MODELS,
   MODEL_CATEGORIES,
   inferModelCategory,
+  isAutoModel,
   modelCategory,
   modelsForCategory,
 } from "../src/models.catalog";
+
+describe("auto model", () => {
+  test("is a sentinel id outside the catalog", () => {
+    expect(isAutoModel(AUTO_MODEL_ID)).toBe(true);
+    expect(isAutoModel("gemini-3.7-flash")).toBe(false);
+    expect(AVAILABLE_MODELS.some((model) => model.id === AUTO_MODEL_ID)).toBe(false);
+  });
+});
 
 describe("model catalog categories", () => {
   test("every curated model has an explicit category", () => {

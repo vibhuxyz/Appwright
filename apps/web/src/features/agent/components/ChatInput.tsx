@@ -1,4 +1,4 @@
-import type { Attachment } from "@repo/contracts";
+import type { Attachment, EffortLevel } from "@repo/contracts";
 import { useRef, useState } from "react";
 import type { PromptQuality } from "../utils/evaluatePrompt";
 import { AttachmentList } from "./AttachmentList";
@@ -26,10 +26,12 @@ export function ChatInput({
   enhanceError,
   quality,
   model,
+  effort,
   attachments = [],
   isUploading = false,
   uploadError = null,
   onModelChange,
+  onEffortChange,
   onChange,
   onSubmit,
   onEnhance,
@@ -47,10 +49,12 @@ export function ChatInput({
   enhanceError: string | null;
   quality: PromptQuality;
   model: string | undefined;
+  effort: EffortLevel | undefined;
   attachments?: readonly Attachment[];
   isUploading?: boolean;
   uploadError?: string | null;
   onModelChange: (model: string) => void;
+  onEffortChange: (effort: EffortLevel) => void;
   onChange: (value: string) => void;
   onSubmit: () => void;
   onEnhance: () => void;
@@ -156,8 +160,10 @@ export function ChatInput({
           enhancedSuccess={enhancedSuccess}
           enhanceError={enhanceError}
           model={model}
+          effort={effort}
           onAttachClick={() => fileInputRef.current?.click()}
           onModelChange={onModelChange}
+          onEffortChange={onEffortChange}
           onSubmit={onSubmit}
           onStop={onStop}
         />

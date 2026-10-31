@@ -1,5 +1,6 @@
 import { AudioLines, Paperclip } from "lucide-react";
-import { ModelSelect } from "@/features/workspace/components/ModelSelect";
+import type { EffortLevel } from "@repo/contracts";
+import { ModelSelect } from "@/features/workspace/components/model-select";
 import {
   PROMPT_QUALITY_LABEL,
   PROMPT_QUALITY_TONE,
@@ -15,8 +16,10 @@ export function ChatInputControls({
   enhancedSuccess,
   enhanceError,
   model,
+  effort,
   onAttachClick,
   onModelChange,
+  onEffortChange,
   onSubmit,
   onStop,
 }: {
@@ -26,8 +29,10 @@ export function ChatInputControls({
   enhancedSuccess: boolean;
   enhanceError: string | null;
   model: string | undefined;
+  effort: EffortLevel | undefined;
   onAttachClick: () => void;
   onModelChange: (model: string) => void;
+  onEffortChange: (effort: EffortLevel) => void;
   onSubmit: () => void;
   onStop: () => void;
 }) {
@@ -60,7 +65,15 @@ export function ChatInputControls({
       </div>
 
       <div className="flex items-center gap-2">
-        {model && <ModelSelect value={model} disabled={running} onChange={onModelChange} />}
+        {model && (
+          <ModelSelect
+            value={model}
+            effort={effort}
+            disabled={running}
+            onChange={onModelChange}
+            onEffortChange={onEffortChange}
+          />
+        )}
 
         <SubmitButton
           running={running}

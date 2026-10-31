@@ -3,6 +3,7 @@ import {
   bestModelsForPlan,
   buildSystemPrompt,
   runAgentLoop,
+  scaleBudget,
   type AgentEventSink,
   type Budget,
   type Message,
@@ -11,7 +12,7 @@ import {
   type StopReason,
   type Tool,
 } from "@repo/agent-core";
-import { AGENT_LOOP_LIMITS, type PlanId, type TaskType } from "@repo/contracts";
+import { AGENT_LOOP_LIMITS, type EffortLevel, type PlanId, type TaskType } from "@repo/contracts";
 import { createLogger } from "@repo/logger";
 import { ALL_TOOLS, guardTools } from "@repo/tools";
 import type { FencedAttemptInput, GeneratedAttempt, TaskGenerator } from "orchestrator";
@@ -58,6 +59,10 @@ export interface RunTaskGeneratorOptions {
   loadDetail?: (taskId: string) => Promise<TaskDetail>;
   providers?: readonly Provider[];
   extraTools?: readonly Tool[];
+  complexity?: number;
+  confidence?: number;
+  intent?: string;
+  effort?: EffortLevel;
 }
 
 async function withPatterns(task: TaskDetail, runtime: Runtime): Promise<string[]> {
@@ -77,11 +82,28 @@ function pathFromToolArgs(args: Record<string, unknown>): string | undefined {
   return typeof args.path === "string" ? args.path : undefined;
 }
 
-function taskBudget(nowMs: number): Budget {
+function codingRoute(options: RunTaskGeneratorOptions) {
   return {
-    maxIterations: AGENT_LOOP_LIMITS.maxTaskIterations,
+    plan: options.plan,
+    ...(options.complexity !== undefined ? { complexity: options.complexity } : {}),
+    ...(options.confidence !== undefined ? { confidence: options.confidence } : {}),
+    ...(options.intent !== undefined ? { intent: options.intent } : {}),
+    ...(options.effort !== undefined ? { effort: options.effort } : {}),
+  };
+}
+
+function taskBudget(nowMs: number, effort?: EffortLevel): Budget {
+  const scaled = scaleBudget(
+    {
+      maxCostUsd: AGENT_LOOP_LIMITS.maxTaskCostUsd,
+      maxIterations: AGENT_LOOP_LIMITS.maxTaskIterations,
+    },
+    effort,
+  );
+  return {
+    maxIterations: scaled.maxIterations,
     maxTokens: AGENT_LOOP_LIMITS.maxTokens,
-    maxCostUsd: AGENT_LOOP_LIMITS.maxTaskCostUsd,
+    maxCostUsd: scaled.maxCostUsd,
     deadline: nowMs + AGENT_LOOP_LIMITS.taskDeadlineMs,
   };
 }
@@ -145,21 +167,29 @@ export function createRunTaskGenerator(options: RunTaskGeneratorOptions): TaskGe
     async generate(input: FencedAttemptInput): Promise<GeneratedAttempt> {
       const task = await loadDetail(input.task.id);
       const profile = codingProfileFor(task.type);
-      log.info("coding agent", { sessionId, taskId: input.task.id, type: task.type, agent: profile.label });
+      const chosenModel = codingModelFor(profile, model, process.env, codingRoute(options));
+      log.info("coding agent", {
+        sessionId,
+        taskId: input.task.id,
+        type: task.type,
+        agent: profile.label,
+        model: chosenModel,
+        sessionModel: model,
+      });
       const deterministicGenerator = DETERMINISTIC_GENERATORS[taskTypeFromPrisma(task.type)];
       if (deterministicGenerator) return deterministicGenerator(task, runtime);
 
       const { emit, totals } = trackAttempt(conversationEmit);
-      const [primary, ...fallback] = options.providers ?? providerChain(codingModelFor(profile, model), plan);
+      const [primary, ...fallback] = options.providers ?? providerChain(chosenModel, plan);
       const guard = guardTools([...ALL_TOOLS, ...(options.extraTools ?? [])]);
       const stopReason = await runAgentLoop({
         messages: await taskMessages(task, runtime, input.previousError),
         tools: guard.tools,
-        provider: primary ?? new OpenAiProvider({ model }),
+        provider: primary ?? new OpenAiProvider({ model: chosenModel }),
         fallbackProviders: fallback,
         runtime,
         emit,
-        budget: taskBudget(Date.now()),
+        budget: taskBudget(Date.now(), options.effort),
         signal: input.signal,
         sessionId,
       });

@@ -22,7 +22,7 @@ export {
   OpenAiProvider,
 } from "./providers/openai";
 export { listAvailableModels } from "./providers/list-models";
-export { bestAvailableModel, bestAvailableModels } from "./providers/best-available-model";
+export { bestAvailableModel, bestAvailableModelForCategory, bestAvailableModels } from "./providers/best-available-model";
 export {
   bestModelForPlan,
   plannerModel,
@@ -30,6 +30,17 @@ export {
   modelAllowedForPlan,
   resolveModelForPlan,
 } from "./providers/model-for-plan";
+export {
+  HANDOFF_ENV_KEY,
+  TESTING_ENV_KEY,
+  resolveRunModel,
+  scaleBudget,
+  selectModel,
+  specialistModel,
+  tierFor,
+  type AutoProfile,
+  type SelectModelInput,
+} from "./model-router";
 export { costUsd, priceFor } from "./providers/pricing";
 export {
   isProviderCreditsDepleted,

@@ -2,6 +2,7 @@ import {
   CreateSessionRequest,
   UpdateSessionRequest,
   canUseModel,
+  parseEffortLevel,
   requiredPlanFor,
   type SessionResponse,
 } from "@repo/contracts";
@@ -41,6 +42,7 @@ function serializeSession(s: {
   projectId: string;
   title: string | null;
   model: string;
+  effort?: string;
   cost: number;
   tokenIn: number;
   tokenOut: number;
@@ -58,6 +60,7 @@ function serializeSession(s: {
     projectId: s.projectId,
     title: s.title,
     model: s.model,
+    effort: parseEffortLevel(s.effort),
     cost: s.cost,
     tokenIn: s.tokenIn,
     tokenOut: s.tokenOut,
@@ -143,6 +146,7 @@ sessionRouter.put("/session/:id", async (req, res) => {
       model: body.model,
       mode: body.mode,
       allowedTools: body.allowedTools,
+      effort: body.effort,
     },
   });
   res.json(serializeSession(session));

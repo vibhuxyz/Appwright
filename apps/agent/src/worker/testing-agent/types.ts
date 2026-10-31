@@ -1,5 +1,5 @@
 import type { AgentEventSink, Message, Provider, Runtime } from "@repo/agent-core";
-import type { VerificationResult } from "@repo/contracts";
+import type { EffortLevel, PlanId, VerificationResult } from "@repo/contracts";
 import type { PersistFields } from "../persist";
 
 export interface TestingEvidence {
@@ -33,6 +33,8 @@ export interface ReviewInput {
   readonly worktreeDir: string;
   readonly verifyResults: readonly VerificationResult[];
   readonly sessionModel: string;
+  readonly plan?: PlanId;
+  readonly effort?: EffortLevel;
   readonly provider?: Provider;
   readonly runtime: Runtime & { flush(): Promise<void> };
   readonly emit: AgentEventSink;

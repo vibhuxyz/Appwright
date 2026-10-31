@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { resumePrompt } from "@repo/contracts";
 import type { Session } from "../schemas/agentSchemas";
 import { useAgentStore } from "../store/agentStore";
-import { useUpdateSessionModel } from "../hooks/useSession";
+import { useUpdateSessionEffort, useUpdateSessionModel } from "../hooks/useSession";
 import { useStopConversation } from "../hooks/useSendMessage";
 import { useAttachmentUpload } from "../hooks/useAttachmentUpload";
 import { IntakeDock, useIntake } from "../intake";
@@ -40,6 +40,7 @@ export function ChatPane({
   const [dockReopenRequest, setDockReopenRequest] = useState(0);
   const stopConversation = useStopConversation(sessionId);
   const updateModel = useUpdateSessionModel(projectId);
+  const updateEffort = useUpdateSessionEffort(projectId);
   const draft = useComposerDraft(running);
   const uploads = useAttachmentUpload(projectId, sessionId);
   usePendingAgentPrompt({
@@ -137,6 +138,7 @@ export function ChatPane({
           suggestions={draft.suggestions}
           canUndo={draft.canUndo}
           model={session?.model}
+          effort={session?.effort}
           attachments={uploads.attachments}
           isUploading={uploads.isUploading}
           uploadError={uploads.uploadError}
@@ -144,6 +146,9 @@ export function ChatPane({
           onApplySuggestion={draft.applySuggestion}
           onModelChange={(model) => {
             if (session) updateModel.mutate({ sessionId: session.id, model });
+          }}
+          onEffortChange={(effort) => {
+            if (session) updateEffort.mutate({ sessionId: session.id, effort });
           }}
           onChange={draft.change}
           onSubmit={send}

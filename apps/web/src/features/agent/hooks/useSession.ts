@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { EffortLevel } from "@repo/contracts";
 import { agentApi } from "../api/agentApi";
 import type { PermissionMode, Session } from "../schemas/agentSchemas";
 
@@ -21,6 +22,17 @@ export function useUpdateSessionModel(projectId: string) {
   return useMutation({
     mutationFn: ({ sessionId, model }: { sessionId: string; model: string }) =>
       agentApi.updateSessionModel(sessionId, model),
+    onSuccess: (session) => {
+      queryClient.setQueryData(["session", projectId], session);
+    },
+  });
+}
+
+export function useUpdateSessionEffort(projectId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, effort }: { sessionId: string; effort: EffortLevel }) =>
+      agentApi.updateSessionEffort(sessionId, effort),
     onSuccess: (session) => {
       queryClient.setQueryData(["session", projectId], session);
     },

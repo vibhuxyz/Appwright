@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { modelCategory } from "../models.catalog";
+import { isAutoModel, modelCategory } from "../models.catalog";
 import type { ModelCategory } from "../session.schema";
 
 export const PLAN_IDS = ["FREE", "PRO", "MAX"] as const;
@@ -30,6 +30,7 @@ export const UpgradePlanRequest = z
 export type UpgradePlanRequest = z.infer<typeof UpgradePlanRequest>;
 
 export function canUseModel(plan: PlanId, modelId: string): boolean {
+  if (isAutoModel(modelId)) return true;
   const categories: readonly ModelCategory[] = PLAN_MODEL_CATEGORIES[plan];
   return categories.includes(modelCategory({ id: modelId }));
 }

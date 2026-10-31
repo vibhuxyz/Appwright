@@ -22,19 +22,30 @@ export const SessionPermissionModeSchema = z.enum([
   "plan",
 ]);
 
+export const EffortLevelSchema = z.enum(["low", "medium", "high"]);
+export type EffortLevel = z.infer<typeof EffortLevelSchema>;
+export const DEFAULT_EFFORT_LEVEL: EffortLevel = "medium";
+
+export function parseEffortLevel(value: string | null | undefined): EffortLevel {
+  if (value === "low" || value === "high" || value === "medium") return value;
+  return DEFAULT_EFFORT_LEVEL;
+}
+
 export const UpdateSessionRequest = z
   .object({
     model: z.string().min(1).optional(),
     mode: SessionPermissionModeSchema.optional(),
     allowedTools: z.array(z.string()).optional(),
+    effort: EffortLevelSchema.optional(),
   })
   .refine(
     (body) =>
       body.model !== undefined ||
       body.mode !== undefined ||
-      body.allowedTools !== undefined,
+      body.allowedTools !== undefined ||
+      body.effort !== undefined,
     {
-      message: "model, mode, or allowedTools is required",
+      message: "model, mode, allowedTools, or effort is required",
     },
   );
 
@@ -43,6 +54,7 @@ export const SessionResponse = z.object({
   projectId: z.string(),
   title: z.string().nullable(),
   model: z.string(),
+  effort: EffortLevelSchema.optional(),
   cost: z.number(),
   tokenIn: z.number(),
   tokenOut: z.number(),

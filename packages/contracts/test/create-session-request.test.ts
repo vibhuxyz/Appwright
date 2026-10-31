@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { CreateSessionRequest } from "../src/session.schema";
+import { CreateSessionRequest, UpdateSessionRequest } from "../src/session.schema";
 
 describe("CreateSessionRequest", () => {
   it("does not accept another session id", () => {
@@ -9,5 +9,12 @@ describe("CreateSessionRequest", () => {
     });
     expect(parsed).toEqual({ title: "RK Home Planner" });
     expect(parsed).not.toHaveProperty("fromSessionId");
+  });
+});
+
+describe("UpdateSessionRequest", () => {
+  it("accepts Auto and an effort-only change", () => {
+    expect(UpdateSessionRequest.parse({ model: "auto" })).toEqual({ model: "auto" });
+    expect(UpdateSessionRequest.parse({ effort: "high" })).toEqual({ effort: "high" });
   });
 });

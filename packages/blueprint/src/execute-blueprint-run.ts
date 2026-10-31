@@ -1,4 +1,4 @@
-import type { PlanId } from "@repo/contracts";
+import type { EffortLevel, PlanId } from "@repo/contracts";
 import { workspaceRoot } from "@repo/contracts/files";
 import { prisma } from "@repo/db";
 import { createLogger } from "@repo/logger";
@@ -38,6 +38,10 @@ export interface ExecuteBlueprintRunOptions {
   onTaskStatus?: (taskId: string, status: string) => void;
   conversationEmit?: AgentEventSink;
   extraTools?: readonly Tool[];
+  complexity?: number;
+  confidence?: number;
+  intent?: string;
+  effort?: EffortLevel;
 }
 
 function withTaskStatusNotifications(
@@ -84,7 +88,18 @@ export async function executeBlueprintRun(
     runSpentCents: run.spentCents,
   });
 
-  const generator = createRunTaskGenerator({ sessionId, model, plan, runtime, conversationEmit, extraTools: options.extraTools });
+  const generator = createRunTaskGenerator({
+    sessionId,
+    model,
+    plan,
+    runtime,
+    conversationEmit,
+    extraTools: options.extraTools,
+    ...(options.complexity !== undefined ? { complexity: options.complexity } : {}),
+    ...(options.confidence !== undefined ? { confidence: options.confidence } : {}),
+    ...(options.intent !== undefined ? { intent: options.intent } : {}),
+    ...(options.effort !== undefined ? { effort: options.effort } : {}),
+  });
   const workspaceDir = workspaceRoot(projectId, worktreeSessionId);
   const verifier = createWorkspaceVerifier(workspaceDir, verifyWorkspace);
   const ports = createPostgresPorts({ runId, store, generator, verifier, now: () => Date.now() });

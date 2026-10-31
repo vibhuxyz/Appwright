@@ -1,9 +1,10 @@
 import { DEFAULT_MODEL, ENDPOINTS, providerFor, resolveModelForPlan } from "@repo/agent-core";
-import { canUseModel, type PlanId } from "@repo/contracts";
+import { canUseModel, isAutoModel, type PlanId } from "@repo/contracts";
 import { prisma } from "@repo/db";
 import { resolveNewSessionModel } from "./resolve";
 
 function isModelConfigured(model: string): boolean {
+  if (isAutoModel(model)) return true;
   const key = process.env[ENDPOINTS[providerFor(model)].envKey];
   return typeof key === "string" && key.length > 0;
 }
@@ -27,5 +28,6 @@ export async function modelForNewSession(userId: string): Promise<string> {
     defaultModel: DEFAULT_MODEL,
     isConfigured: isUsableOnPlan(plan),
   });
+  if (isAutoModel(model)) return model;
   return resolveModelForPlan(plan, model);
 }

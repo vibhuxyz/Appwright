@@ -50,6 +50,7 @@ describe("plan model access", () => {
     expect(canUseModel("FREE", "claude-haiku-5-5")).toBe(true);
     expect(canUseModel("FREE", "claude-sonnet-5-5")).toBe(false);
     expect(canUseModel("FREE", "deepseek-reasoner")).toBe(false);
+    expect(canUseModel("FREE", "auto")).toBe(true);
   });
 
   it("gives PRO efficient and standard models", () => {

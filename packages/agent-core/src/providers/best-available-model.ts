@@ -32,3 +32,15 @@ export function bestAvailableModel(
 ): string {
   return bestAvailableModels(env, isAllowed)[0] ?? DEFAULT_MODEL;
 }
+
+export function bestAvailableModelForCategory(
+  category: (typeof MODEL_CATEGORIES)[number],
+  env: Env = process.env,
+  isAllowed: (modelId: string) => boolean = () => true,
+): string | undefined {
+  for (const model of AVAILABLE_MODELS) {
+    if (modelCategory(model) !== category || !isAllowed(model.id) || !hasKeyFor(model.id, env)) continue;
+    return model.id;
+  }
+  return undefined;
+}

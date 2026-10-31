@@ -18,6 +18,13 @@ describe("codingModelFor", () => {
     expect(codingModelFor(page, "session-model", { UI_AGENT_MODEL: "fast-ui" })).toBe("fast-ui");
     expect(codingModelFor(page, "session-model", {})).toBe("session-model");
   });
+
+  it("routes Auto to a UI-tier model when the override is unset", () => {
+    const page = codingProfileFor("page");
+    const env = { GEMINI_API_KEY: "x", OPENAI_API_KEY: "x" };
+    expect(codingModelFor(page, "auto", env, { plan: "MAX" })).toBe("gemini-3.1-pro-preview");
+    expect(codingModelFor(page, "auto", { ...env, UI_AGENT_MODEL: "fast-ui" }, { plan: "MAX" })).toBe("fast-ui");
+  });
 });
 
 describe("withCodingBrief", () => {

@@ -2,6 +2,7 @@ import {
   PlanPreviewSchema,
   PromptQuestionsResponse,
   type Attachment,
+  type EffortLevel,
   type PlanPreviewRequest,
   type ElementSelection,
   type PromptAnalysis,
@@ -47,8 +48,10 @@ export const agentApi = {
     httpClient
       .post(`/project/${projectId}/session`, {})
       .then(sessionSchema.parse),
-  updateSessionModel: (id: string, model: string) =>
-    httpClient.put(`/session/${id}`, { model }).then(sessionSchema.parse),
+  updateSessionModel: (id: string, model: string, effort?: EffortLevel) =>
+    httpClient.put(`/session/${id}`, { model, ...(effort ? { effort } : {}) }).then(sessionSchema.parse),
+  updateSessionEffort: (id: string, effort: EffortLevel) =>
+    httpClient.put(`/session/${id}`, { effort }).then(sessionSchema.parse),
   updateSessionMode: (id: string, mode: PermissionMode) =>
     httpClient.put(`/session/${id}`, { mode }).then(sessionSchema.parse),
   startPreview: (sessionId: string, signal?: AbortSignal) =>

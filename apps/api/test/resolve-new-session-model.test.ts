@@ -31,6 +31,15 @@ describe("resolveNewSessionModel", () => {
     expect(model).toBe("deepseek-chat");
   });
 
+  it("keeps Auto when that was the last choice", () => {
+    const model = resolveNewSessionModel({
+      lastUsedModel: "auto",
+      defaultModel: "deepseek-chat",
+      isConfigured: (id) => id === "auto" || id === "deepseek-chat",
+    });
+    expect(model).toBe("auto");
+  });
+
   it("ignores a last-used model whose key was removed", () => {
     const model = resolveNewSessionModel({
       lastUsedModel: "gpt-5.4-mini",

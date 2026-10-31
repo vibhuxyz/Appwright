@@ -6,7 +6,6 @@ import {
   plannerModel,
   PROVIDER_CREDITS_DEPLETED_NOTICE,
   providerFor,
-  resolveModelForPlan,
   resolveStopNotice,
   runAgentLoop,
   type Message as CoreMessage,
@@ -19,7 +18,7 @@ import {
 } from "@repo/cache";
 import { loadMissingAssetsNotice } from "@repo/assets";
 import { applyTheme, chosenThemeFromRows } from "@repo/blueprint";
-import { AGENT_LOOP_LIMITS, isResumePrompt, loopSpendLimits, type Attachment, type VerificationResult } from "@repo/contracts";
+import { AGENT_LOOP_LIMITS, creditsToUsd, isResumePrompt, loopSpendLimits, type Attachment, type VerificationResult } from "@repo/contracts";
 import { loadProjectMemoryRows, prisma, type Job } from "@repo/db";
 import { classify, type VerifyOutcome } from "@repo/decision-engine";
 import { createLogger } from "@repo/logger";
@@ -50,6 +49,7 @@ import { freshStoredAnalysis } from "./stored-analysis";
 import type { AgentJobResult } from "./types";
 import { runHandoffAgent } from "./handoff-agent";
 import { reviewAfterVerification } from "./testing-agent";
+import { autoRouteFields, effortLoopBudget, runModelFor, sessionEffort } from "./session-run-model";
 import { runVerifyStep } from "./verify-step";
 
 const log = createLogger("agent-job");
@@ -98,7 +98,8 @@ export async function executeAgentJob(
     return { jobId: job.id, sessionId: job.sessionId, stopReason: notice.stopReason };
   }
 
-  const sessionModel = resolveModelForPlan(user.plan, session.model);
+  const requestedModel = session.model;
+  const effort = sessionEffort(session.effort);
   await prisma.session.update({ where: { id: session.id }, data: { status: "RUNNING" } });
   publishStatus(session.id, "RUNNING", "Analyzing request…");
 
@@ -181,7 +182,20 @@ export async function executeAgentJob(
     const turnRows = currentTurnRows(priorRows);
     const approvedBlueprintId = approvedBlueprintIdFromRows(turnRows);
     const storedAnalysis = await freshStoredAnalysis(job.analysis, turnRows);
-    log.info("routing analysis", { sessionId: session.id, reused: storedAnalysis !== undefined });
+    const sessionModel = runModelFor({
+      sessionModel: requestedModel,
+      plan: user.plan,
+      profile: "coding",
+      effort,
+      ...(storedAnalysis ? { analysis: storedAnalysis } : {}),
+    });
+    log.info("routing analysis", {
+      sessionId: session.id,
+      reused: storedAnalysis !== undefined,
+      sessionModel: requestedModel,
+      runModel: sessionModel,
+      effort,
+    });
     const planInDetail = await shouldRunBlueprintPath(
       { theme: chosenThemeFromRows(turnRows), approvedBlueprintId, analysis: storedAnalysis, isResume: isResumePrompt(currentTurnText(effectiveRows)) },
       () =>
@@ -200,7 +214,7 @@ export async function executeAgentJob(
           projectId: job.projectId,
           sessionId: session.id,
           worktreeSessionId,
-          model: sessionModel,
+          model: requestedModel,
           credits: user.credits,
           userId,
           userPlan: user.plan,
@@ -211,6 +225,7 @@ export async function executeAgentJob(
           approvedBlueprintId,
           isAutoImageChoice: isAutoImageChoice(turnRows),
           answers: answersFromRows(turnRows),
+          ...autoRouteFields(storedAnalysis, effort),
         })
       : undefined;
 
@@ -270,8 +285,12 @@ export async function executeAgentJob(
           runtime,
           emit,
           budget: {
-            maxIterations: AGENT_LOOP_LIMITS.maxIterations,
-            ...loopSpendLimits(user.credits),
+            ...effortLoopBudget(
+              loopSpendLimits(user.credits),
+              AGENT_LOOP_LIMITS.maxIterations,
+              effort,
+              creditsToUsd(user.credits),
+            ),
             deadline: deadlineAt,
           },
           signal: controller.signal,
@@ -330,7 +349,9 @@ export async function executeAgentJob(
         userId,
         worktreeDir,
         verifyResults,
-        sessionModel,
+        sessionModel: requestedModel,
+        plan: user.plan,
+        effort,
         ...(provider ? { provider } : {}),
         runtime,
         emit,
@@ -341,7 +362,9 @@ export async function executeAgentJob(
       if (review.passed) {
         await runHandoffAgent({
           sessionId: session.id,
-          sessionModel,
+          sessionModel: requestedModel,
+          plan: user.plan,
+          effort,
           worktreeDir,
           memory: memorySection,
           verifyResults,
