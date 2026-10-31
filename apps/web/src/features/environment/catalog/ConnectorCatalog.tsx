@@ -1,9 +1,12 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import type { IntegrationEnvironment } from "@repo/contracts";
+import type { IntegrationCatalogEntry, IntegrationEnvironment } from "@repo/contracts";
+import { pendingPromptStore } from "@/features/agent/pending-prompt";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useIntegrationCatalog } from "../hooks";
+import { ConnectorCard } from "./ConnectorCard";
 import { filterIntegrationCatalog, type CatalogFilter } from "./filter-catalog";
-import { ConnectorIcon } from "./ConnectorIcon";
+import { integrationAgentPrompt } from "./integration-prompt";
 import { IntegrationSetupDialog } from "./IntegrationSetupDialog";
 
 const FILTERS: { id: CatalogFilter; label: string }[] = [
@@ -19,6 +22,11 @@ interface ConnectorCatalogProps {
   projectId: string;
   environment: IntegrationEnvironment;
   initialCategory?: CatalogFilter;
+}
+
+function startIntegration(entry: IntegrationCatalogEntry) {
+  pendingPromptStore.getState().request(integrationAgentPrompt(entry));
+  useWorkspaceStore.getState().setActiveTab("preview");
 }
 
 export function ConnectorCatalog({ projectId, environment, initialCategory = "all" }: ConnectorCatalogProps) {
@@ -40,7 +48,9 @@ export function ConnectorCatalog({ projectId, environment, initialCategory = "al
     <section className="space-y-6" aria-labelledby="connectors-heading">
       <header>
         <h1 id="connectors-heading" className="text-2xl font-bold text-foreground">Connectors</h1>
-        <p className="mt-1 text-sm text-muted">Connect the services your application needs.</p>
+        <p className="mt-1 text-sm text-muted">
+          Integrate sends the agent to add this service. It will ask whether to use the Appwright test key or your own key, then build what the app needs.
+        </p>
       </header>
 
       <label className="relative block max-w-xl">
@@ -64,40 +74,17 @@ export function ConnectorCatalog({ projectId, environment, initialCategory = "al
       ) : null}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {entries.map((entry) => {
-          const configuration = data?.configurations.find(
-            (item) => item.provider === entry.provider && item.environment === environment,
-          );
-          const isConnected = configuration?.status === "connected" || configuration?.status === "verified";
-          const isFailed = configuration?.status === "test_failed" || configuration?.status === "invalid";
-          const status = isConnected
-            ? "Connected"
-            : isFailed
-              ? "Test failed"
-              : configuration?.status === "quota_exhausted"
-                ? "Quota exhausted"
-                : configuration?.status === "production_configuration_required"
-                  ? "Production setup required"
-                  : configuration?.status === "configured"
-                    ? "Configuration saved"
-                    : "Not connected";
-          return (
-            <article key={entry.provider} className="flex min-h-52 flex-col justify-between rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-muted">
-              <div>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="grid size-10 place-items-center rounded-xl bg-surface-2"><ConnectorIcon entry={entry} /></div>
-                  <span className={`rounded-full border px-2 py-1 text-[11px] ${isConnected ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : isFailed ? "border-rose-500/30 bg-rose-500/10 text-rose-300" : "border-border text-muted"}`}>{status}</span>
-                </div>
-                <h2 className="mt-4 text-base font-semibold text-foreground">{entry.name}</h2>
-                <p className="mt-1 text-sm text-muted">{entry.description}</p>
-                <p className="mt-3 text-xs text-muted">{entry.capabilities.join(" · ")}</p>
-              </div>
-              <button type="button" onClick={() => setSelectedProvider(entry.provider)} className="mt-5 self-start rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:border-lime focus-visible:outline-2 focus-visible:outline-lime">
-                {isConnected ? "Configure" : isFailed ? "Reconnect" : configuration ? "Continue setup" : "Add integration"}
-              </button>
-            </article>
-          );
-        })}
+        {entries.map((entry) => (
+          <ConnectorCard
+            key={entry.provider}
+            entry={entry}
+            configuration={data?.configurations.find(
+              (item) => item.provider === entry.provider && item.environment === environment,
+            )}
+            onIntegrate={() => startIntegration(entry)}
+            onConfigure={() => setSelectedProvider(entry.provider)}
+          />
+        ))}
       </div>
 
       {selectedEntry && (

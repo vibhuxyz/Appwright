@@ -25,19 +25,19 @@ export function appNeedsDatabase(
   if (scope.isStatic || facts.exclusions.includes("database")) return false;
   if (EXPLICIT_DATABASE.test(text)) return true;
 
-  const storesWorkflow = workflowsFrom(facts).some(
-    (workflow) => workflow.inScope && STORED_WORKFLOWS.has(workflow.kind),
-  );
-  if (storesWorkflow) return true;
-
-  const browseOnly =
+  const catalogOnly =
     facts.signals.browseOnly ||
     facts.exclusions.includes("ordering") ||
     facts.answered["ordering-mode"] === "Browse only";
+  const storesWorkflow = workflowsFrom(facts).some(
+    (workflow) => workflow.inScope && STORED_WORKFLOWS.has(workflow.kind),
+  );
+  if (!catalogOnly && storesWorkflow) return true;
+
   const wantsAccounts =
     facts.signals.accountsMentioned && !facts.exclusions.includes("accounts");
   const wantsAdmin = facts.signals.adminMentioned && !facts.exclusions.includes("admin");
-  if (browseOnly) return wantsAdmin || wantsAccounts;
+  if (catalogOnly) return wantsAdmin || wantsAccounts;
   if (scope.isSinglePage) return wantsAccounts || wantsAdmin;
   if (wantsAccounts) return true;
   if (facts.signals.paymentsMentioned && !facts.exclusions.includes("ordering")) return true;

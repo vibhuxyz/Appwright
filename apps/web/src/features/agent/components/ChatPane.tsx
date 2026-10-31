@@ -12,6 +12,7 @@ import { isVerificationFailure, stopNoticeDescription } from "../utils/stopNotic
 import { Panel } from "@/shared/components/ui/Panel";
 import { SelectionChip, selectionStore } from "@/features/preview";
 import { PaneComposer, useComposerDraft } from "../composer";
+import { usePendingAgentPrompt } from "../pending-prompt";
 import { MessageList } from "./MessageList";
 import { StopNoticeCard } from "./StopNoticeCard";
 
@@ -41,6 +42,12 @@ export function ChatPane({
   const updateModel = useUpdateSessionModel(projectId);
   const draft = useComposerDraft(running);
   const uploads = useAttachmentUpload(projectId, sessionId);
+  usePendingAgentPrompt({
+    sessionId,
+    isBlocked: running || intake.holdsComposer || intake.isWorking || intake.isSubmitting,
+    send: (prompt) => intake.sendNow(prompt),
+    fillDraft: draft.change,
+  });
 
   const activeStopNotice = useMemo(
     () => deriveActiveStopNotice(liveStopNotice, messages, userCredits),

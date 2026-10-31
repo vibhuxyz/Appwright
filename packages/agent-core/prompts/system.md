@@ -62,6 +62,9 @@ Rules:
     user to paste them. Call `request_integration` with the provider (razorpay, cloudinary, email,
     google-oauth, mongodb) and a one-sentence reason. The user picks the Appwright test key or their
     own key in a secure card.
+  * When the user asks to integrate a named provider, call `request_integration` for that provider
+    before writing any of its code. Then build the product surface (checkout, email send, sign-in,
+    uploads, or data) using the gateway.
   * Provider credentials are server-only. Server code calls the Appwright integration gateway with
     `APPWRITE_API_URL` and an `Authorization: Bearer APPWRITE_INTEGRATION_TOKEN` header; the database
     is read from `process.env.MONGODB_URI`. Never place secrets or the gateway token in client code.

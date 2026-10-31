@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { BlueprintSchema } from "@repo/contracts";
-import { appNeedsDatabase, detectNeeds, resolveRequirements } from "../src";
+import { appNeedsDatabase, detectNeeds, planBlueprint, resolveRequirements } from "../src";
 
 const ARBOR_PROMPT =
   "Build a single-page website for Arbor & Oak, a design-led group in Lisbon with four businesses on one page: an architecture studio, a boutique resort with rooms and booking enquiries, an online furniture collection, and a B2B marketing consultancy. Contact: hello@example.com.";
@@ -44,6 +44,33 @@ describe("single-page briefs", () => {
     const resolved = resolveRequirements({ blueprint: arborBlueprint(), prompt, needs: detectNeeds(prompt), answers });
     expect(resolved.blueprint.pages.map((page) => page.route)).toEqual(["/"]);
     expect(resolved.blueprint.stack.db).toBe("none");
+  });
+
+  it("does not require admin when intake options mention pop-ups but the user chose enquiry-only", () => {
+    const prompt = [
+      ARBOR_PROMPT,
+      "1. Ordering — How do customers work with you?",
+      "   a) Enquiry-only (contact form for all business units)",
+      "   b) Online checkout with modal popups",
+      "   c) Pickup orders",
+    ].join("\n");
+    const answers = {
+      "ordering-mode": "Enquiry-only (contact form for all business units)",
+      plan: "One page only: Home. No login, admin, menu or settings pages and no database.",
+    };
+    const resolved = resolveRequirements({
+      blueprint: arborBlueprint(),
+      prompt,
+      needs: detectNeeds(prompt),
+      answers,
+    });
+    expect(resolved.blueprint.pages.map((page) => page.route)).toEqual(["/"]);
+    expect(resolved.blueprint.stack.db).toBe("none");
+    expect(resolved.blueprint.requirements?.find((requirement) => requirement.area === "admin")?.level).toBe(
+      "not-applicable",
+    );
+    const plan = planBlueprint(resolved.blueprint);
+    expect(plan.ok).toBe(true);
   });
 
   it("keeps multi-page apps that store data unchanged", () => {

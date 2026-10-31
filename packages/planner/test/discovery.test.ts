@@ -104,6 +104,20 @@ describe("bakery discovery", () => {
     expect(workflows.find((workflow) => workflow.kind === "browse-catalog")?.inScope).toBe(true);
   });
 
+  it("does not store pop-ups or admin when the user chose enquiry-only", () => {
+    const prompt = `${BAKERY_FULL}\nOnline checkout with modal popups`;
+    const facts = extractFacts(prompt, {
+      "ordering-mode": "Enquiry-only (contact form for all business units)",
+    });
+    const inScope = workflowsFrom(facts)
+      .filter((workflow) => workflow.inScope)
+      .map((workflow) => workflow.kind);
+    expect(inScope).not.toContain("pickup-order");
+    expect(inScope).not.toContain("pop-up-locations");
+    expect(inScope).not.toContain("custom-request");
+    expect(inScope).not.toContain("admin-operations");
+  });
+
   it("asks payment for pickup orders when payment is unresolved", () => {
     expect(needsOf(BAKERY_PICKUP)).toContain("payment-method");
     expect(needsOf(BAKERY_PICKUP)).not.toContain("custom-workflow");

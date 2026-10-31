@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { lstat, mkdir, rm, unlink } from "node:fs/promises";
+import { mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { $ } from "bun";
 import { resolveSandboxRuntimeEnv } from "@repo/db";
@@ -14,8 +14,13 @@ import { PUBLIC_API_URL } from "../env";
 import { writeProjectRuntimeEnvFile } from "../project-database/write-runtime-env";
 import { captureInstallLogs, captureServerLogs, logSystem } from "../dev-logs";
 import { devServerEnv } from "./dev-server-env";
+import {
+  createSessionWorktree,
+  unlinkNodeModulesSymlink,
+} from "./session-worktree";
 
 export { projectRepoPath, sessionWorktreePath, workspacePath, WORKSPACES_DIR };
+export { createSessionWorktree, unlinkNodeModulesSymlink };
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 const TEMPLATES_DIR = path.join(REPO_ROOT, "templates");
@@ -43,57 +48,6 @@ export async function createWorkspace(
   await initProjectGit(repoDir);
 
   return repoDir;
-}
-
-export async function createSessionWorktree(
-  projectId: string,
-  worktreeSessionId: string,
-): Promise<string> {
-  const repoDir = projectRepoPath(projectId);
-  const worktreeDir = sessionWorktreePath(projectId, worktreeSessionId);
-  const branchName = sessionBranchName(worktreeSessionId);
-
-  if (existsSync(worktreeDir)) {
-    await unlinkNodeModulesSymlink(worktreeDir);
-    return worktreeDir;
-  }
-
-  const branchExists = await $`git -C ${repoDir} rev-parse --verify ${branchName}`
-    .quiet()
-    .then(() => true)
-    .catch(() => false);
-
-  if (branchExists) {
-    await $`git -C ${repoDir} worktree add ${worktreeDir} ${branchName}`.quiet();
-  } else {
-    await $`git -C ${repoDir} worktree add ${worktreeDir} -b ${branchName} main`.quiet();
-  }
-
-  await unlinkNodeModulesSymlink(worktreeDir);
-  return worktreeDir;
-}
-
-function isEnoent(err: unknown): boolean {
-  return (
-    typeof err === "object" &&
-    err !== null &&
-    "code" in err &&
-    err.code === "ENOENT"
-  );
-}
-
-/** Next/Turbopack panics when node_modules is a symlink that leaves the nested git root. */
-export async function unlinkNodeModulesSymlink(dir: string): Promise<void> {
-  const modules = path.join(dir, "node_modules");
-  try {
-    const st = await lstat(modules);
-    if (st.isSymbolicLink()) {
-      await unlink(modules);
-    }
-  } catch (err) {
-    if (isEnoent(err)) return;
-    throw err;
-  }
 }
 
 export async function removeSessionWorktree(

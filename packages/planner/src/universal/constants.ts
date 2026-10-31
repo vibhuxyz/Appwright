@@ -14,6 +14,8 @@ export const BROWSE_ONLY_PATTERNS: readonly RegExp[] = [
   /\b(catalog|informational) only\b/i,
   /\bwithout (online )?(ordering|checkout|payments?)\b/i,
   /\bnot (taking|accepting) (online )?orders\b/i,
+  /\benquir(?:y|ies)[- ]only\b/i,
+  /\bcontact[- ]form (for all|only)\b/i,
 ];
 
 export const SINGLE_PAGE_PATTERNS: readonly RegExp[] = [

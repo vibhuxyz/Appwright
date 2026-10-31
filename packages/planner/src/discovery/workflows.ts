@@ -11,10 +11,19 @@ function workflow(
   return { id: kind, kind, name, inScope, reason, actors, steps };
 }
 
-function ordersInScope(facts: ExtractedFacts): boolean {
-  if (facts.signals.browseOnly || facts.exclusions.includes("ordering")) return false;
+function isCatalogOnly(facts: ExtractedFacts): boolean {
   const mode = facts.answered["ordering-mode"] ?? "";
-  if (mode === "Browse only") return false;
+  return (
+    facts.signals.browseOnly ||
+    facts.exclusions.includes("ordering") ||
+    mode === "Browse only" ||
+    /\benquir(?:y|ies)[- ]only\b/i.test(mode)
+  );
+}
+
+function ordersInScope(facts: ExtractedFacts): boolean {
+  if (isCatalogOnly(facts)) return false;
+  const mode = facts.answered["ordering-mode"] ?? "";
   return facts.signals.ordering || mode.includes("Pickup") || mode.includes("Delivery");
 }
 
@@ -23,13 +32,14 @@ function catalogInScope(facts: ExtractedFacts): boolean {
 }
 
 export function workflowsFrom(facts: ExtractedFacts): WorkflowSpec[] {
+  const catalogOnly = isCatalogOnly(facts);
   const ordering = ordersInScope(facts);
   const pickup = ordering && (facts.signals.pickup || (facts.answered["ordering-mode"] ?? "").includes("Pickup"));
   const delivery = ordering && (facts.signals.delivery || (facts.answered["ordering-mode"] ?? "").includes("Delivery"));
-  const custom = facts.signals.customOrders && !facts.exclusions.includes("custom-orders");
-  const popups = facts.signals.popups && !facts.exclusions.includes("popups");
+  const custom = facts.signals.customOrders && !facts.exclusions.includes("custom-orders") && !catalogOnly;
+  const popups = facts.signals.popups && !facts.exclusions.includes("popups") && !catalogOnly;
   const catalog = catalogInScope(facts);
-  const admin = ordering || custom || popups || facts.signals.bakery;
+  const admin = ordering || custom || popups || (facts.signals.bakery && !catalogOnly);
 
   return [
     workflow(

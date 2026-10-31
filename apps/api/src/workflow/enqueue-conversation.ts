@@ -15,7 +15,7 @@ import {
   type IntakeQuestion,
   type PromptAnswer,
 } from "@repo/planner";
-import { createSessionWorktree } from "../workspace/manager";
+import { ensureSessionWorktree } from "../workspace";
 import { publishMessage } from "../stream/sse";
 import { serializeRow } from "./message-mapper";
 
@@ -131,6 +131,6 @@ export async function enqueueConversation(
   } else if (blueprintId) {
     await persistTurn({ role: "user", type: "text", content: PLAN_APPROVED_AUTO_DESIGN_TEXT, data: { intake: true, ...planChoice } });
   }
-  await createSessionWorktree(projectId, worktreeSessionId);
+  await ensureSessionWorktree(projectId, sessionId, worktreeSessionId);
   return enqueueJob({ sessionId, projectId, analysis });
 }

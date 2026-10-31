@@ -60,7 +60,7 @@ describe("summarizePlan", () => {
 });
 
 describe("planRequestText", () => {
-  it("plans from the prompt, every answer, and the requested changes", () => {
+  it("plans from the prompt, chosen answers, and the requested changes", () => {
     const text = planRequestText({
       prompt: "bakery site",
       answers: { "site-pages": "Home, Menu, Gallery" },
@@ -77,8 +77,34 @@ describe("planRequestText", () => {
       ],
       feedback: "add a cakes page",
     });
-    expect(text).toContain("Which pages should the site have?");
-    expect(text).toContain("Home, Menu, Gallery");
+    expect(text).toContain("site-pages: Home, Menu, Gallery");
     expect(text).toContain("Change the plan: add a cakes page");
+  });
+
+  it("omits unselected options so keyword detectors cannot treat them as requirements", () => {
+    const text = planRequestText({
+      prompt: "single-page site for Arbor & Oak",
+      answers: { "ordering-mode": "Enquiry-only (contact form for all business units)" },
+      questions: [
+        {
+          need: "ordering-mode",
+          text: "How do customers work with you?",
+          label: "Ordering",
+          options: [
+            "Enquiry-only (contact form for all business units)",
+            "Online checkout with modal popups",
+            "Pickup orders",
+          ],
+          defaultOptionIndex: 0,
+          inputType: "single",
+          importance: "required",
+        },
+      ],
+    });
+    expect(text).toContain("ordering-mode: Enquiry-only (contact form for all business units)");
+    expect(text).not.toContain("modal popups");
+    expect(text).not.toContain("Online checkout");
+    expect(text).not.toContain("Pickup orders");
+    expect(text).not.toContain("How do customers work with you?");
   });
 });

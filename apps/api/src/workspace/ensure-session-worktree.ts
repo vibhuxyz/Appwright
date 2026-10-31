@@ -1,6 +1,6 @@
 import { prisma } from "@repo/db";
 import { sessionBranchName } from "@repo/workspace";
-import { createSessionWorktree } from "./manager";
+import { createSessionWorktree } from "./session-worktree";
 
 // D18 — opening a project costs nothing; only sending a message boots a
 // sandbox. createSessionWorktree is a pure filesystem/git primitive with no

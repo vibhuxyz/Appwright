@@ -69,6 +69,31 @@ describe("Git Worktree Workspace Isolation (V2 Slice 1)", () => {
     expect(existsSync(worktreeDir)).toBe(true);
   });
 
+  it("createSessionWorktree is safe under concurrent calls for the same session", async () => {
+    const sessionId = `test-sess-conc-${Date.now()}`;
+    const [first, second] = await Promise.all([
+      createSessionWorktree(testProjectId, sessionId),
+      createSessionWorktree(testProjectId, sessionId),
+    ]);
+    expect(first).toBe(second);
+    expect(existsSync(first)).toBe(true);
+    await removeSessionWorktree(testProjectId, sessionId);
+  });
+
+  it("reattaches a worktree when the branch exists without a directory", async () => {
+    const sessionId = `test-sess-reattach-${Date.now()}`;
+    const wt = sessionWorktreePath(testProjectId, sessionId);
+    await createSessionWorktree(testProjectId, sessionId);
+    await $`git -C ${repoDir} worktree remove --force ${wt}`.quiet();
+    expect(existsSync(wt)).toBe(false);
+
+    const reattached = await createSessionWorktree(testProjectId, sessionId);
+    expect(reattached).toBe(wt);
+    expect(existsSync(wt)).toBe(true);
+
+    await removeSessionWorktree(testProjectId, sessionId);
+  });
+
   it("does not symlink repo node_modules into the session worktree", async () => {
     const sessionId = `test-sess-nm-${Date.now()}`;
     const wt = sessionWorktreePath(testProjectId, sessionId);

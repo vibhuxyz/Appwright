@@ -91,37 +91,37 @@ function collectGoals(prompt: string, signals: DomainSignals): string[] {
   if (signals.bakery) goals.push("Run a bakery with public pages for customers");
   if (signals.ordering && signals.pickup) goals.push("Let customers place pickup orders");
   if (signals.customOrders) goals.push("Take custom cake and event requests");
-  if (signals.popups) goals.push("Operate pop-up locations alongside a storefront");
+  if (signals.popups && !signals.browseOnly) goals.push("Operate pop-up locations alongside a storefront");
   if (signals.todoApp) goals.push("Track personal or shared tasks");
   if (signals.browseOnly) goals.push("Show a catalog without taking orders");
   if (goals.length === 0 && prompt.trim().length > 0) goals.push(prompt.trim().slice(0, 160));
   return clipList(goals, MAX_GOALS);
 }
 
-function detectSignals(prompt: string): DomainSignals {
-  const scope = detectScope(prompt);
+function detectSignals(text: string): DomainSignals {
+  const scope = detectScope(text);
   const browseOnly = scope.isBrowseOnly;
-  const pickup = /\bpickup\b/i.test(prompt);
-  const delivery = ORDER_DELIVERY.test(prompt);
-  const customOrders = /\b(custom cake|event requests?|custom orders?|bespoke)\b/i.test(prompt);
-  const ordering = !browseOnly && (/\border/i.test(prompt) || pickup || delivery || customOrders);
+  const pickup = /\bpickup\b/i.test(text);
+  const delivery = ORDER_DELIVERY.test(text);
+  const customOrders = /\b(custom cake|event requests?|custom orders?|bespoke)\b/i.test(text);
+  const ordering = !browseOnly && (/\border/i.test(text) || pickup || delivery || customOrders);
   return {
-    bakery: /\bbakery|bakeries|patisserie|cake shop\b/i.test(prompt),
-    todoApp: /\b(todo|to-do|task list|task manager)\b/i.test(prompt),
-    commerce: /\b(shop|store|catalog|menu|checkout|cart|orders?)\b/i.test(prompt),
+    bakery: /\bbakery|bakeries|patisserie|cake shop\b/i.test(text),
+    todoApp: /\b(todo|to-do|task list|task manager)\b/i.test(text),
+    commerce: /\b(shop|store|catalog|menu|checkout|cart|orders?)\b/i.test(text),
     browseOnly,
     ordering,
     pickup: ordering && pickup,
     delivery: ordering && delivery,
     customOrders: ordering && customOrders,
-    popups: /\bpop-?ups?\b/i.test(prompt),
-    storefront: /\b(storefront|shopfront|retail (shop|store)|physical (shop|store))\b/i.test(prompt),
-    paymentsMentioned: /\b(pay|payment|checkout|stripe|card)\b/i.test(prompt),
-    accountsMentioned: /\b(account|log ?in|sign ?up|guest)\b/i.test(prompt),
-    adminMentioned: /\b(admin|staff dashboard|back office)\b/i.test(prompt),
+    popups: /\bpop-?ups?\b/i.test(text),
+    storefront: /\b(storefront|shopfront|retail (shop|store)|physical (shop|store))\b/i.test(text),
+    paymentsMentioned: /\b(pay|payment|checkout|stripe|card)\b/i.test(text),
+    accountsMentioned: /\b(account|log ?in|sign ?up|guest)\b/i.test(text),
+    adminMentioned: /\b(admin|staff dashboard|back office)\b/i.test(text),
     singlePage: scope.isSinglePage,
-    existingAdmin: /\b(existing|already have|current) (an )?admin\b/i.test(prompt),
-    existingImages: /\b(existing|our own|brand) (photos?|images?|assets?|logo)\b/i.test(prompt),
+    existingAdmin: /\b(existing|already have|current) (an )?admin\b/i.test(text),
+    existingImages: /\b(existing|our own|brand) (photos?|images?|assets?|logo)\b/i.test(text),
   };
 }
 
@@ -129,8 +129,9 @@ export function extractFacts(
   prompt: string,
   answers: Readonly<Record<string, string>> = {},
 ): ExtractedFacts {
-  const signals = detectSignals(prompt);
-  const exclusions = collectExclusions([prompt, ...Object.values(answers)].join("\n"));
+  const text = [prompt, ...Object.values(answers)].join("\n");
+  const signals = detectSignals(text);
+  const exclusions = collectExclusions(text);
   const answered = collectAnswered(prompt, answers);
   if (exclusions.includes("ordering")) {
     answered["ordering-mode"] = answered["ordering-mode"] ?? "Browse only";

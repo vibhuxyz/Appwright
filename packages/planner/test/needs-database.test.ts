@@ -23,4 +23,16 @@ describe("appNeedsDatabase", () => {
     expect(appNeedsDatabase("Clinic site where patients book appointments")).toBe(true);
     expect(appNeedsDatabase("Build a full stack app for my bakery")).toBe(true);
   });
+
+  it("stays off when the user chose enquiry-only even if unselected options mention pop-ups", () => {
+    const prompt = [
+      "Build a single-page website for Arbor & Oak with booking enquiries.",
+      "1. Ordering — How do customers work with you?",
+      "   a) Enquiry-only (contact form for all business units)",
+      "   b) Online checkout with modal popups",
+      "   c) Pickup orders",
+    ].join("\n");
+    const answers = { "ordering-mode": "Enquiry-only (contact form for all business units)" };
+    expect(appNeedsDatabase(prompt, answers)).toBe(false);
+  });
 });
